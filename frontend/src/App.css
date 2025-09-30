@@ -274,9 +274,65 @@
 }
 
 .concentration-section h3 {
-  margin: 0;
+  margin: 0 0 15px 0;
   font-size: 1.2rem;
   font-weight: 600;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.step-cycle {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.step-cycle h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.step-item {
+  padding: 4px 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.step-placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+.step-group {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.step-group h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.step-cycle strong {
+  display: block;
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* Buttons */
@@ -299,6 +355,15 @@
 .btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-execute {
+  background: #16a34a;
+  color: white;
+}
+
+.btn-execute:hover {
+  background: #15803d;
 }
 
 .btn-delete {
@@ -326,6 +391,69 @@
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-add-step {
+  background: #059669;
+  color: white;
+  margin-top: 10px;
+}
+
+.btn-add-step:hover {
+  background: #047857;
+}
+
+/* Program Section */
+.program-section {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 40px;
+}
+
+.program-section h2 {
+  margin: 0 0 30px 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.program-form {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  max-width: 500px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.form-input {
+  padding: 12px 16px;
+  font-size: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Footer */

@@ -5,6 +5,37 @@ function App() {
   const [activeTab, setActiveTab] = useState('settings')
   const [selectedWell, setSelectedWell] = useState('G3')
 
+  // Program tab state
+  const [cycles, setCycles] = useState(1)
+  const [pickupWell, setPickupWell] = useState('')
+  const [dropoffWell, setDropoffWell] = useState('')
+  const [rinseWell, setRinseWell] = useState('')
+  const [waitTime, setWaitTime] = useState('')
+  const [sampleVolume, setSampleVolume] = useState('')
+  const [steps, setSteps] = useState([])
+
+  const handleAddStep = () => {
+    if (pickupWell) {
+      const newStep = {
+        id: Date.now(),
+        cycles: Number(cycles),
+        pickupWell,
+        dropoffWell,
+        rinseWell,
+        waitTime,
+        sampleVolume
+      }
+      setSteps([...steps, newStep])
+      // Reset form
+      setCycles(1)
+      setPickupWell('')
+      setDropoffWell('')
+      setRinseWell('')
+      setWaitTime('')
+      setSampleVolume('')
+    }
+  }
+
   // Initialize 96-well plate data (8 rows x 12 columns)
   const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
   const columns = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -74,23 +105,99 @@ function App() {
           <span className="nav-icon">☐</span> Protocol
         </button>
         <button
-          className={`nav-tab ${activeTab === 'results' ? 'active' : ''}`}
-          onClick={() => setActiveTab('results')}
+          className={`nav-tab ${activeTab === 'program' ? 'active' : ''}`}
+          onClick={() => setActiveTab('program')}
         >
-          <span className="nav-icon">◇</span> Results
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          <span className="nav-icon">⚙</span> Settings
+          <span className="nav-icon">◇</span> Program
         </button>
         <button className="nav-tab info-btn">ⓘ</button>
       </nav>
 
       <div className="plate-container">
-        {/* Plate Layout Section */}
-        <div className="plate-section">
+        {/* Conditionally render based on active tab */}
+        {activeTab === 'program' ? (
+          /* Program Tab Content */
+          <div className="program-section">
+            <h2>Program Configuration</h2>
+
+            <div className="program-form">
+              <div className="form-group">
+                <label>Cycles:</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={cycles}
+                  onChange={(e) => setCycles(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Pickup Well:</label>
+                <input
+                  type="text"
+                  placeholder="e.g., A1"
+                  value={pickupWell}
+                  onChange={(e) => setPickupWell(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Dropoff Well:</label>
+                <input
+                  type="text"
+                  placeholder="e.g., B2"
+                  value={dropoffWell}
+                  onChange={(e) => setDropoffWell(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Rinse Well:</label>
+                <input
+                  type="text"
+                  placeholder="e.g., C3"
+                  value={rinseWell}
+                  onChange={(e) => setRinseWell(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Wait Time (seconds):</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 5"
+                  value={waitTime}
+                  onChange={(e) => setWaitTime(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Sample Volume (mL):</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  placeholder="e.g., 0.5"
+                  value={sampleVolume}
+                  onChange={(e) => setSampleVolume(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <button className="btn btn-add-step" onClick={handleAddStep}>
+                Add Step
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Plate Layout Section */
+          <div className="plate-section">
           <div className="plate-header">
             <h2>Plate layout</h2>
             <div className="plate-info">
@@ -129,6 +236,7 @@ function App() {
             ))}
           </div>
         </div>
+        )}
 
         {/* Right Panel */}
         <div className="right-panel">
@@ -160,11 +268,45 @@ function App() {
 
           {/* Concentration Section */}
           <div className="concentration-section">
-            <h3>Concentration</h3>
+            <h3>Cycles</h3>
+            {activeTab === 'program' && (
+              <div className="steps-list">
+                {steps.map((step, stepIndex) => (
+                  <div key={step.id} className="step-group">
+                    <h4>Cicle {stepIndex + 1}</h4>
+                    {[...Array(step.cycles)].map((_, cycleIndex) => (
+                      <div key={cycleIndex} className="step-cycle">
+                        {step.pickupWell && (
+                          <div className="step-item">• Pickup from well: {step.pickupWell}</div>
+                        )}
+                        {step.sampleVolume && (
+                          <div className="step-item">• Sample volume: {step.sampleVolume} mL</div>
+                        )}
+                        {step.dropoffWell && (
+                          <div className="step-item">• Dropoff to well: {step.dropoffWell}</div>
+                        )}
+                        {step.rinseWell && (
+                          <div className="step-item">• Rinse at well: {step.rinseWell}</div>
+                        )}
+                        {step.waitTime && (
+                          <div className="step-item">• Wait: {step.waitTime}s</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {steps.length === 0 && (
+                  <div className="step-placeholder">Add steps to see program</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
           <div className="action-buttons">
+            <button className="btn btn-execute">
+              Execute
+            </button>
             <button className="btn btn-delete" onClick={handleDeleteAll}>
               Delete all
             </button>
