@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -6,10 +6,13 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from contextlib import asynccontextmanager
 from pathlib import Path
+import threading
 from pipetting_controller import PipettingController, PipettingStep
 
 # Global pipetting controller instance
 pipetting_controller: Optional[PipettingController] = None
+execution_lock = threading.Lock()
+is_executing = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,6 +84,17 @@ async def create_item(item: Item):
     return {"id": 3, **item.model_dump()}
 
 # Pipetting API endpoints
+def run_pipetting_sequence(pipetting_steps: List[PipettingStep]):
+    """Background task to run pipetting sequence"""
+    global is_executing
+    try:
+        is_executing = True
+        pipetting_controller.execute_sequence(pipetting_steps)
+    except Exception as e:
+        print(f"Error during execution: {e}")
+    finally:
+        is_executing = False
+
 @app.post("/api/pipetting/execute", response_model=PipettingResponse)
 async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
     """
@@ -100,10 +114,18 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
         ]
     }
     """
+    global is_executing
+
     if pipetting_controller is None:
         raise HTTPException(
             status_code=503,
             detail="Pipetting controller not initialized"
+        )
+
+    if is_executing:
+        raise HTTPException(
+            status_code=409,
+            detail="Another sequence is already executing"
         )
 
     try:
@@ -119,14 +141,14 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
                 cycles=step.cycles
             ))
 
-        # Execute sequence in background to avoid blocking
-        # For now, we'll run it synchronously
-        # In production, consider using background tasks
-        pipetting_controller.execute_sequence(pipetting_steps)
+        # Run in background thread so status endpoint can respond
+        thread = threading.Thread(target=run_pipetting_sequence, args=(pipetting_steps,))
+        thread.daemon = True
+        thread.start()
 
         return PipettingResponse(
             status="success",
-            message=f"Successfully executed {len(pipetting_steps)} step(s)",
+            message=f"Started execution of {len(pipetting_steps)} step(s)",
             steps_executed=len(pipetting_steps)
         )
 
@@ -141,6 +163,8 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
 @app.post("/api/pipetting/stop")
 async def stop_pipetting_execution():
     """Stop the current pipetting execution"""
+    global is_executing
+
     if pipetting_controller is None:
         raise HTTPException(
             status_code=503,
@@ -149,7 +173,8 @@ async def stop_pipetting_execution():
 
     try:
         pipetting_controller.stop()
-        return {"status": "success", "message": "Execution stopped successfully"}
+        # Note: is_executing will be set to False by the background thread when it finishes
+        return {"status": "success", "message": "Stop requested - execution will halt after current operation"}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -177,11 +202,14 @@ async def home_pipetting_system():
 @app.get("/api/pipetting/status")
 async def get_pipetting_status():
     """Get current status of pipetting system"""
+    global is_executing
+
     if pipetting_controller is None:
         return {
             "initialized": False,
             "message": "Controller not initialized",
-            "current_well": None
+            "current_well": None,
+            "is_executing": False
         }
 
     try:
@@ -195,13 +223,41 @@ async def get_pipetting_status():
                 "z": position.z
             },
             "current_well": current_well,
-            "message": "System ready"
+            "is_executing": is_executing,
+            "message": "Executing" if is_executing else "System ready"
         }
     except Exception as e:
         return {
             "initialized": False,
             "message": f"Error: {str(e)}",
-            "current_well": None
+            "current_well": None,
+            "is_executing": False
+        }
+
+@app.get("/api/pipetting/logs")
+async def get_pipetting_logs(last_n: int = 50):
+    """
+    Get recent log messages from pipetting controller
+
+    Args:
+        last_n: Number of recent log messages to retrieve (default: 50)
+    """
+    if pipetting_controller is None:
+        return {
+            "logs": [],
+            "message": "Controller not initialized"
+        }
+
+    try:
+        logs = pipetting_controller.get_logs(last_n)
+        return {
+            "logs": logs,
+            "count": len(logs)
+        }
+    except Exception as e:
+        return {
+            "logs": [],
+            "message": f"Error fetching logs: {str(e)}"
         }
 
 # Mount static files for frontend (serve built React app or dev version)

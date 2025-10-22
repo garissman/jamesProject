@@ -213,6 +213,46 @@
     line-height: 1.2;
 }
 
+.logs-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 15px;
+    max-height: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.logs-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.logs-viewer {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    max-height: 200px;
+}
+
+.log-entry {
+    padding: 2px 0;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-placeholder {
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+}
+
 .concentration-section {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 15px;
@@ -402,6 +442,39 @@
 
 .btn-add-step:hover {
     background: #047857;
+}
+
+.program-file-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-save-program,
+.btn-load-program {
+    background: #8b5cf6;
+    color: white;
+    flex: 1;
+    cursor: pointer;
+}
+
+.btn-save-program:hover,
+.btn-load-program:hover {
+    background: #7c3aed;
+}
+
+.btn-save-program:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.btn-save-program:disabled:hover {
+    background: #6b7280;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Program Section */

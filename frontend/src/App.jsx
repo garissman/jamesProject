@@ -14,6 +14,8 @@ function App() {
     const [sampleVolume, setSampleVolume] = useState('')
     const [steps, setSteps] = useState([])
     const [isExecuting, setIsExecuting] = useState(false)
+    const [systemStatus, setSystemStatus] = useState('Connecting...')
+    const [logs, setLogs] = useState([])
 
     const handleAddStep = () => {
         if (pickupWell) {
@@ -91,11 +93,72 @@ function App() {
         setWellData({})
     }
 
+    const handleSaveProgram = () => {
+        if (steps.length === 0) {
+            alert('No program steps to save.')
+            return
+        }
+
+        // Create JSON file with program data
+        const programData = {
+            version: "1.0",
+            created: new Date().toISOString(),
+            steps: steps
+        }
+
+        const jsonString = JSON.stringify(programData, null, 2)
+        const blob = new Blob([jsonString], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+
+        // Create download link
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `pipetting_program_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        alert(`Program saved with ${steps.length} step(s)`)
+    }
+
+    const handleLoadProgram = (event) => {
+        const file = event.target.files[0]
+        if (!file) return
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            try {
+                const programData = JSON.parse(e.target.result)
+
+                // Validate the program data
+                if (!programData.steps || !Array.isArray(programData.steps)) {
+                    alert('Invalid program file format')
+                    return
+                }
+
+                // Load the steps
+                setSteps(programData.steps)
+                alert(`Program loaded successfully with ${programData.steps.length} step(s)`)
+
+                // Clear the file input so the same file can be loaded again if needed
+                event.target.value = null
+            } catch (error) {
+                alert(`Error loading program: ${error.message}`)
+            }
+        }
+
+        reader.readAsText(file)
+    }
+
     const handleExecute = async () => {
         if (steps.length === 0) {
             alert('No steps to execute. Please add steps first.')
             return
         }
+
+        // Switch to plate layout tab to show real-time position
+        setActiveTab('protocol')
 
         setIsExecuting(true)
 
@@ -183,30 +246,76 @@ function App() {
             const data = await response.json()
 
             if (data.initialized && data.current_well) {
+                console.log('Current well position:', data.current_well)
                 setSelectedWell(data.current_well)
+                setSystemStatus(data.message || 'System ready')
+
+                // Update isExecuting state from backend
+                if (data.is_executing !== undefined) {
+                    setIsExecuting(data.is_executing)
+                }
+            } else {
+                console.log('No position data available:', data)
+                setSystemStatus(data.message || 'System not ready')
             }
         } catch (error) {
             console.error('Failed to fetch current position:', error)
+            setSystemStatus('Backend offline')
         }
     }
 
-    // Fetch current position on component mount
+    const fetchLogs = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/pipetting/logs?last_n=100')
+            const data = await response.json()
+
+            if (data.logs) {
+                setLogs(data.logs)
+            }
+        } catch (error) {
+            console.error('Failed to fetch logs:', error)
+        }
+    }
+
+    // Fetch current position on component mount and poll regularly
     useEffect(() => {
+        // Initial fetch
         fetchCurrentPosition()
+
+        // Poll every 1 second to keep UI in sync with backend
+        const interval = setInterval(() => {
+            fetchCurrentPosition()
+        }, 1000) // Poll every second
+
+        return () => clearInterval(interval)
     }, [])
 
-    // Poll for position updates during execution
+    // Increase polling frequency during execution
     useEffect(() => {
         let interval
         if (isExecuting) {
             interval = setInterval(() => {
                 fetchCurrentPosition()
-            }, 500) // Poll every 500ms during execution
+                fetchLogs() // Also fetch logs during execution
+            }, 300) // Poll every 300ms during execution for smooth updates
         }
         return () => {
             if (interval) clearInterval(interval)
         }
     }, [isExecuting])
+
+    // Poll logs regularly
+    useEffect(() => {
+        // Initial fetch
+        fetchLogs()
+
+        // Poll every 2 seconds
+        const interval = setInterval(() => {
+            fetchLogs()
+        }, 2000)
+
+        return () => clearInterval(interval)
+    }, [])
 
     return (
         <div className="App">
@@ -307,6 +416,25 @@ function App() {
                             <button className="btn btn-add-step" onClick={handleAddStep}>
                                 Add Step
                             </button>
+
+                            <div className="program-file-actions">
+                                <button
+                                    className="btn btn-save-program"
+                                    onClick={handleSaveProgram}
+                                    disabled={steps.length === 0}
+                                >
+                                    Save Program
+                                </button>
+                                <label className="btn btn-load-program">
+                                    Load Program
+                                    <input
+                                        type="file"
+                                        accept=".json"
+                                        onChange={handleLoadProgram}
+                                        style={{display: 'none'}}
+                                    />
+                                </label>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -315,8 +443,8 @@ function App() {
                         <div className="plate-header">
                             <h2>Plate layout</h2>
                             <div className="plate-info">
-                                <span>Well: {selectedWell}</span>
-                                <span>Plate: 96 wells</span>
+                                <span>Position: {selectedWell}</span>
+                                <span>Status: {systemStatus}</span>
                             </div>
                         </div>
 
@@ -353,10 +481,26 @@ function App() {
 
                 {/* Right Panel */}
                 <div className="right-panel">
+                    {/* Logs Section */}
+                    <div className="logs-section">
+                        <h3>System Logs</h3>
+                        <div className="logs-viewer">
+                            {logs.length > 0 ? (
+                                logs.map((log, index) => (
+                                    <div key={index} className="log-entry">
+                                        {log}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="log-placeholder">No logs available</div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Concentration Section */}
-                    <div className="concentration-section">
-                        <h3>Cycles</h3>
-                        {activeTab === 'program' && (
+                    {activeTab === 'program' && (
+                        <div className="concentration-section">
+                            <h3>Cycles</h3>
                             <div className="steps-list">
                                 {steps.map((step, stepIndex) => (
                                     <div key={step.id} className="step-group">
@@ -389,8 +533,8 @@ function App() {
                                     <div className="step-placeholder">Add steps to see program</div>
                                 )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="action-buttons">

@@ -4,6 +4,8 @@ Handles coordinate mapping and pipetting workflows
 """
 
 import time
+import json
+from pathlib import Path
 from typing import Tuple, Optional
 from dataclasses import dataclass
 from stepper_control import StepperController, Direction
@@ -168,13 +170,78 @@ class PipettingController:
     TRAVEL_SPEED = 0.001  # Fast movement delay (seconds between steps)
     PIPETTE_SPEED = 0.002  # Slower for pipetting operations
 
+    # Position persistence
+    POSITION_FILE = Path(__file__).parent / "pipette_position.json"
+
     def __init__(self):
         """Initialize the pipetting controller"""
         self.stepper_controller = StepperController()
         self.mapper = CoordinateMapper()
-        self.current_position = WellCoordinates(x=0, y=0, z=0)
         self.stop_requested = False
-        print("Pipetting controller initialized")
+        self.log_buffer = []  # Store log messages for UI display
+        self.max_logs = 100   # Maximum number of logs to keep
+
+        # Load last known position or default to home (A1)
+        self.current_position = self.load_position()
+        self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
+
+    def log(self, message: str):
+        """Log a message to both console and buffer for UI display"""
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {message}"
+
+        # Print to console
+        print(log_entry)
+
+        # Add to buffer
+        self.log_buffer.append(log_entry)
+
+        # Keep buffer size limited
+        if len(self.log_buffer) > self.max_logs:
+            self.log_buffer.pop(0)
+
+    def get_logs(self, last_n: int = 50) -> list:
+        """Get the last N log messages"""
+        return self.log_buffer[-last_n:] if self.log_buffer else []
+
+    def clear_logs(self):
+        """Clear the log buffer"""
+        self.log_buffer.clear()
+
+    def save_position(self):
+        """Save current position to file for recovery after interruption"""
+        try:
+            position_data = {
+                "x": self.current_position.x,
+                "y": self.current_position.y,
+                "z": self.current_position.z,
+                "well": self.get_current_well()
+            }
+            with open(self.POSITION_FILE, 'w') as f:
+                json.dump(position_data, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save position to file: {e}")
+
+    def load_position(self) -> WellCoordinates:
+        """Load last known position from file"""
+        try:
+            if self.POSITION_FILE.exists():
+                with open(self.POSITION_FILE, 'r') as f:
+                    position_data = json.load(f)
+                # Note: can't use self.log here as it's called before __init__ completes
+                print(f"Loaded last position from file: {position_data.get('well', 'Unknown')}")
+                return WellCoordinates(
+                    x=position_data.get('x', 0.0),
+                    y=position_data.get('y', 0.0),
+                    z=position_data.get('z', 0.0)
+                )
+        except Exception as e:
+            print(f"Warning: Could not load position from file: {e}")
+
+        # Default to home position (A1)
+        print("Using default home position (A1)")
+        return WellCoordinates(x=0.0, y=0.0, z=0.0)
 
     def move_to_well(self, well_id: str, z_offset: float = 0.0):
         """
@@ -184,7 +251,7 @@ class PipettingController:
             well_id: Well identifier (e.g., 'A12')
             z_offset: Additional Z offset in mm (negative goes down)
         """
-        print(f"Moving to well {well_id}...")
+        self.log(f"Moving to well {well_id}...")
 
         # Get target coordinates
         target_coords = self.mapper.well_to_coordinates(well_id)
@@ -224,7 +291,10 @@ class PipettingController:
 
         # Update current position
         self.current_position = target_coords
-        print(f"  Arrived at {well_id} (X={target_coords.x:.1f}, Y={target_coords.y:.1f}, Z={target_coords.z:.1f})")
+        self.log(f"  Arrived at {well_id} (X={target_coords.x:.1f}, Y={target_coords.y:.1f}, Z={target_coords.z:.1f})")
+
+        # Save position to file for recovery
+        self.save_position()
 
     def aspirate(self, volume_ml: float):
         """
@@ -233,7 +303,7 @@ class PipettingController:
         Args:
             volume_ml: Volume to aspirate in mL
         """
-        print(f"  Aspirating {volume_ml} mL...")
+        self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
@@ -245,7 +315,7 @@ class PipettingController:
         Args:
             volume_ml: Volume to dispense in mL
         """
-        print(f"  Dispensing {volume_ml} mL...")
+        self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
@@ -257,7 +327,7 @@ class PipettingController:
         Args:
             rinse_well: Well ID containing rinse solution
         """
-        print(f"  Rinsing in well {rinse_well}...")
+        self.log(f"  Rinsing in well {rinse_well}...")
         for i in range(self.RINSE_CYCLES):
             # Move to rinse well
             self.move_to_well(rinse_well, -self.PICKUP_DEPTH)
@@ -282,7 +352,7 @@ class PipettingController:
             volume_ml: Volume to transfer in mL
             rinse_well: Optional well for rinsing after transfer
         """
-        print(f"\nTransfer: {pickup_well} -> {dropoff_well} ({volume_ml} mL)")
+        self.log(f"Transfer: {pickup_well} -> {dropoff_well} ({volume_ml} mL)")
 
         # Move to pickup well and aspirate
         self.move_to_well(pickup_well, -self.PICKUP_DEPTH)
@@ -312,35 +382,35 @@ class PipettingController:
         # Reset stop flag at the start
         self.stop_requested = False
 
-        print(f"\n{'='*60}")
-        print(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
-        print(f"{'='*60}")
+        self.log("="*60)
+        self.log(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
+        self.log("="*60)
 
         for step_num, step in enumerate(steps, 1):
             # Check for stop request
             if self.stop_requested:
-                print(f"\n{'='*60}")
-                print("EXECUTION STOPPED BY USER")
-                print(f"Completed {step_num - 1} of {len(steps)} steps")
-                print(f"{'='*60}\n")
+                self.log("="*60)
+                self.log("EXECUTION STOPPED BY USER")
+                self.log(f"Completed {step_num - 1} of {len(steps)} steps")
+                self.log("="*60)
                 self.stop_requested = False
                 return
 
-            print(f"\n--- Step {step_num}/{len(steps)} ---")
-            print(f"Cycles: {step.cycles}")
+            self.log(f"--- Step {step_num}/{len(steps)} ---")
+            self.log(f"Cycles: {step.cycles}")
 
             for cycle in range(step.cycles):
                 # Check for stop request during cycles
                 if self.stop_requested:
-                    print(f"\n{'='*60}")
-                    print("EXECUTION STOPPED BY USER")
-                    print(f"Stopped at step {step_num}, cycle {cycle + 1}")
-                    print(f"{'='*60}\n")
+                    self.log("="*60)
+                    self.log("EXECUTION STOPPED BY USER")
+                    self.log(f"Stopped at step {step_num}, cycle {cycle + 1}")
+                    self.log("="*60)
                     self.stop_requested = False
                     return
 
                 if step.cycles > 1:
-                    print(f"\n  Cycle {cycle + 1}/{step.cycles}")
+                    self.log(f"  Cycle {cycle + 1}/{step.cycles}")
 
                 # Execute transfer
                 self.execute_transfer(
@@ -352,27 +422,27 @@ class PipettingController:
 
                 # Wait between cycles
                 if step.wait_time > 0 and cycle < step.cycles - 1:
-                    print(f"  Waiting {step.wait_time} seconds...")
+                    self.log(f"  Waiting {step.wait_time} seconds...")
                     time.sleep(step.wait_time)
 
             # Wait before next step
             if step.wait_time > 0 and step_num < len(steps):
-                print(f"  Waiting {step.wait_time} seconds before next step...")
+                self.log(f"  Waiting {step.wait_time} seconds before next step...")
                 time.sleep(step.wait_time)
 
-        print(f"\n{'='*60}")
-        print("SEQUENCE COMPLETE")
-        print(f"{'='*60}\n")
+        self.log("="*60)
+        self.log("SEQUENCE COMPLETE")
+        self.log("="*60)
 
     def stop(self):
         """Request to stop the current execution"""
-        print("Stop requested...")
+        self.log("Stop requested...")
         self.stop_requested = True
         self.stepper_controller.stop_all()
 
     def home(self):
         """Return to home position (well A1)"""
-        print("Returning to home position (well A1)...")
+        self.log("Returning to home position (well A1)...")
 
         # First, raise Z to safe height if needed
         if self.current_position.z < 0:
@@ -384,7 +454,8 @@ class PipettingController:
 
         # Reset position tracking
         self.current_position = WellCoordinates(x=0, y=0, z=0)
-        print("Home position reached (A1)")
+        self.save_position()
+        self.log("Home position reached (A1)")
 
     def get_current_well(self) -> Optional[str]:
         """

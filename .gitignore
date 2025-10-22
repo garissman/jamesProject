@@ -19,3 +19,6 @@ dist/
 .idea/
 *.swp
 *.swo
+
+# Pipetting system state
+pipette_position.json
