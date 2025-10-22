@@ -1,0 +1,429 @@
+"""
+Pipetting Controller for Laboratory Sampler
+Handles coordinate mapping and pipetting workflows
+"""
+
+import time
+from typing import Tuple, Optional
+from dataclasses import dataclass
+from stepper_control import StepperController, Direction
+
+
+@dataclass
+class WellCoordinates:
+    """Physical coordinates for a well position"""
+    x: float  # mm from origin
+    y: float  # mm from origin
+    z: float  # mm depth (0 = top of well)
+
+
+@dataclass
+class PipettingStep:
+    """Single step in a pipetting sequence"""
+    pickup_well: str
+    dropoff_well: str
+    rinse_well: Optional[str]
+    volume_ml: float
+    wait_time: int
+    cycles: int = 1
+
+
+class CoordinateMapper:
+    """Maps well positions to physical coordinates"""
+
+    # Well plate configuration from CLAUDE.md
+    ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    COLUMNS = list(range(1, 13))  # 1-12
+
+    # Physical dimensions
+    WELL_SPACING = 4.0  # mm between wells
+    WELL_DIAMETER = 8.0  # mm
+    WELL_HEIGHT = 14.0  # mm
+
+    # Motor configuration (steps per mm - adjust based on your stepper setup)
+    STEPS_PER_MM_X = 100  # Adjust based on calibration
+    STEPS_PER_MM_Y = 100  # Adjust based on calibration
+    STEPS_PER_MM_Z = 100  # Adjust based on calibration
+
+    # Origin offset (position of well A1)
+    ORIGIN_X = 0.0  # mm
+    ORIGIN_Y = 0.0  # mm
+
+    @staticmethod
+    def coordinates_to_well(coords: WellCoordinates) -> Optional[str]:
+        """
+        Convert physical coordinates back to well ID
+
+        Args:
+            coords: WellCoordinates with x, y position
+
+        Returns:
+            Well ID (e.g., 'A1') or None if not at a well position
+        """
+        # Calculate which column based on X coordinate
+        x_offset = coords.x - CoordinateMapper.ORIGIN_X
+        well_pitch_x = CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING
+        column_index = round(x_offset / well_pitch_x)
+
+        # Calculate which row based on Y coordinate
+        y_offset = coords.y - CoordinateMapper.ORIGIN_Y
+        well_pitch_y = CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING
+        row_index = round(y_offset / well_pitch_y)
+
+        # Validate indices are within bounds
+        if 0 <= row_index < len(CoordinateMapper.ROWS) and 0 <= column_index < len(CoordinateMapper.COLUMNS):
+            row = CoordinateMapper.ROWS[row_index]
+            column = CoordinateMapper.COLUMNS[column_index]
+            return f"{row}{column}"
+
+        return None
+
+    @staticmethod
+    def parse_well(well_id: str) -> Tuple[str, int]:
+        """
+        Parse well identifier into row and column
+
+        Args:
+            well_id: Well identifier (e.g., 'A12', 'H1')
+
+        Returns:
+            Tuple of (row, column)
+        """
+        if not well_id or len(well_id) < 2:
+            raise ValueError(f"Invalid well ID: {well_id}")
+
+        row = well_id[0].upper()
+        try:
+            column = int(well_id[1:])
+        except ValueError:
+            raise ValueError(f"Invalid column in well ID: {well_id}")
+
+        if row not in CoordinateMapper.ROWS:
+            raise ValueError(f"Invalid row '{row}'. Must be A-H")
+        if column not in CoordinateMapper.COLUMNS:
+            raise ValueError(f"Invalid column {column}. Must be 1-12")
+
+        return row, column
+
+    @staticmethod
+    def well_to_coordinates(well_id: str) -> WellCoordinates:
+        """
+        Convert well ID to physical coordinates
+
+        Args:
+            well_id: Well identifier (e.g., 'A12')
+
+        Returns:
+            WellCoordinates with x, y, z positions
+        """
+        row, column = CoordinateMapper.parse_well(well_id)
+
+        # Calculate row index (A=0, B=1, etc.)
+        row_index = CoordinateMapper.ROWS.index(row)
+
+        # Calculate column index (1=0, 2=1, etc.)
+        column_index = column - 1
+
+        # Calculate physical coordinates
+        # X increases with column number
+        x = CoordinateMapper.ORIGIN_X + (column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+
+        # Y increases with row letter (A to H)
+        y = CoordinateMapper.ORIGIN_Y + (row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+
+        # Z is at top of well (0), adjust during pipetting
+        z = 0.0
+
+        return WellCoordinates(x=x, y=y, z=z)
+
+    @staticmethod
+    def coordinates_to_steps(coords: WellCoordinates) -> Tuple[int, int, int]:
+        """
+        Convert physical coordinates to motor steps
+
+        Args:
+            coords: WellCoordinates
+
+        Returns:
+            Tuple of (x_steps, y_steps, z_steps)
+        """
+        x_steps = int(coords.x * CoordinateMapper.STEPS_PER_MM_X)
+        y_steps = int(coords.y * CoordinateMapper.STEPS_PER_MM_Y)
+        z_steps = int(coords.z * CoordinateMapper.STEPS_PER_MM_Z)
+
+        return x_steps, y_steps, z_steps
+
+
+class PipettingController:
+    """High-level controller for pipetting operations"""
+
+    # Pipette parameters
+    PIPETTE_STEPS_PER_ML = 1000  # Steps to aspirate/dispense 1mL (adjust based on syringe)
+    PICKUP_DEPTH = 10.0  # mm to descend into well for pickup
+    DROPOFF_DEPTH = 5.0  # mm to descend into well for dropoff
+    SAFE_HEIGHT = 20.0   # mm above well for travel
+    RINSE_CYCLES = 3     # Number of rinse cycles
+
+    # Movement speeds
+    TRAVEL_SPEED = 0.001  # Fast movement delay (seconds between steps)
+    PIPETTE_SPEED = 0.002  # Slower for pipetting operations
+
+    def __init__(self):
+        """Initialize the pipetting controller"""
+        self.stepper_controller = StepperController()
+        self.mapper = CoordinateMapper()
+        self.current_position = WellCoordinates(x=0, y=0, z=0)
+        self.stop_requested = False
+        print("Pipetting controller initialized")
+
+    def move_to_well(self, well_id: str, z_offset: float = 0.0):
+        """
+        Move to a specific well position
+
+        Args:
+            well_id: Well identifier (e.g., 'A12')
+            z_offset: Additional Z offset in mm (negative goes down)
+        """
+        print(f"Moving to well {well_id}...")
+
+        # Get target coordinates
+        target_coords = self.mapper.well_to_coordinates(well_id)
+        target_coords.z += z_offset
+
+        # Convert to steps
+        target_steps = self.mapper.coordinates_to_steps(target_coords)
+        current_steps = self.mapper.coordinates_to_steps(self.current_position)
+
+        # Calculate relative movements
+        x_delta = target_steps[0] - current_steps[0]
+        y_delta = target_steps[1] - current_steps[1]
+        z_delta = target_steps[2] - current_steps[2]
+
+        # Move Z up to safe height first (if moving down)
+        if z_delta < 0:
+            safe_z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
+            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+
+        # Move X and Y
+        if x_delta != 0:
+            direction = Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE
+            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
+
+        if y_delta != 0:
+            direction = Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE
+            self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED)
+
+        # Move Z to target position
+        if z_delta != 0:
+            # Account for safe height movement
+            if z_delta < 0:
+                total_z = abs(z_delta) + int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
+                self.stepper_controller.move_motor(3, total_z, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            else:
+                self.stepper_controller.move_motor(3, abs(z_delta), Direction.CLOCKWISE, self.TRAVEL_SPEED)
+
+        # Update current position
+        self.current_position = target_coords
+        print(f"  Arrived at {well_id} (X={target_coords.x:.1f}, Y={target_coords.y:.1f}, Z={target_coords.z:.1f})")
+
+    def aspirate(self, volume_ml: float):
+        """
+        Aspirate liquid into pipette
+
+        Args:
+            volume_ml: Volume to aspirate in mL
+        """
+        print(f"  Aspirating {volume_ml} mL...")
+        steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
+        self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, self.PIPETTE_SPEED)
+        time.sleep(0.5)  # Allow liquid to settle
+
+    def dispense(self, volume_ml: float):
+        """
+        Dispense liquid from pipette
+
+        Args:
+            volume_ml: Volume to dispense in mL
+        """
+        print(f"  Dispensing {volume_ml} mL...")
+        steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
+        self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, self.PIPETTE_SPEED)
+        time.sleep(0.5)  # Allow liquid to settle
+
+    def rinse(self, rinse_well: str):
+        """
+        Rinse the pipette tip
+
+        Args:
+            rinse_well: Well ID containing rinse solution
+        """
+        print(f"  Rinsing in well {rinse_well}...")
+        for i in range(self.RINSE_CYCLES):
+            # Move to rinse well
+            self.move_to_well(rinse_well, -self.PICKUP_DEPTH)
+
+            # Aspirate rinse solution
+            self.aspirate(0.5)  # Use half volume for rinsing
+
+            # Dispense
+            self.dispense(0.5)
+
+        # Move back up
+        self.move_to_well(rinse_well, 0)
+
+    def execute_transfer(self, pickup_well: str, dropoff_well: str,
+                        volume_ml: float, rinse_well: Optional[str] = None):
+        """
+        Execute a single liquid transfer
+
+        Args:
+            pickup_well: Source well ID
+            dropoff_well: Destination well ID
+            volume_ml: Volume to transfer in mL
+            rinse_well: Optional well for rinsing after transfer
+        """
+        print(f"\nTransfer: {pickup_well} -> {dropoff_well} ({volume_ml} mL)")
+
+        # Move to pickup well and aspirate
+        self.move_to_well(pickup_well, -self.PICKUP_DEPTH)
+        self.aspirate(volume_ml)
+
+        # Raise pipette
+        self.move_to_well(pickup_well, 0)
+
+        # Move to dropoff well and dispense
+        self.move_to_well(dropoff_well, -self.DROPOFF_DEPTH)
+        self.dispense(volume_ml)
+
+        # Raise pipette
+        self.move_to_well(dropoff_well, 0)
+
+        # Rinse if specified
+        if rinse_well:
+            self.rinse(rinse_well)
+
+    def execute_sequence(self, steps: list[PipettingStep]):
+        """
+        Execute a complete pipetting sequence
+
+        Args:
+            steps: List of PipettingStep objects
+        """
+        # Reset stop flag at the start
+        self.stop_requested = False
+
+        print(f"\n{'='*60}")
+        print(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
+        print(f"{'='*60}")
+
+        for step_num, step in enumerate(steps, 1):
+            # Check for stop request
+            if self.stop_requested:
+                print(f"\n{'='*60}")
+                print("EXECUTION STOPPED BY USER")
+                print(f"Completed {step_num - 1} of {len(steps)} steps")
+                print(f"{'='*60}\n")
+                self.stop_requested = False
+                return
+
+            print(f"\n--- Step {step_num}/{len(steps)} ---")
+            print(f"Cycles: {step.cycles}")
+
+            for cycle in range(step.cycles):
+                # Check for stop request during cycles
+                if self.stop_requested:
+                    print(f"\n{'='*60}")
+                    print("EXECUTION STOPPED BY USER")
+                    print(f"Stopped at step {step_num}, cycle {cycle + 1}")
+                    print(f"{'='*60}\n")
+                    self.stop_requested = False
+                    return
+
+                if step.cycles > 1:
+                    print(f"\n  Cycle {cycle + 1}/{step.cycles}")
+
+                # Execute transfer
+                self.execute_transfer(
+                    step.pickup_well,
+                    step.dropoff_well,
+                    step.volume_ml,
+                    step.rinse_well
+                )
+
+                # Wait between cycles
+                if step.wait_time > 0 and cycle < step.cycles - 1:
+                    print(f"  Waiting {step.wait_time} seconds...")
+                    time.sleep(step.wait_time)
+
+            # Wait before next step
+            if step.wait_time > 0 and step_num < len(steps):
+                print(f"  Waiting {step.wait_time} seconds before next step...")
+                time.sleep(step.wait_time)
+
+        print(f"\n{'='*60}")
+        print("SEQUENCE COMPLETE")
+        print(f"{'='*60}\n")
+
+    def stop(self):
+        """Request to stop the current execution"""
+        print("Stop requested...")
+        self.stop_requested = True
+        self.stepper_controller.stop_all()
+
+    def home(self):
+        """Return to home position (well A1)"""
+        print("Returning to home position (well A1)...")
+
+        # First, raise Z to safe height if needed
+        if self.current_position.z < 0:
+            safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
+            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+
+        # Move to well A1 (home position)
+        self.move_to_well("A1", 0)
+
+        # Reset position tracking
+        self.current_position = WellCoordinates(x=0, y=0, z=0)
+        print("Home position reached (A1)")
+
+    def get_current_well(self) -> Optional[str]:
+        """
+        Get the current well position of the pipette/gripper
+
+        Returns:
+            Well ID (e.g., 'A1') or None if not at a well
+        """
+        return self.mapper.coordinates_to_well(self.current_position)
+
+    def cleanup(self):
+        """Clean up resources"""
+        self.stepper_controller.cleanup()
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create controller
+    controller = PipettingController()
+
+    try:
+        # Example: Transfer from A12 to A15
+        step = PipettingStep(
+            pickup_well="A12",
+            dropoff_well="B3",
+            rinse_well="H12",
+            volume_ml=1.0,
+            wait_time=2,
+            cycles=1
+        )
+
+        controller.execute_sequence([step])
+
+        # Return home
+        controller.home()
+
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        controller.cleanup()
