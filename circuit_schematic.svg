@@ -1,0 +1,454 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1150">
+  <!-- Define gradients and filters -->
+  <defs>
+    <!-- Pi board gradient -->
+    <linearGradient id="piGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2E7D32;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1B5E20;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Driver gradients -->
+    <linearGradient id="driver1Gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6F00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E65100;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="driver2Gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0288D1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#01579B;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="driver3Gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8E24AA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A148C;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="driver4Gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFA726;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F57C00;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Motor icon -->
+    <g id="motorIcon">
+      <circle cx="0" cy="0" r="18" fill="#37474F" stroke="#263238" stroke-width="2"/>
+      <circle cx="0" cy="0" r="12" fill="#546E7A" stroke="#263238" stroke-width="1.5"/>
+      <circle cx="0" cy="0" r="5" fill="#78909C"/>
+      <line x1="-15" y1="0" x2="-20" y2="0" stroke="#263238" stroke-width="2"/>
+      <line x1="15" y1="0" x2="20" y2="0" stroke="#263238" stroke-width="2"/>
+      <line x1="0" y1="-15" x2="0" y2="-20" stroke="#263238" stroke-width="2"/>
+      <line x1="0" y1="15" x2="0" y2="20" stroke="#263238" stroke-width="2"/>
+    </g>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1150" fill="#f5f5f5"/>
+
+  <!-- Title -->
+  <text x="700" y="45" font-size="32" font-weight="bold" text-anchor="middle" fill="#1a237e" font-family="Arial, sans-serif">
+    Laboratory Sampler Circuit Schematic
+  </text>
+  <text x="700" y="70" font-size="14" text-anchor="middle" fill="#666" font-family="Arial, sans-serif">
+    Raspberry Pi → Stepper Motor Driver System
+  </text>
+
+  <!-- Raspberry Pi Component -->
+  <g id="raspberry-pi" filter="url(#shadow)">
+    <!-- Main board -->
+    <rect x="50" y="120" width="340" height="680" fill="url(#piGradient)" stroke="#1B5E20" stroke-width="4" rx="15"/>
+
+    <!-- USB ports representation -->
+    <rect x="360" y="180" width="25" height="60" fill="#C0C0C0" stroke="#757575" stroke-width="2" rx="3"/>
+    <rect x="360" y="260" width="25" height="60" fill="#C0C0C0" stroke="#757575" stroke-width="2" rx="3"/>
+
+    <!-- Ethernet port -->
+    <rect x="360" y="360" width="25" height="70" fill="#808080" stroke="#424242" stroke-width="2" rx="3"/>
+
+    <!-- Pi Logo -->
+    <circle cx="220" cy="750" r="25" fill="#A5D6A7" opacity="0.3"/>
+    <text x="220" y="760" font-size="28" font-weight="bold" text-anchor="middle" fill="#E8F5E9">π</text>
+
+    <!-- Title -->
+    <text x="220" y="160" font-size="24" font-weight="bold" text-anchor="middle" fill="white" font-family="Arial, sans-serif">
+      Raspberry Pi
+    </text>
+
+    <!-- GPIO Header Panel -->
+    <rect x="85" y="190" width="270" height="520" fill="#1B5E20" stroke="#0D4710" stroke-width="2" rx="8"/>
+    <rect x="95" y="200" width="250" height="500" fill="#E8F5E9" stroke="#0D4710" stroke-width="2" rx="5"/>
+
+    <text x="220" y="230" font-size="16" font-weight="bold" text-anchor="middle" fill="#1B5E20" font-family="Arial, sans-serif">
+      GPIO HEADER (40-PIN)
+    </text>
+
+    <!-- GPIO Pin connectors with labels -->
+    <!-- X Motor GPIO Pins -->
+    <g id="x-motor-pins">
+      <rect x="110" y="260" width="200" height="50" fill="#FFEBEE" stroke="#C62828" stroke-width="1" rx="5" opacity="0.3"/>
+      <circle cx="125" cy="275" r="8" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+      <circle cx="125" cy="295" r="8" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+      <text x="145" y="280" font-size="13" font-weight="bold" fill="#1B5E20">GPIO04 - Pulse X</text>
+      <text x="145" y="300" font-size="13" font-weight="bold" fill="#1B5E20">GPIO17 - Dir X</text>
+    </g>
+
+    <!-- Y Motor GPIO Pins -->
+    <g id="y-motor-pins">
+      <rect x="110" y="330" width="200" height="50" fill="#E3F2FD" stroke="#1565C0" stroke-width="1" rx="5" opacity="0.3"/>
+      <circle cx="125" cy="345" r="8" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+      <circle cx="125" cy="365" r="8" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+      <text x="145" y="350" font-size="13" font-weight="bold" fill="#1B5E20">GPIO27 - Pulse Y</text>
+      <text x="145" y="370" font-size="13" font-weight="bold" fill="#1B5E20">GPIO22 - Dir Y</text>
+    </g>
+
+    <!-- Z Motor GPIO Pins -->
+    <g id="z-motor-pins">
+      <rect x="110" y="400" width="200" height="50" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1" rx="5" opacity="0.3"/>
+      <circle cx="125" cy="415" r="8" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+      <circle cx="125" cy="435" r="8" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+      <text x="145" y="420" font-size="13" font-weight="bold" fill="#1B5E20">GPIO23 - Pulse Z</text>
+      <text x="145" y="440" font-size="13" font-weight="bold" fill="#1B5E20">GPIO24 - Dir Z</text>
+    </g>
+
+    <!-- Pipette Motor GPIO Pins -->
+    <g id="pipette-motor-pins">
+      <rect x="110" y="470" width="200" height="50" fill="#FFF3E0" stroke="#E65100" stroke-width="1" rx="5" opacity="0.3"/>
+      <circle cx="125" cy="485" r="8" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+      <circle cx="125" cy="505" r="8" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+      <text x="145" y="490" font-size="13" font-weight="bold" fill="#1B5E20">GPIO25 - Pulse P</text>
+      <text x="145" y="510" font-size="13" font-weight="bold" fill="#1B5E20">GPIO05 - Dir P</text>
+    </g>
+
+    <!-- Power and Ground -->
+    <g id="power-ground">
+      <rect x="110" y="555" width="200" height="110" fill="#EEEEEE" stroke="#424242" stroke-width="1" rx="5" opacity="0.3"/>
+      <circle cx="125" cy="575" r="8" fill="#212121" stroke="#000" stroke-width="2"/>
+      <text x="145" y="580" font-size="13" font-weight="bold" fill="#1B5E20">GND - Common</text>
+
+      <circle cx="125" cy="605" r="8" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+      <text x="145" y="610" font-size="13" font-weight="bold" fill="#1B5E20">+5V Power</text>
+
+      <circle cx="125" cy="635" r="8" fill="#FFA726" stroke="#F57C00" stroke-width="2"/>
+      <text x="145" y="640" font-size="13" font-weight="bold" fill="#1B5E20">+3.3V Logic</text>
+    </g>
+  </g>
+
+  <!-- Motor Driver 1: X-Axis -->
+  <g id="driver-1" filter="url(#shadow)">
+    <rect x="550" y="120" width="250" height="210" fill="url(#driver1Gradient)" stroke="#BF360C" stroke-width="3" rx="10"/>
+    <rect x="565" y="135" width="220" height="180" fill="#FFF3E0" stroke="#E65100" stroke-width="2" rx="5"/>
+
+    <text x="675" y="160" font-size="18" font-weight="bold" text-anchor="middle" fill="#BF360C" font-family="Arial, sans-serif">
+      STEPPER DRIVER 1
+    </text>
+    <text x="675" y="178" font-size="14" font-weight="bold" text-anchor="middle" fill="#E65100" font-family="Arial, sans-serif">
+      X-AXIS (Horizontal)
+    </text>
+
+    <!-- Signal inputs -->
+    <text x="575" y="200" font-size="11" font-weight="bold" fill="#666">Signal:</text>
+    <circle cx="585" cy="210" r="7" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+    <text x="600" y="215" font-size="11" font-weight="bold" fill="#333">PUL+</text>
+
+    <circle cx="585" cy="228" r="7" fill="#FF8A80" stroke="#D32F2F" stroke-width="2"/>
+    <text x="600" y="233" font-size="11" font-weight="bold" fill="#333">PUL-</text>
+
+    <circle cx="585" cy="246" r="7" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+    <text x="600" y="251" font-size="11" font-weight="bold" fill="#333">DIR+</text>
+
+    <circle cx="585" cy="264" r="7" fill="#82B1FF" stroke="#1976D2" stroke-width="2"/>
+    <text x="600" y="269" font-size="11" font-weight="bold" fill="#333">DIR-</text>
+
+    <!-- Power inputs -->
+    <text x="575" y="287" font-size="11" font-weight="bold" fill="#666">Power:</text>
+    <circle cx="585" cy="297" r="7" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+    <text x="600" y="302" font-size="11" font-weight="bold" fill="#333">V+ (12-24V)</text>
+
+    <circle cx="585" cy="315" r="7" fill="#212121" stroke="#000" stroke-width="2"/>
+    <text x="600" y="320" font-size="11" font-weight="bold" fill="#333">V- (GND)</text>
+
+    <!-- Output to motor -->
+    <rect x="720" y="230" width="60" height="45" fill="#FFCCBC" stroke="#BF360C" stroke-width="2" rx="3"/>
+    <text x="750" y="255" font-size="11" font-weight="bold" text-anchor="middle" fill="#BF360C">MOTOR</text>
+    <text x="750" y="270" font-size="11" font-weight="bold" text-anchor="middle" fill="#BF360C">OUT</text>
+  </g>
+
+  <!-- Motor Driver 2: Y-Axis -->
+  <g id="driver-2" filter="url(#shadow)">
+    <rect x="550" y="350" width="250" height="210" fill="url(#driver2Gradient)" stroke="#01579B" stroke-width="3" rx="10"/>
+    <rect x="565" y="365" width="220" height="180" fill="#E1F5FE" stroke="#0277BD" stroke-width="2" rx="5"/>
+
+    <text x="675" y="390" font-size="18" font-weight="bold" text-anchor="middle" fill="#01579B" font-family="Arial, sans-serif">
+      STEPPER DRIVER 2
+    </text>
+    <text x="675" y="408" font-size="14" font-weight="bold" text-anchor="middle" fill="#0277BD" font-family="Arial, sans-serif">
+      Y-AXIS (Lateral)
+    </text>
+
+    <!-- Signal inputs -->
+    <text x="575" y="430" font-size="11" font-weight="bold" fill="#666">Signal:</text>
+    <circle cx="585" cy="440" r="7" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+    <text x="600" y="445" font-size="11" font-weight="bold" fill="#333">PUL+</text>
+
+    <circle cx="585" cy="458" r="7" fill="#FF8A80" stroke="#D32F2F" stroke-width="2"/>
+    <text x="600" y="463" font-size="11" font-weight="bold" fill="#333">PUL-</text>
+
+    <circle cx="585" cy="476" r="7" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+    <text x="600" y="481" font-size="11" font-weight="bold" fill="#333">DIR+</text>
+
+    <circle cx="585" cy="494" r="7" fill="#82B1FF" stroke="#1976D2" stroke-width="2"/>
+    <text x="600" y="499" font-size="11" font-weight="bold" fill="#333">DIR-</text>
+
+    <!-- Power inputs -->
+    <text x="575" y="517" font-size="11" font-weight="bold" fill="#666">Power:</text>
+    <circle cx="585" cy="527" r="7" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+    <text x="600" y="532" font-size="11" font-weight="bold" fill="#333">V+ (12-24V)</text>
+
+    <circle cx="585" cy="545" r="7" fill="#212121" stroke="#000" stroke-width="2"/>
+    <text x="600" y="550" font-size="11" font-weight="bold" fill="#333">V- (GND)</text>
+
+    <rect x="720" y="460" width="60" height="45" fill="#B3E5FC" stroke="#01579B" stroke-width="2" rx="3"/>
+    <text x="750" y="485" font-size="11" font-weight="bold" text-anchor="middle" fill="#01579B">MOTOR</text>
+    <text x="750" y="500" font-size="11" font-weight="bold" text-anchor="middle" fill="#01579B">OUT</text>
+  </g>
+
+  <!-- Motor Driver 3: Z-Axis -->
+  <g id="driver-3" filter="url(#shadow)">
+    <rect x="550" y="580" width="250" height="210" fill="url(#driver3Gradient)" stroke="#4A148C" stroke-width="3" rx="10"/>
+    <rect x="565" y="595" width="220" height="180" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="2" rx="5"/>
+
+    <text x="675" y="620" font-size="18" font-weight="bold" text-anchor="middle" fill="#4A148C" font-family="Arial, sans-serif">
+      STEPPER DRIVER 3
+    </text>
+    <text x="675" y="638" font-size="14" font-weight="bold" text-anchor="middle" fill="#6A1B9A" font-family="Arial, sans-serif">
+      Z-AXIS (Vertical)
+    </text>
+
+    <!-- Signal inputs -->
+    <text x="575" y="660" font-size="11" font-weight="bold" fill="#666">Signal:</text>
+    <circle cx="585" cy="670" r="7" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+    <text x="600" y="675" font-size="11" font-weight="bold" fill="#333">PUL+</text>
+
+    <circle cx="585" cy="688" r="7" fill="#FF8A80" stroke="#D32F2F" stroke-width="2"/>
+    <text x="600" y="693" font-size="11" font-weight="bold" fill="#333">PUL-</text>
+
+    <circle cx="585" cy="706" r="7" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+    <text x="600" y="711" font-size="11" font-weight="bold" fill="#333">DIR+</text>
+
+    <circle cx="585" cy="724" r="7" fill="#82B1FF" stroke="#1976D2" stroke-width="2"/>
+    <text x="600" y="729" font-size="11" font-weight="bold" fill="#333">DIR-</text>
+
+    <!-- Power inputs -->
+    <text x="575" y="747" font-size="11" font-weight="bold" fill="#666">Power:</text>
+    <circle cx="585" cy="757" r="7" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+    <text x="600" y="762" font-size="11" font-weight="bold" fill="#333">V+ (12-24V)</text>
+
+    <circle cx="585" cy="775" r="7" fill="#212121" stroke="#000" stroke-width="2"/>
+    <text x="600" y="780" font-size="11" font-weight="bold" fill="#333">V- (GND)</text>
+
+    <rect x="720" y="690" width="60" height="45" fill="#E1BEE7" stroke="#4A148C" stroke-width="2" rx="3"/>
+    <text x="750" y="715" font-size="11" font-weight="bold" text-anchor="middle" fill="#4A148C">MOTOR</text>
+    <text x="750" y="730" font-size="11" font-weight="bold" text-anchor="middle" fill="#4A148C">OUT</text>
+  </g>
+
+  <!-- Motor Driver 4: Pipette -->
+  <g id="driver-4" filter="url(#shadow)">
+    <rect x="550" y="810" width="250" height="210" fill="url(#driver4Gradient)" stroke="#F57C00" stroke-width="3" rx="10"/>
+    <rect x="565" y="825" width="220" height="180" fill="#FFF9C4" stroke="#F57F17" stroke-width="2" rx="5"/>
+
+    <text x="675" y="850" font-size="18" font-weight="bold" text-anchor="middle" fill="#F57C00" font-family="Arial, sans-serif">
+      STEPPER DRIVER 4
+    </text>
+    <text x="675" y="868" font-size="14" font-weight="bold" text-anchor="middle" fill="#F57F17" font-family="Arial, sans-serif">
+      PIPETTE/GRIPPER
+    </text>
+
+    <!-- Signal inputs -->
+    <text x="575" y="890" font-size="11" font-weight="bold" fill="#666">Signal:</text>
+    <circle cx="585" cy="900" r="7" fill="#D32F2F" stroke="#B71C1C" stroke-width="2"/>
+    <text x="600" y="905" font-size="11" font-weight="bold" fill="#333">PUL+</text>
+
+    <circle cx="585" cy="918" r="7" fill="#FF8A80" stroke="#D32F2F" stroke-width="2"/>
+    <text x="600" y="923" font-size="11" font-weight="bold" fill="#333">PUL-</text>
+
+    <circle cx="585" cy="936" r="7" fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+    <text x="600" y="941" font-size="11" font-weight="bold" fill="#333">DIR+</text>
+
+    <circle cx="585" cy="954" r="7" fill="#82B1FF" stroke="#1976D2" stroke-width="2"/>
+    <text x="600" y="959" font-size="11" font-weight="bold" fill="#333">DIR-</text>
+
+    <!-- Power inputs -->
+    <text x="575" y="977" font-size="11" font-weight="bold" fill="#666">Power:</text>
+    <circle cx="585" cy="987" r="7" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+    <text x="600" y="992" font-size="11" font-weight="bold" fill="#333">V+ (12-24V)</text>
+
+    <circle cx="585" cy="1005" r="7" fill="#212121" stroke="#000" stroke-width="2"/>
+    <text x="600" y="1010" font-size="11" font-weight="bold" fill="#333">V- (GND)</text>
+
+    <rect x="720" y="920" width="60" height="45" fill="#FFECB3" stroke="#F57C00" stroke-width="2" rx="3"/>
+    <text x="750" y="945" font-size="11" font-weight="bold" text-anchor="middle" fill="#F57C00">MOTOR</text>
+    <text x="750" y="960" font-size="11" font-weight="bold" text-anchor="middle" fill="#F57C00">OUT</text>
+  </g>
+
+  <!-- Connection wires -->
+  <!-- X-Axis Signal connections -->
+  <path d="M 125 275 L 400 275 L 585 210" fill="none" stroke="#D32F2F" stroke-width="3"/>
+  <path d="M 125 295 L 420 295 L 585 246" fill="none" stroke="#1976D2" stroke-width="3"/>
+
+  <!-- Y-Axis Signal connections -->
+  <path d="M 125 345 L 440 345 L 585 440" fill="none" stroke="#D32F2F" stroke-width="3"/>
+  <path d="M 125 365 L 460 365 L 585 476" fill="none" stroke="#1976D2" stroke-width="3"/>
+
+  <!-- Z-Axis Signal connections -->
+  <path d="M 125 415 L 480 415 L 585 670" fill="none" stroke="#D32F2F" stroke-width="3"/>
+  <path d="M 125 435 L 500 435 L 585 706" fill="none" stroke="#1976D2" stroke-width="3"/>
+
+  <!-- Pipette Signal connections -->
+  <path d="M 125 485 L 520 485 L 585 900" fill="none" stroke="#D32F2F" stroke-width="3"/>
+  <path d="M 125 505 L 540 505 L 585 936" fill="none" stroke="#1976D2" stroke-width="3"/>
+
+  <!-- Signal Ground bus - connects to PUL- and DIR- pins -->
+  <path d="M 125 575 L 450 575 L 450 228 L 585 228" fill="none" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+  <path d="M 450 228 L 450 264 L 585 264" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="8,4"/>
+  <path d="M 450 575 L 450 458 L 585 458" fill="none" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+  <path d="M 450 458 L 450 494 L 585 494" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="8,4"/>
+  <path d="M 450 575 L 450 688 L 585 688" fill="none" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+  <path d="M 450 688 L 450 724 L 585 724" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="8,4"/>
+  <path d="M 450 575 L 450 918 L 585 918" fill="none" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+  <path d="M 450 918 L 450 954 L 585 954" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="8,4"/>
+
+  <!-- Power Supply -->
+  <g id="power-supply" filter="url(#shadow)">
+    <rect x="80" y="720" width="120" height="100" fill="#FFE0B2" stroke="#E65100" stroke-width="3" rx="8"/>
+    <text x="140" y="745" font-size="14" font-weight="bold" text-anchor="middle" fill="#BF360C">POWER</text>
+    <text x="140" y="762" font-size="13" font-weight="bold" text-anchor="middle" fill="#E65100">SUPPLY</text>
+    <text x="140" y="780" font-size="11" text-anchor="middle" fill="#555">24V 10A</text>
+
+    <circle cx="110" cy="795" r="6" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+    <text x="125" y="800" font-size="11" font-weight="bold" fill="#333">V+</text>
+
+    <circle cx="155" cy="795" r="6" fill="#212121" stroke="#000" stroke-width="2"/>
+    <text x="170" y="800" font-size="11" font-weight="bold" fill="#333">V-</text>
+  </g>
+
+  <!-- Power connections to drivers -->
+  <path d="M 110 795 L 110 650 L 470 650 L 470 297 L 585 297" fill="none" stroke="#FF6F00" stroke-width="4"/>
+  <path d="M 470 297 L 470 527 L 585 527" fill="none" stroke="#FF6F00" stroke-width="4"/>
+  <path d="M 470 527 L 470 757 L 585 757" fill="none" stroke="#FF6F00" stroke-width="4"/>
+  <path d="M 470 757 L 470 987 L 585 987" fill="none" stroke="#FF6F00" stroke-width="4"/>
+
+  <!-- Power ground connections -->
+  <path d="M 155 795 L 155 665 L 490 665 L 490 315 L 585 315" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="10,5"/>
+  <path d="M 490 315 L 490 545 L 585 545" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="10,5"/>
+  <path d="M 490 545 L 490 775 L 585 775" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="10,5"/>
+  <path d="M 490 775 L 490 1005 L 585 1005" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="10,5"/>
+
+  <!-- Stepper Motors -->
+  <!-- X Motor -->
+  <use href="#motorIcon" x="850" y="235" transform="translate(850, 235)"/>
+  <text x="900" y="240" font-size="14" font-weight="bold" fill="#BF360C">X-Axis Motor</text>
+
+  <!-- Y Motor -->
+  <use href="#motorIcon" x="850" y="465" transform="translate(850, 465)"/>
+  <text x="900" y="470" font-size="14" font-weight="bold" fill="#01579B">Y-Axis Motor</text>
+
+  <!-- Z Motor -->
+  <use href="#motorIcon" x="850" y="695" transform="translate(850, 695)"/>
+  <text x="900" y="700" font-size="14" font-weight="bold" fill="#4A148C">Z-Axis Motor</text>
+
+  <!-- Pipette Motor -->
+  <use href="#motorIcon" x="850" y="925" transform="translate(850, 925)"/>
+  <text x="900" y="930" font-size="14" font-weight="bold" fill="#F57C00">Pipette Motor</text>
+
+  <!-- Motor connections -->
+  <line x1="780" y1="252" x2="832" y2="235" stroke="#BF360C" stroke-width="4"/>
+  <line x1="780" y1="482" x2="832" y2="465" stroke="#01579B" stroke-width="4"/>
+  <line x1="780" y1="712" x2="832" y2="695" stroke="#4A148C" stroke-width="4"/>
+  <line x1="780" y1="942" x2="832" y2="925" stroke="#F57C00" stroke-width="4"/>
+
+  <!-- Information panels -->
+  <!-- Power Supply Panel -->
+  <g id="power-panel" filter="url(#shadow)">
+    <rect x="1020" y="120" width="340" height="190" fill="#FFF8E1" stroke="#F57F17" stroke-width="3" rx="10"/>
+    <rect x="1030" y="130" width="320" height="40" fill="#FFA726" stroke="#F57F17" stroke-width="2" rx="5"/>
+    <text x="1190" y="158" font-size="18" font-weight="bold" text-anchor="middle" fill="#BF360C" font-family="Arial, sans-serif">
+      ⚡ POWER REQUIREMENTS
+    </text>
+
+    <text x="1050" y="195" font-size="13" font-weight="bold" fill="#333">Stepper Drivers:</text>
+    <text x="1070" y="215" font-size="12" fill="#555">• Input: 12-24V DC, 2-5A per driver</text>
+    <text x="1070" y="235" font-size="12" fill="#555">• Recommended: 24V 10A power supply</text>
+
+    <text x="1050" y="260" font-size="13" font-weight="bold" fill="#333">Raspberry Pi:</text>
+    <text x="1070" y="280" font-size="12" fill="#555">• 5V DC, 3A minimum (USB-C)</text>
+    <text x="1070" y="300" font-size="12" fill="#555">• Logic level: 3.3V GPIO</text>
+  </g>
+
+  <!-- Signal Legend Panel -->
+  <g id="legend-panel" filter="url(#shadow)">
+    <rect x="1020" y="330" width="340" height="270" fill="#E8F5E9" stroke="#2E7D32" stroke-width="3" rx="10"/>
+    <rect x="1030" y="340" width="320" height="40" fill="#66BB6A" stroke="#2E7D32" stroke-width="2" rx="5"/>
+    <text x="1190" y="368" font-size="18" font-weight="bold" text-anchor="middle" fill="#1B5E20" font-family="Arial, sans-serif">
+      📊 SIGNAL LEGEND
+    </text>
+
+    <text x="1050" y="400" font-size="12" font-weight="bold" fill="#1B5E20">Signal Wires:</text>
+    <line x1="1050" y1="410" x2="1100" y2="410" stroke="#D32F2F" stroke-width="4"/>
+    <text x="1115" y="415" font-size="12" fill="#333">PUL+ / DIR+ (3.3V GPIO)</text>
+
+    <line x1="1050" y1="430" x2="1100" y2="430" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+    <text x="1115" y="435" font-size="12" fill="#333">Signal GND (PUL-/DIR-)</text>
+
+    <text x="1050" y="460" font-size="12" font-weight="bold" fill="#1B5E20">Power Wires:</text>
+    <line x1="1050" y1="470" x2="1100" y2="470" stroke="#FF6F00" stroke-width="4"/>
+    <text x="1115" y="475" font-size="12" fill="#333">V+ (12-24V motor power)</text>
+
+    <line x1="1050" y1="490" x2="1100" y2="490" stroke="#000" stroke-width="4" stroke-dasharray="10,5"/>
+    <text x="1115" y="495" font-size="12" fill="#333">V- (Power GND)</text>
+
+    <text x="1050" y="520" font-size="12" font-weight="bold" fill="#1B5E20">Differential Signaling:</text>
+    <text x="1070" y="540" font-size="11" fill="#555">• PUL+/PUL-: Step pulse control pair</text>
+    <text x="1070" y="558" font-size="11" fill="#555">• DIR+/DIR-: Direction control pair</text>
+    <text x="1070" y="576" font-size="11" fill="#555">• Both grounds tied to common GND</text>
+  </g>
+
+  <!-- Technical Notes Panel -->
+  <g id="notes-panel" filter="url(#shadow)">
+    <rect x="1020" y="620" width="340" height="310" fill="#E3F2FD" stroke="#1565C0" stroke-width="3" rx="10"/>
+    <rect x="1030" y="630" width="320" height="40" fill="#42A5F5" stroke="#1565C0" stroke-width="2" rx="5"/>
+    <text x="1190" y="658" font-size="18" font-weight="bold" text-anchor="middle" fill="#0D47A1" font-family="Arial, sans-serif">
+      📝 TECHNICAL NOTES
+    </text>
+
+    <text x="1050" y="695" font-size="13" font-weight="bold" fill="#333">Signal Specifications:</text>
+    <text x="1070" y="715" font-size="12" fill="#555">• Pulse frequency: 1-200 kHz typical</text>
+    <text x="1070" y="735" font-size="12" fill="#555">• Logic HIGH: 3.3V (from Raspberry Pi)</text>
+    <text x="1070" y="755" font-size="12" fill="#555">• Logic LOW: 0V (GND)</text>
+
+    <text x="1050" y="785" font-size="13" font-weight="bold" fill="#333">Power Specifications:</text>
+    <text x="1070" y="805" font-size="12" fill="#555">• Driver input: 12-24V DC (24V recommended)</text>
+    <text x="1070" y="825" font-size="12" fill="#555">• Current: 2-5A per driver</text>
+    <text x="1070" y="845" font-size="12" fill="#555">• Total: 24V 10A power supply</text>
+
+    <text x="1050" y="875" font-size="13" font-weight="bold" fill="#333">96-Well Plate System:</text>
+    <text x="1070" y="895" font-size="12" fill="#555">• Well spacing: 4mm center-to-center</text>
+    <text x="1070" y="915" font-size="12" fill="#555">• Well: Ø8mm × 14mm H | 8×12 layout</text>
+  </g>
+
+  <!-- Footer -->
+  <rect x="0" y="1100" width="1400" height="50" fill="#263238"/>
+  <text x="700" y="1130" font-size="14" text-anchor="middle" fill="#B0BEC5" font-family="Arial, sans-serif">
+    96-Well Laboratory Sampler System | 3-Pipette Configuration | FastAPI + React + Raspberry Pi
+  </text>
+</svg>
