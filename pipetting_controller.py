@@ -32,6 +32,7 @@ class PipettingStep:
     repetition_quantity: int = 1
     repetition_interval: Optional[int] = None  # seconds
     repetition_duration: Optional[int] = None  # seconds
+    pipette_count: int = 3  # 1 or 3 pipettes (default: 3)
 
 
 class CoordinateMapper:
@@ -184,10 +185,14 @@ class PipettingController:
         self.stop_requested = False
         self.log_buffer = []  # Store log messages for UI display
         self.max_logs = 100   # Maximum number of logs to keep
+        self.current_pipette_count = 1  # Current pipette configuration (default: 1)
+        self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
+        self.operation_well = None  # Well where current operation is happening
 
         # Load last known position or default to home (A1)
-        self.current_position = self.load_position()
+        self.current_position, self.current_pipette_count = self.load_position()
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
+        self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
 
     def log(self, message: str):
         """Log a message to both console and buffer for UI display"""
@@ -214,38 +219,44 @@ class PipettingController:
         self.log_buffer.clear()
 
     def save_position(self):
-        """Save current position to file for recovery after interruption"""
+        """Save current position and pipette count to file for recovery after interruption"""
         try:
             position_data = {
                 "x": self.current_position.x,
                 "y": self.current_position.y,
                 "z": self.current_position.z,
-                "well": self.get_current_well()
+                "well": self.get_current_well(),
+                "pipette_count": self.current_pipette_count
             }
             with open(self.POSITION_FILE, 'w') as f:
                 json.dump(position_data, f, indent=2)
         except Exception as e:
             print(f"Warning: Could not save position to file: {e}")
 
-    def load_position(self) -> WellCoordinates:
-        """Load last known position from file"""
+    def load_position(self) -> tuple[WellCoordinates, int]:
+        """Load last known position and pipette count from file"""
         try:
             if self.POSITION_FILE.exists():
                 with open(self.POSITION_FILE, 'r') as f:
                     position_data = json.load(f)
                 # Note: can't use self.log here as it's called before __init__ completes
                 print(f"Loaded last position from file: {position_data.get('well', 'Unknown')}")
-                return WellCoordinates(
-                    x=position_data.get('x', 0.0),
-                    y=position_data.get('y', 0.0),
-                    z=position_data.get('z', 0.0)
+                pipette_count = position_data.get('pipette_count', 1)  # Default to 1 if not found
+                print(f"Loaded pipette configuration: {pipette_count} pipette(s)")
+                return (
+                    WellCoordinates(
+                        x=position_data.get('x', 0.0),
+                        y=position_data.get('y', 0.0),
+                        z=position_data.get('z', 0.0)
+                    ),
+                    pipette_count
                 )
         except Exception as e:
             print(f"Warning: Could not load position from file: {e}")
 
-        # Default to home position (A1)
-        print("Using default home position (A1)")
-        return WellCoordinates(x=0.0, y=0.0, z=0.0)
+        # Default to home position (A1) with 1 pipette
+        print("Using default home position (A1) and 1 pipette")
+        return WellCoordinates(x=0.0, y=0.0, z=0.0), 1
 
     def move_to_well(self, well_id: str, z_offset: float = 0.0):
         """
@@ -255,6 +266,8 @@ class PipettingController:
             well_id: Well identifier (e.g., 'A12')
             z_offset: Additional Z offset in mm (negative goes down)
         """
+        self.current_operation = "moving"
+        self.operation_well = well_id
         self.log(f"Moving to well {well_id}...")
 
         # Get target coordinates
@@ -297,6 +310,9 @@ class PipettingController:
         self.current_position = target_coords
         self.log(f"  Arrived at {well_id} (X={target_coords.x:.1f}, Y={target_coords.y:.1f}, Z={target_coords.z:.1f})")
 
+        self.current_operation = "idle"
+        self.operation_well = None
+
         # Save position to file for recovery
         self.save_position()
 
@@ -307,10 +323,14 @@ class PipettingController:
         Args:
             volume_ml: Volume to aspirate in mL
         """
+        self.current_operation = "aspirating"
+        self.operation_well = self.get_current_well()
         self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
+        self.current_operation = "idle"
+        self.operation_well = None
 
     def dispense(self, volume_ml: float):
         """
@@ -319,10 +339,14 @@ class PipettingController:
         Args:
             volume_ml: Volume to dispense in mL
         """
+        self.current_operation = "dispensing"
+        self.operation_well = self.get_current_well()
         self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
+        self.current_operation = "idle"
+        self.operation_well = None
 
     def rinse(self, rinse_well: str):
         """
@@ -431,6 +455,10 @@ class PipettingController:
                 return
 
             self.log(f"--- Step {step_num}/{len(steps)} ---")
+            self.log(f"Pipette Configuration: {step.pipette_count} pipette(s)")
+
+            # Update current pipette configuration
+            self.current_pipette_count = step.pipette_count
 
             # Handle repetition based on mode
             if step.repetition_mode == 'quantity':
@@ -543,6 +571,20 @@ class PipettingController:
         """
         return self.mapper.coordinates_to_well(self.current_position)
 
+    def set_pipette_count(self, count: int):
+        """
+        Set the current pipette configuration
+
+        Args:
+            count: Number of pipettes (1 or 3)
+        """
+        if count not in [1, 3]:
+            raise ValueError("Pipette count must be 1 or 3")
+
+        self.current_pipette_count = count
+        self.log(f"Pipette configuration changed to: {count} pipette(s)")
+        self.save_position()  # Save the new configuration
+
     def cleanup(self):
         """Clean up resources"""
         self.stepper_controller.cleanup()
@@ -563,7 +605,8 @@ if __name__ == "__main__":
             wait_time=2,
             cycles=1,
             repetition_mode='quantity',
-            repetition_quantity=3
+            repetition_quantity=3,
+            pipette_count=3  # Using 3 pipettes
         )
 
         controller.execute_sequence([step])

@@ -1,9 +1,13 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useState, useRef} from 'react'
 import './App.css'
 
 function App() {
     const [activeTab, setActiveTab] = useState('settings')
-    const [selectedWell, setSelectedWell] = useState('A1')
+    const [selectedWell, setSelectedWell] = useState('A1') // Current motor position
+    const [targetWell, setTargetWell] = useState(null) // User-clicked target well
+    const [currentPipetteCount, setCurrentPipetteCount] = useState(3) // Current pipette configuration (from backend)
+    const [currentOperation, setCurrentOperation] = useState('idle') // Current operation: idle, moving, aspirating, dispensing
+    const [operationWell, setOperationWell] = useState(null) // Well where operation is happening
     const [theme, setTheme] = useState(() => {
         // Get theme from localStorage or default to 'light'
         return localStorage.getItem('theme') || 'light'
@@ -27,6 +31,13 @@ function App() {
     const [repetitionInterval, setRepetitionInterval] = useState('') // in seconds
     const [repetitionDuration, setRepetitionDuration] = useState('') // total duration in seconds
 
+    // Pipette configuration state
+    const [pipetteCount, setPipetteCount] = useState(3) // 1 or 3 pipettes (default: 3)
+
+    // Ref for auto-scrolling logs
+    const logsEndRef = useRef(null)
+    const previousLogCountRef = useRef(0)
+
     const handleAddStep = () => {
         if (pickupWell) {
             const newStep = {
@@ -40,7 +51,8 @@ function App() {
                 repetitionMode,
                 repetitionQuantity: repetitionMode === 'quantity' ? Number(repetitionQuantity) : 1,
                 repetitionInterval: repetitionMode === 'timeFrequency' ? Number(repetitionInterval) : null,
-                repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null
+                repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null,
+                pipetteCount: Number(pipetteCount)
             }
             setSteps([...steps, newStep])
             // Reset form
@@ -54,6 +66,7 @@ function App() {
             setRepetitionQuantity(1)
             setRepetitionInterval('')
             setRepetitionDuration('')
+            setPipetteCount(3) // Reset to default (3 pipettes)
         }
     }
 
@@ -61,50 +74,43 @@ function App() {
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     const columns = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-    // Sample data for wells with their types and labels
-    const [wellData, setWellData] = useState({
-        'A1': {type: 'empty', label: ''},
-        'A2': {type: 'pc', label: 'PC'},
-        'A3': {type: 'pc', label: 'PC'},
-        'A4': {type: 'pc', label: 'PC'},
-        'A5': {type: '05', label: '05'},
-        'A6': {type: 'pc', label: 'PC'},
-        'A7': {type: 'pc', label: 'PC'},
-        'A8': {type: 'nc', label: 'NC'},
-        'A9': {type: 'nc', label: 'NC'},
-        'B2': {type: 'nc', label: 'NC'},
-        'B3': {type: '01', label: '01'},
-        'B4': {type: '01', label: '01'},
-        'B9': {type: 'nc', label: 'NC'},
-        'C1': {type: 'sd', label: 'SD'},
-        'C2': {type: 'sd', label: 'SD'},
-        'C3': {type: 'sd', label: 'SD'},
-        'C4': {type: 'sd', label: 'SD'},
-        'C5': {type: 'sd', label: 'SD'},
-        'C6': {type: 'sd', label: 'SD'},
-        'C7': {type: 'sd', label: 'SD'},
-        'C8': {type: 'sd', label: 'SD'},
-        'C9': {type: 'sd', label: 'SD'},
-        'C10': {type: 'sd', label: 'SD'},
-        'C11': {type: 'sd', label: 'SD'},
-        'C12': {type: 'sd', label: 'SD'},
-        'D1': {type: 'empty', label: ''},
-        'D2': {type: 'nc', label: 'NC'},
-        'D3': {type: '03', label: '03'},
-        'D4': {type: '03', label: '03'},
-        'D9': {type: '01', label: '01'},
-        'E3': {type: '01', label: '01'},
-        'E4': {type: '01', label: '01'},
-        'F3': {type: '02', label: '02'},
-        'F4': {type: '02', label: '02'},
-        'G1': {type: 'sd-03', label: 'SD 03'},
-        'G3': {type: '03', label: '03'},
-        'G4': {type: '03', label: '03'},
-    })
+    // Well data - all wells start empty by default
+    const [wellData, setWellData] = useState({})
 
     const getWellType = (row, col) => {
         const wellId = `${row}${col}`
         return wellData[wellId] || {type: 'empty', label: ''}
+    }
+
+    // Calculate which wells should be highlighted based on pipette configuration
+    const getPipetteWells = (centerWell, pipetteCount) => {
+        if (!centerWell || pipetteCount === 1) {
+            return [centerWell]
+        }
+
+        // For 3 pipettes: center, left, and right
+        const match = centerWell.match(/^([A-H])(\d+)$/)
+        if (!match) return [centerWell]
+
+        const row = match[1]
+        const col = parseInt(match[2])
+
+        const wells = []
+
+        // Left well (col - 1)
+        if (col > 1) {
+            wells.push(`${row}${col - 1}`)
+        }
+
+        // Center well
+        wells.push(centerWell)
+
+        // Right well (col + 1)
+        if (col < 12) {
+            wells.push(`${row}${col + 1}`)
+        }
+
+        return wells
     }
 
     const handleDeleteAll = () => {
@@ -258,6 +264,66 @@ function App() {
         }
     }
 
+    const handleSetPipetteCount = async (count) => {
+        try {
+            const response = await fetch('/api/pipetting/set-pipette-count', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ pipetteCount: count })
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setCurrentPipetteCount(count)
+                alert(`${data.message}`)
+                // Update status to sync with backend
+                fetchCurrentPosition()
+            } else {
+                alert(`Error: ${data.detail || 'Failed to set pipette count'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        }
+    }
+
+    const handleWellClick = (wellId) => {
+        // Set the target well when user clicks
+        setTargetWell(wellId)
+    }
+
+    const handleMoveToWell = async () => {
+        if (!targetWell) {
+            return
+        }
+
+        try {
+            const response = await fetch('/api/pipetting/move-to-well', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ wellId: targetWell })
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                alert(`${data.message}`)
+                // Update current position after moving
+                fetchCurrentPosition()
+                // Clear target well
+                setTargetWell(null)
+            } else {
+                alert(`Error: ${data.detail || 'Failed to move to well'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        }
+    }
+
     const fetchCurrentPosition = async () => {
         try {
             const response = await fetch('/api/pipetting/status')
@@ -268,9 +334,22 @@ function App() {
                 setSelectedWell(data.current_well)
                 setSystemStatus(data.message || 'System ready')
 
+                // Update pipette count from backend
+                if (data.pipette_count !== undefined) {
+                    setCurrentPipetteCount(data.pipette_count)
+                }
+
                 // Update isExecuting state from backend
                 if (data.is_executing !== undefined) {
                     setIsExecuting(data.is_executing)
+                }
+
+                // Update operation state from backend
+                if (data.current_operation !== undefined) {
+                    setCurrentOperation(data.current_operation)
+                }
+                if (data.operation_well !== undefined) {
+                    setOperationWell(data.operation_well)
                 }
             } else {
                 console.log('No position data available:', data)
@@ -315,7 +394,7 @@ function App() {
             interval = setInterval(() => {
                 fetchCurrentPosition()
                 fetchLogs() // Also fetch logs during execution
-            }, 1000) // Poll every 300ms during execution for smooth updates
+            }, 300) // Poll every 300ms during execution for smooth updates and catching quick operations
         }
         return () => {
             if (interval) clearInterval(interval)
@@ -342,6 +421,15 @@ function App() {
         // Save to localStorage
         localStorage.setItem('theme', theme)
     }, [theme])
+
+    // Auto-scroll logs to bottom only when new logs are added
+    useEffect(() => {
+        // Only scroll if logs count has increased (new logs added)
+        if (logs.length > previousLogCountRef.current) {
+            logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+            previousLogCountRef.current = logs.length
+        }
+    }, [logs])
 
     const toggleTheme = () => {
         setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
@@ -382,6 +470,18 @@ function App() {
                         <h2>Program Configuration</h2>
 
                         <div className="program-form">
+                            <div className="form-group">
+                                <label>Pipette Configuration:</label>
+                                <select
+                                    value={pipetteCount}
+                                    onChange={(e) => setPipetteCount(Number(e.target.value))}
+                                    className="form-input form-select"
+                                >
+                                    <option value={1}>1 Pipette</option>
+                                    <option value={3}>3 Pipettes</option>
+                                </select>
+                            </div>
+
                             <div className="form-group">
                                 <label>Cycles:</label>
                                 <input
@@ -538,7 +638,28 @@ function App() {
                             <div className="plate-info">
                                 <span>Position: {selectedWell}</span>
                                 <span>Status: {systemStatus}</span>
+                                {currentOperation !== 'idle' && operationWell && (
+                                    <span className={`operation-status operation-${currentOperation}`}>
+                                        {currentOperation === 'aspirating' && '🔵 Aspirating'}
+                                        {currentOperation === 'dispensing' && '🟢 Dispensing'}
+                                        {currentOperation === 'moving' && '🟡 Moving'}
+                                        {' at ' + operationWell}
+                                    </span>
+                                )}
                             </div>
+                        </div>
+
+                        <div className="pipette-config-control">
+                            <label>Pipette Configuration:</label>
+                            <select
+                                value={currentPipetteCount}
+                                onChange={(e) => handleSetPipetteCount(Number(e.target.value))}
+                                className="form-input form-select"
+                                disabled={isExecuting}
+                            >
+                                <option value={1}>1 Pipette</option>
+                                <option value={3}>3 Pipettes</option>
+                            </select>
                         </div>
 
                         <div className="plate-grid-wrapper">
@@ -551,23 +672,40 @@ function App() {
                             </div>
 
                             {/* Grid with row labels */}
-                            {rows.map(row => (
-                                <div key={row} className="plate-row">
-                                    <div className="row-label">{row}</div>
-                                    {columns.map(col => {
-                                        const well = getWellType(row, col)
-                                        const wellId = `${row}${col}`
-                                        return (
-                                            <div
-                                                key={wellId}
-                                                className={`well well-${well.type} ${selectedWell === wellId ? 'selected' : ''}`}
-                                            >
-                                                {wellId}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            ))}
+                            {rows.map(row => {
+                                // Calculate which wells should be highlighted for pipette positions
+                                const pipetteWells = getPipetteWells(selectedWell, currentPipetteCount)
+
+                                return (
+                                    <div key={row} className="plate-row">
+                                        <div className="row-label">{row}</div>
+                                        {columns.map(col => {
+                                            const well = getWellType(row, col)
+                                            const wellId = `${row}${col}`
+                                            const isPipettePosition = pipetteWells.includes(wellId)
+                                            const isCenterPipette = wellId === selectedWell
+                                            const isSidePipette = isPipettePosition && !isCenterPipette
+                                            const isOperating = operationWell === wellId
+                                            const operationClass = isOperating ? `operation-${currentOperation}` : ''
+
+                                            return (
+                                                <div
+                                                    key={wellId}
+                                                    className={`well well-${well.type}
+                                                        ${isCenterPipette ? 'selected' : ''}
+                                                        ${isSidePipette ? 'pipette-side' : ''}
+                                                        ${targetWell === wellId ? 'target' : ''}
+                                                        ${operationClass}`}
+                                                    onClick={() => handleWellClick(wellId)}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
+                                                    {wellId}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
                 )}
@@ -579,11 +717,14 @@ function App() {
                         <h3>System Logs</h3>
                         <div className="logs-viewer">
                             {logs.length > 0 ? (
-                                logs.map((log, index) => (
-                                    <div key={index} className="log-entry">
-                                        {log}
-                                    </div>
-                                ))
+                                <>
+                                    {logs.map((log, index) => (
+                                        <div key={index} className="log-entry">
+                                            {log}
+                                        </div>
+                                    ))}
+                                    <div ref={logsEndRef} />
+                                </>
                             ) : (
                                 <div className="log-placeholder">No logs available</div>
                             )}
@@ -604,6 +745,11 @@ function App() {
                                     return (
                                         <div key={step.id} className="step-group">
                                             <h4>Step {stepIndex + 1}</h4>
+                                            <div className="step-config-info">
+                                                <div className="step-item-header">
+                                                    🔧 {step.pipetteCount || 3} Pipette{(step.pipetteCount || 3) > 1 ? 's' : ''}
+                                                </div>
+                                            </div>
                                             <div className="step-repetition-info">
                                                 {step.repetitionMode === 'quantity' ? (
                                                     <div className="step-item-header">
@@ -651,6 +797,15 @@ function App() {
 
                     {/* Action Buttons */}
                     <div className="action-buttons">
+                        {targetWell && (
+                            <button
+                                className="btn btn-move-to-well"
+                                onClick={handleMoveToWell}
+                                disabled={isExecuting}
+                            >
+                                Move to {targetWell}
+                            </button>
+                        )}
                         <button
                             className="btn btn-execute"
                             onClick={handleExecute}

@@ -63,8 +63,11 @@ class PipettingStepRequest(BaseModel):
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
     repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
     repetitionQuantity: int = Field(1, ge=1, description="Number of times to repeat (for quantity mode)")
-    repetitionInterval: Optional[int] = Field(None, ge=0, description="Interval between repetitions in seconds (for timeFrequency mode)")
-    repetitionDuration: Optional[int] = Field(None, ge=0, description="Total duration in seconds (for timeFrequency mode)")
+    repetitionInterval: Optional[int] = Field(None, ge=0,
+                                              description="Interval between repetitions in seconds (for timeFrequency mode)")
+    repetitionDuration: Optional[int] = Field(None, ge=0,
+                                              description="Total duration in seconds (for timeFrequency mode)")
+    pipetteCount: int = Field(3, ge=1, le=3, description="Number of pipettes: 1 or 3 (default: 3)")
 
 
 class PipettingSequenceRequest(BaseModel):
@@ -158,7 +161,8 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
                 repetition_mode=step.repetitionMode,
                 repetition_quantity=step.repetitionQuantity,
                 repetition_interval=step.repetitionInterval,
-                repetition_duration=step.repetitionDuration
+                repetition_duration=step.repetitionDuration,
+                pipette_count=step.pipetteCount
             ))
 
         # Run in background thread so status endpoint can respond
@@ -222,6 +226,41 @@ async def home_pipetting_system():
         )
 
 
+class MoveToWellRequest(BaseModel):
+    """Request to move to a specific well"""
+    wellId: str = Field(..., description="Well ID to move to (e.g., 'A1', 'B5')")
+
+
+class SetPipetteCountRequest(BaseModel):
+    """Request to set pipette configuration"""
+    pipetteCount: int = Field(..., ge=1, le=3, description="Number of pipettes: 1 or 3")
+
+
+@app.post("/api/pipetting/move-to-well")
+async def move_to_well(request: MoveToWellRequest):
+    """Move pipetting system to a specific well"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        # Move to the specified well
+        pipetting_controller.move_to_well(request.wellId, 0)
+        return {"status": "success", "message": f"Moved to well {request.wellId}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid well ID: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error moving to well: {str(e)}"
+        )
+
+
 @app.get("/api/pipetting/status")
 async def get_pipetting_status():
     """Get current status of pipetting system"""
@@ -238,6 +277,9 @@ async def get_pipetting_status():
     try:
         position = pipetting_controller.current_position
         current_well = pipetting_controller.get_current_well()
+        pipette_count = pipetting_controller.current_pipette_count
+        current_operation = pipetting_controller.current_operation
+        operation_well = pipetting_controller.operation_well
         return {
             "initialized": True,
             "position": {
@@ -246,7 +288,10 @@ async def get_pipetting_status():
                 "z": position.z
             },
             "current_well": current_well,
+            "pipette_count": pipette_count,
             "is_executing": is_executing,
+            "current_operation": current_operation,
+            "operation_well": operation_well,
             "message": "Executing" if is_executing else "System ready"
         }
     except Exception as e:
@@ -254,7 +299,10 @@ async def get_pipetting_status():
             "initialized": False,
             "message": f"Error: {str(e)}",
             "current_well": None,
-            "is_executing": False
+            "pipette_count": 3,
+            "is_executing": False,
+            "current_operation": "idle",
+            "operation_well": None
         }
 
 
@@ -283,6 +331,34 @@ async def get_pipetting_logs(last_n: int = 50):
             "logs": [],
             "message": f"Error fetching logs: {str(e)}"
         }
+
+
+@app.post("/api/pipetting/set-pipette-count")
+async def set_pipette_count(request: SetPipetteCountRequest):
+    """Set the pipette configuration (1 or 3 pipettes)"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        pipetting_controller.set_pipette_count(request.pipetteCount)
+        return {
+            "status": "success",
+            "message": f"Pipette configuration set to {request.pipetteCount} pipette(s)",
+            "pipette_count": request.pipetteCount
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error setting pipette count: {str(e)}"
+        )
 
 
 # Mount static files for frontend (serve built React app or dev version)

@@ -143,40 +143,104 @@
     gap: 20px;
     font-size: 1rem;
     color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.operation-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    animation: fade-in 0.3s ease;
+}
+
+.operation-status.operation-aspirating {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    border: 1px solid #3b82f6;
+}
+
+.operation-status.operation-dispensing {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.operation-status.operation-moving {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pipette-config-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.pipette-config-control label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.pipette-config-control select {
+    flex: 0 0 auto;
+    min-width: 150px;
 }
 
 /* Grid */
 .plate-grid-wrapper {
     background: var(--bg-tertiary);
-    padding: 10px;
+    padding: 20px;
     border-radius: 10px;
     flex: 1;
 }
 
 .column-headers {
     display: grid;
-    grid-template-columns: 30px repeat(12, 1fr);
-    gap: 3px;
-    margin-bottom: 3px;
+    grid-template-columns: 40px repeat(12, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+    justify-items: center;
+    align-items: center;
 }
 
 .row-label-space {
-    width: 30px;
+    width: 40px;
 }
 
 .column-header {
     text-align: center;
     font-weight: 600;
-    padding: 2px;
-    font-size: 0.8rem;
+    padding: 4px;
+    font-size: 0.75rem;
     color: var(--text-primary);
 }
 
 .plate-row {
     display: grid;
-    grid-template-columns: 30px repeat(12, 1fr);
-    gap: 3px;
-    margin-bottom: 3px;
+    grid-template-columns: 40px repeat(12, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+    justify-items: center;
+    align-items: center;
 }
 
 .row-label {
@@ -184,7 +248,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-primary);
 }
 
@@ -194,16 +258,99 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: default;
-    font-size: 0.75rem;
+    cursor: pointer;
+    font-size: 0.65rem;
     font-weight: 600;
     transition: all 0.2s ease;
     border: 2px solid transparent;
+    width: 50%;
+    max-width: 50px;
+    margin: auto;
+}
+
+.well:hover {
+    transform: scale(1.1);
+    opacity: 0.8;
 }
 
 .well.selected {
     border: 2px solid #ffd700;
     box-shadow: 0 0 8px #ffd700;
+}
+
+.well.pipette-side {
+    border: 2px solid #fbbf24;
+    box-shadow: 0 0 6px #fbbf24;
+    opacity: 0.9;
+}
+
+.well.target {
+    border: 2px solid #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 8px #10b981;
+    }
+    50% {
+        box-shadow: 0 0 16px #10b981;
+    }
+}
+
+/* Operation animations */
+.well.operation-aspirating {
+    border: 3px solid #3b82f6 !important;
+    box-shadow: 0 0 12px #3b82f6;
+    animation: aspirate-pulse 1s infinite;
+    background: rgba(59, 130, 246, 0.2) !important;
+}
+
+@keyframes aspirate-pulse {
+    0%, 100% {
+        box-shadow: 0 0 12px #3b82f6, inset 0 0 10px #3b82f6;
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 24px #3b82f6, inset 0 0 20px #3b82f6;
+        transform: scale(1.1);
+    }
+}
+
+.well.operation-dispensing {
+    border: 3px solid #10b981 !important;
+    box-shadow: 0 0 12px #10b981;
+    animation: dispense-pulse 1s infinite;
+    background: rgba(16, 185, 129, 0.2) !important;
+}
+
+@keyframes dispense-pulse {
+    0%, 100% {
+        box-shadow: 0 0 12px #10b981, inset 0 0 10px #10b981;
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 24px #10b981, inset 0 0 20px #10b981;
+        transform: scale(1.15);
+    }
+}
+
+.well.operation-moving {
+    border: 3px solid #f59e0b !important;
+    box-shadow: 0 0 10px #f59e0b;
+    animation: move-pulse 0.8s infinite;
+}
+
+@keyframes move-pulse {
+    0%, 100% {
+        box-shadow: 0 0 10px #f59e0b;
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 20px #f59e0b;
+        opacity: 0.8;
+    }
 }
 
 /* Well types - all same color */
@@ -471,6 +618,27 @@
     background: #b91c1c;
 }
 
+.btn-move-to-well {
+    background: #10b981;
+    color: white;
+}
+
+.btn-move-to-well:hover {
+    background: #059669;
+}
+
+.btn-move-to-well:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.btn-move-to-well:disabled:hover {
+    background: #6b7280;
+    transform: none;
+    box-shadow: none;
+}
+
 .btn-primary {
     background: rgba(59, 130, 246, 0.8);
     color: white;
@@ -596,6 +764,14 @@
     margin: 10px 0;
 }
 
+.step-config-info {
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 3px solid #8b5cf6;
+}
+
 .step-repetition-info {
     margin-bottom: 10px;
     padding: 8px 12px;
@@ -705,13 +881,22 @@
 
     /* Plate grid */
     .plate-grid-wrapper {
-        padding: 5px;
+        padding: 15px;
         overflow-x: auto;
     }
 
     .column-headers,
     .plate-row {
-        min-width: 500px;
+        min-width: 600px;
+        gap: 6px;
+    }
+
+    .column-headers {
+        margin-bottom: 6px;
+    }
+
+    .plate-row {
+        margin-bottom: 6px;
     }
 
     .column-header,
@@ -720,7 +905,9 @@
     }
 
     .well {
-        font-size: 0.65rem;
+        font-size: 0.6rem;
+        width: 50%;
+        max-width: 45px;
     }
 
     /* Right panel sections */
@@ -841,9 +1028,22 @@
     }
 
     /* Plate grid - make it scrollable */
+    .plate-grid-wrapper {
+        padding: 12px;
+    }
+
     .column-headers,
     .plate-row {
-        min-width: 450px;
+        min-width: 550px;
+        gap: 5px;
+    }
+
+    .column-headers {
+        margin-bottom: 5px;
+    }
+
+    .plate-row {
+        margin-bottom: 5px;
     }
 
     .column-header,
@@ -852,7 +1052,9 @@
     }
 
     .well {
-        font-size: 0.6rem;
+        font-size: 0.55rem;
+        width: 50%;
+        max-width: 40px;
     }
 
     /* Sections */
@@ -974,8 +1176,10 @@
     }
 
     .well {
-        min-width: 30px;
-        min-height: 30px;
+        width: 50%;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 2px;
     }
 }
 
