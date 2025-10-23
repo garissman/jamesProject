@@ -38,36 +38,71 @@ function App() {
     const logsEndRef = useRef(null)
     const previousLogCountRef = useRef(0)
 
+    const validateWellId = (wellId) => {
+        if (!wellId || wellId.trim() === '') return true // Empty is OK for optional fields
+
+        // Well ID format: Row (A-H) + Column (1-12)
+        const wellPattern = /^[A-H]([1-9]|1[0-2])$/
+        return wellPattern.test(wellId.trim().toUpperCase())
+    }
+
     const handleAddStep = () => {
-        if (pickupWell) {
-            const newStep = {
-                id: Date.now(),
-                cycles: Number(cycles),
-                pickupWell,
-                dropoffWell,
-                rinseWell,
-                waitTime,
-                sampleVolume,
-                repetitionMode,
-                repetitionQuantity: repetitionMode === 'quantity' ? Number(repetitionQuantity) : 1,
-                repetitionInterval: repetitionMode === 'timeFrequency' ? Number(repetitionInterval) : null,
-                repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null,
-                pipetteCount: Number(pipetteCount)
-            }
-            setSteps([...steps, newStep])
-            // Reset form
-            setCycles(1)
-            setPickupWell('')
-            setDropoffWell('')
-            setRinseWell('')
-            setWaitTime('')
-            setSampleVolume('')
-            setRepetitionMode('quantity')
-            setRepetitionQuantity(1)
-            setRepetitionInterval('')
-            setRepetitionDuration('')
-            setPipetteCount(3) // Reset to default (3 pipettes)
+        // Validate required fields
+        if (!pickupWell || pickupWell.trim() === '') {
+            alert('Pickup well is required')
+            return
         }
+
+        // Validate well IDs
+        if (!validateWellId(pickupWell)) {
+            alert('Invalid pickup well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            return
+        }
+
+        if (dropoffWell && !validateWellId(dropoffWell)) {
+            alert('Invalid dropoff well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            return
+        }
+
+        if (rinseWell && !validateWellId(rinseWell)) {
+            alert('Invalid rinse well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            return
+        }
+
+        // Validate other fields
+        if (sampleVolume && (Number(sampleVolume) <= 0 || Number(sampleVolume) > 10)) {
+            alert('Sample volume must be between 0 and 10 mL')
+            return
+        }
+
+        const newStep = {
+            id: Date.now(),
+            cycles: Number(cycles),
+            pickupWell: pickupWell.trim().toUpperCase(),
+            dropoffWell: dropoffWell ? dropoffWell.trim().toUpperCase() : '',
+            rinseWell: rinseWell ? rinseWell.trim().toUpperCase() : '',
+            waitTime,
+            sampleVolume,
+            repetitionMode,
+            repetitionQuantity: repetitionMode === 'quantity' ? Number(repetitionQuantity) : 1,
+            repetitionInterval: repetitionMode === 'timeFrequency' ? Number(repetitionInterval) : null,
+            repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null,
+            pipetteCount: Number(pipetteCount)
+        }
+        setSteps([...steps, newStep])
+
+        // Reset form
+        setCycles(1)
+        setPickupWell('')
+        setDropoffWell('')
+        setRinseWell('')
+        setWaitTime('')
+        setSampleVolume('')
+        setRepetitionMode('quantity')
+        setRepetitionQuantity(1)
+        setRepetitionInterval('')
+        setRepetitionDuration('')
+        setPipetteCount(3) // Reset to default (3 pipettes)
     }
 
     // Initialize 96-well plate data (8 rows x 12 columns)
@@ -114,7 +149,11 @@ function App() {
     }
 
     const handleDeleteAll = () => {
-        setWellData({})
+        if (steps.length > 0) {
+            if (window.confirm(`Are you sure you want to delete all ${steps.length} step(s)?`)) {
+                setSteps([])
+            }
+        }
     }
 
     const handleSaveProgram = () => {
@@ -685,7 +724,10 @@ function App() {
                                             const isPipettePosition = pipetteWells.includes(wellId)
                                             const isCenterPipette = wellId === selectedWell
                                             const isSidePipette = isPipettePosition && !isCenterPipette
-                                            const isOperating = operationWell === wellId
+
+                                            // Check if this well is part of an operation (for multi-pipette animation)
+                                            const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                            const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
                                             const operationClass = isOperating ? `operation-${currentOperation}` : ''
 
                                             return (
