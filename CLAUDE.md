@@ -9,10 +9,10 @@ This is a full-stack laboratory sampler application with:
 - **Backend**: FastAPI (Python) providing REST API
 - **Frontend**: React + Vite with a 96-well plate interface for laboratory workflow management
 - **Electronic**: A Raspberry Pi microcontroller will be used for hardware control, with the pins Setup:
-  Stepper X Motor Driver 1 in GPIO04,GPIO17,GPIO27,GPIO22;
-  Stepper Y Motor Driver 2 in GPIO23,GPIO24,GPIO25,GPIO05;
-  Stepper Z Motor Driver 3 in GPIO06,GPIO12,GPIO13,GPIO16;
-  Stepper pipette/gripper Motor Driver 4 in GPIO19,GPIO26,GPIO20,GPIO21;
+  Stepper X Motor Driver 1 in Pulse Pin: GPIO04, Drive Pin: GPIO17;
+  Stepper Y Motor Driver 2 in Pulse Pin: GPIO27, Drive Pin: GPIO22;
+  Stepper Z Motor Driver 3 in Pulse Pin: GPIO23, Drive Pin: GPIO24;
+  Stepper pipette/gripper Motor Driver 4 in Pulse Pin: GPIO25, Drive Pin: GPIO05;
 - **Well Layout**: 8 rows (A-H) × 12 columns (1-12) representing a standard 96-well plate, evenly separated 4mm,
   each well size is 14 mm high and 8 mm in diameter.
 
@@ -81,13 +81,14 @@ The application uses a single-page component architecture in `frontend/src/App.j
 
 ### Backend Structure
 
-- FastAPI server with CORS configured for local frontend (`http://localhost:5173`)
+- FastAPI server with local frontend
 - REST API endpoints at `/api/*`
 - Uses Pydantic models for request/response validation
 
 ## Development Notes
 
-- Frontend dev server may use port 5174 if 5173 is occupied
-- Backend CORS is configured only for `http://localhost:5173` - update `main.py` if frontend port changes
+- Backend CORS is configured only for any host - update `main.py` if frontend port changes
 - Well identifiers follow format: `{Row}{Column}` (e.g., A1, B2, H12)
 - The UI uses a blue gradient theme with glassmorphism effects
+- There are 2 setups of pipette, the first setup is with 1 pipette, the second is 3 pipette, by default will be 3
+  pipette

@@ -1,6 +1,7 @@
 """
 Stepper Motor Control Class for Laboratory Sampler
 Controls 4 stepper motors via GPIO pins on Raspberry Pi
+Uses stepper motor drivers (DRV8825/A4988) with STEP and DIR pins
 """
 
 try:
@@ -18,57 +19,32 @@ from typing import List, Tuple
 class Direction(Enum):
     """Motor rotation direction"""
     CLOCKWISE = 1
-    COUNTERCLOCKWISE = -1
+    COUNTERCLOCKWISE = 0
 
 
 class StepperMotor:
-    """Individual stepper motor controller"""
+    """Individual stepper motor controller using driver (STEP/DIR control)"""
 
-    # Half-step sequence for smoother motion
-    HALF_STEP_SEQUENCE = [
-        [1, 0, 0, 0],
-        [1, 1, 0, 0],
-        [0, 1, 0, 0],
-        [0, 1, 1, 0],
-        [0, 0, 1, 0],
-        [0, 0, 1, 1],
-        [0, 0, 0, 1],
-        [1, 0, 0, 1]
-    ]
-
-    # Full-step sequence for more torque
-    FULL_STEP_SEQUENCE = [
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
-    ]
-
-    def __init__(self, pins: Tuple[int, int, int, int], name: str = "Motor"):
+    def __init__(self, pulse_pin: int, dir_pin: int, name: str = "Motor"):
         """
-        Initialize a stepper motor
+        Initialize a stepper motor with driver
 
         Args:
-            pins: Tuple of 4 GPIO pin numbers (IN1, IN2, IN3, IN4)
+            pulse_pin: GPIO pin for STEP/PULSE signal
+            dir_pin: GPIO pin for DIRECTION signal
             name: Descriptive name for the motor
         """
-        self.pins = pins
+        self.pulse_pin = pulse_pin
+        self.dir_pin = dir_pin
         self.name = name
         self.current_position = 0
-        self.step_sequence = self.HALF_STEP_SEQUENCE
-        self.sequence_index = 0
 
         if GPIO_AVAILABLE:
             GPIO.setmode(GPIO.BCM)
-            for pin in self.pins:
-                GPIO.setup(pin, GPIO.OUT)
-                GPIO.output(pin, GPIO.LOW)
-
-    def _set_step(self, step: List[int]):
-        """Set the GPIO pins for a single step"""
-        if GPIO_AVAILABLE:
-            for pin, value in zip(self.pins, step):
-                GPIO.output(pin, value)
+            GPIO.setup(self.pulse_pin, GPIO.OUT)
+            GPIO.setup(self.dir_pin, GPIO.OUT)
+            GPIO.output(self.pulse_pin, GPIO.LOW)
+            GPIO.output(self.dir_pin, GPIO.LOW)
 
     def step(self, direction: Direction = Direction.CLOCKWISE, steps: int = 1, delay: float = 0.001):
         """
@@ -79,48 +55,44 @@ class StepperMotor:
             steps: Number of steps to move
             delay: Delay between steps in seconds (controls speed)
         """
+        # Set direction
+        if GPIO_AVAILABLE:
+            GPIO.output(self.dir_pin, direction.value)
+
+        # Update position tracking
+        position_delta = steps if direction == Direction.CLOCKWISE else -steps
+
+        # Generate step pulses
         for _ in range(steps):
-            self._set_step(self.step_sequence[self.sequence_index])
-
-            # Update position and sequence index
-            if direction == Direction.CLOCKWISE:
-                self.sequence_index = (self.sequence_index + 1) % len(self.step_sequence)
-                self.current_position += 1
+            if GPIO_AVAILABLE:
+                GPIO.output(self.pulse_pin, GPIO.HIGH)
+                time.sleep(delay)
+                GPIO.output(self.pulse_pin, GPIO.LOW)
+                time.sleep(delay)
             else:
-                self.sequence_index = (self.sequence_index - 1) % len(self.step_sequence)
-                self.current_position -= 1
+                time.sleep(delay * 2)  # Simulate step time in non-GPIO mode
 
-            time.sleep(delay)
+        self.current_position += position_delta
 
     def rotate_degrees(self, degrees: float, direction: Direction = Direction.CLOCKWISE,
-                      steps_per_revolution: int = 2048, delay: float = 0.001):
+                      steps_per_revolution: int = 200, delay: float = 0.001):
         """
         Rotate motor by specified degrees
 
         Args:
             degrees: Angle to rotate
             direction: Rotation direction
-            steps_per_revolution: Steps for 360° rotation (2048 for 28BYJ-48 with half-step)
+            steps_per_revolution: Steps for 360° rotation (200 for 1.8° stepper, 400 for 0.9°)
             delay: Delay between steps
         """
         steps = int((degrees / 360.0) * steps_per_revolution)
         self.step(direction, steps, delay)
 
-    def use_full_step(self):
-        """Switch to full-step mode (more torque, less smooth)"""
-        self.step_sequence = self.FULL_STEP_SEQUENCE
-        self.sequence_index = 0
-
-    def use_half_step(self):
-        """Switch to half-step mode (smoother, less torque)"""
-        self.step_sequence = self.HALF_STEP_SEQUENCE
-        self.sequence_index = 0
-
     def stop(self):
-        """De-energize the motor"""
+        """Set both control pins low"""
         if GPIO_AVAILABLE:
-            for pin in self.pins:
-                GPIO.output(pin, GPIO.LOW)
+            GPIO.output(self.pulse_pin, GPIO.LOW)
+            GPIO.output(self.dir_pin, GPIO.LOW)
 
     def get_position(self) -> int:
         """Get current position in steps"""
@@ -134,18 +106,18 @@ class StepperMotor:
 class StepperController:
     """Main controller for all 4 stepper motors"""
 
-    # GPIO pin configuration from CLAUDE.md
+    # GPIO pin configuration from CLAUDE.md (Pulse Pin, Direction Pin)
     MOTOR_PINS = {
-        1: (4, 17, 27, 22),    # Motor 1 (X-axis typically)
-        2: (23, 24, 25, 5),    # Motor 2 (Y-axis typically)
-        3: (6, 12, 13, 16),    # Motor 3 (Z-axis typically)
-        4: (19, 26, 20, 21)    # Motor 4 (Pipette/gripper typically)
+        1: (4, 17),     # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
+        2: (27, 22),    # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
+        3: (23, 24),    # Motor 3 Z-axis: Pulse=GPIO23, Dir=GPIO24
+        4: (25, 5)      # Motor 4 Pipette: Pulse=GPIO25, Dir=GPIO05
     }
 
     def __init__(self):
         """Initialize all stepper motors"""
         self.motors = {
-            motor_id: StepperMotor(pins, f"Motor_{motor_id}")
+            motor_id: StepperMotor(pins[0], pins[1], f"Motor_{motor_id}")
             for motor_id, pins in self.MOTOR_PINS.items()
         }
         print(f"Initialized {len(self.motors)} stepper motors")

@@ -1,3 +1,47 @@
+/* Light Theme Variables - Light Gray Style */
+:root[data-theme="light"] {
+    --bg-primary: linear-gradient(135deg, #f5f5f5 0%, #e5e5e5 100%);
+    --bg-secondary: rgba(255, 255, 255, 0.8);
+    --bg-tertiary: rgba(0, 0, 0, 0.03);
+    --bg-overlay: rgba(0, 0, 0, 0.05);
+    --text-primary: #1a1a1a;
+    --text-secondary: #404040;
+    --text-tertiary: #737373;
+    --border-color: rgba(0, 0, 0, 0.15);
+    --border-hover: rgba(0, 0, 0, 0.3);
+    --well-bg: rgba(0, 0, 0, 0.08);
+    --well-text: #1a1a1a;
+    --logs-bg: rgba(0, 0, 0, 0.05);
+    --logs-text: #1a1a1a;
+    --nav-active: rgba(0, 0, 0, 0.1);
+    --nav-hover: rgba(0, 0, 0, 0.05);
+    --input-bg: rgba(255, 255, 255, 0.9);
+    --input-border: rgba(0, 0, 0, 0.2);
+    --input-focus-bg: rgba(255, 255, 255, 1);
+}
+
+/* Dark Theme Variables - Black Style */
+:root[data-theme="dark"] {
+    --bg-primary: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    --bg-secondary: rgba(255, 255, 255, 0.05);
+    --bg-tertiary: rgba(255, 255, 255, 0.02);
+    --bg-overlay: rgba(255, 255, 255, 0.08);
+    --text-primary: #ffffff;
+    --text-secondary: #d4d4d4;
+    --text-tertiary: #a3a3a3;
+    --border-color: rgba(255, 255, 255, 0.15);
+    --border-hover: rgba(255, 255, 255, 0.3);
+    --well-bg: rgba(255, 255, 255, 0.1);
+    --well-text: #ffffff;
+    --logs-bg: rgba(0, 0, 0, 0.4);
+    --logs-text: #d4d4d4;
+    --nav-active: rgba(255, 255, 255, 0.1);
+    --nav-hover: rgba(255, 255, 255, 0.05);
+    --input-bg: rgba(255, 255, 255, 0.08);
+    --input-border: rgba(255, 255, 255, 0.2);
+    --input-focus-bg: rgba(255, 255, 255, 0.12);
+}
+
 #root {
     margin: 0;
     padding: 0;
@@ -8,8 +52,8 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #4169e1 0%, #1e3a8a 100%);
-    color: white;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 }
 
@@ -24,8 +68,8 @@
 
 .nav-tab {
     background: transparent;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
     padding: 12px 40px;
     font-size: 1.1rem;
     cursor: pointer;
@@ -37,12 +81,17 @@
 }
 
 .nav-tab.active {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: var(--nav-active);
+    border-color: var(--border-hover);
 }
 
 .nav-tab:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--nav-hover);
+}
+
+.nav-tab.theme-toggle {
+    margin-left: auto;
+    border-radius: 8px;
 }
 
 .nav-tab.info-btn {
@@ -67,7 +116,7 @@
 
 .plate-section {
     flex: 1;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary);
     border-radius: 15px;
     padding: 15px;
     min-width: 0;
@@ -86,17 +135,19 @@
     font-size: 1.3rem;
     margin: 0;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .plate-info {
     display: flex;
     gap: 20px;
     font-size: 1rem;
+    color: var(--text-secondary);
 }
 
 /* Grid */
 .plate-grid-wrapper {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-tertiary);
     padding: 10px;
     border-radius: 10px;
     flex: 1;
@@ -118,6 +169,7 @@
     font-weight: 600;
     padding: 2px;
     font-size: 0.8rem;
+    color: var(--text-primary);
 }
 
 .plate-row {
@@ -133,6 +185,7 @@
     justify-content: center;
     font-weight: 600;
     font-size: 0.9rem;
+    color: var(--text-primary);
 }
 
 .well {
@@ -168,8 +221,8 @@
 .well-ud,
 .well-ep,
 .well-selected {
-    background: rgba(255, 255, 255, 0.3);
-    color: white;
+    background: var(--well-bg);
+    color: var(--well-text);
 }
 
 /* Right Panel */
@@ -182,7 +235,7 @@
 }
 
 .legend {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary);
     border-radius: 15px;
     padding: 20px;
 }
@@ -214,7 +267,7 @@
 }
 
 .logs-section {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary);
     border-radius: 15px;
     padding: 15px;
     max-height: 250px;
@@ -226,10 +279,11 @@
     margin: 0 0 10px 0;
     font-size: 1.1rem;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .logs-viewer {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--logs-bg);
     border-radius: 8px;
     padding: 10px;
     flex: 1;
@@ -241,20 +295,20 @@
 
 .log-entry {
     padding: 2px 0;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--logs-text);
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .log-placeholder {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-tertiary);
     font-style: italic;
     text-align: center;
     padding: 10px;
 }
 
 .concentration-section {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary);
     border-radius: 15px;
     padding: 20px;
     flex: 1;
@@ -264,6 +318,7 @@
     margin: 0 0 15px 0;
     font-size: 1.2rem;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .steps-list {
@@ -275,34 +330,34 @@
 }
 
 .step-cycle {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-tertiary);
     padding: 12px;
     border-radius: 8px;
-    border-left: 3px solid rgba(255, 255, 255, 0.3);
+    border-left: 3px solid var(--border-color);
 }
 
 .step-cycle h4 {
     margin: 0 0 8px 0;
     font-size: 1rem;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-secondary);
 }
 
 .step-item {
     padding: 4px 0;
     font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-tertiary);
 }
 
 .step-placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-tertiary);
     font-style: italic;
     text-align: center;
     padding: 20px;
 }
 
 .step-group {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-overlay);
     padding: 15px;
     border-radius: 10px;
     margin-bottom: 10px;
@@ -311,15 +366,15 @@
 .step-group h4 {
     margin: 0 0 10px 0;
     font-size: 1.1rem;
-    color: rgba(255, 255, 255, 0.95);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
 }
 
 .step-cycle strong {
     display: block;
     margin-bottom: 5px;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-secondary);
 }
 
 /* Buttons */
@@ -449,7 +504,7 @@
     gap: 10px;
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: 1px solid var(--border-color);
 }
 
 .btn-save-program,
@@ -480,7 +535,7 @@
 /* Program Section */
 .program-section {
     flex: 1;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary);
     border-radius: 15px;
     padding: 40px;
 }
@@ -489,6 +544,7 @@
     margin: 0 0 30px 0;
     font-size: 1.8rem;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .program-form {
@@ -507,27 +563,51 @@
 .form-group label {
     font-size: 1.1rem;
     font-weight: 600;
-    color: white;
+    color: var(--text-primary);
 }
 
 .form-input {
     padding: 12px 16px;
     font-size: 1rem;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid var(--input-border);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
+    background: var(--input-bg);
+    color: var(--text-primary);
     transition: all 0.3s ease;
 }
 
 .form-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-tertiary);
 }
 
 .form-input:focus {
     outline: none;
-    border-color: rgba(255, 255, 255, 0.6);
-    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--border-hover);
+    background: var(--input-focus-bg);
+}
+
+.form-select {
+    cursor: pointer;
+}
+
+.form-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 10px 0;
+}
+
+.step-repetition-info {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 3px solid #3b82f6;
+}
+
+.step-item-header {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 /* Footer */
@@ -536,4 +616,375 @@
     padding: 10px;
     font-size: 0.85rem;
     opacity: 0.8;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE STYLES
+   ======================================== */
+
+/* Tablet and below (< 1024px) */
+@media (max-width: 1024px) {
+    .plate-container {
+        flex-direction: column;
+        gap: 15px;
+        padding: 10px;
+    }
+
+    .right-panel {
+        width: 100%;
+        min-width: 100%;
+        order: 2;
+    }
+
+    .plate-section {
+        order: 1;
+    }
+
+    .concentration-section {
+        order: 3;
+    }
+
+    .action-buttons {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .action-buttons .btn {
+        flex: 1 1 45%;
+        min-width: 150px;
+    }
+}
+
+/* Mobile devices (< 768px) */
+@media (max-width: 768px) {
+    .App {
+        font-size: 14px;
+    }
+
+    /* Navigation */
+    .nav-tabs {
+        flex-wrap: wrap;
+        padding: 10px;
+        gap: 5px;
+    }
+
+    .nav-tab {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+        flex: 1 1 auto;
+        min-width: 120px;
+    }
+
+    .nav-tab.theme-toggle {
+        margin-left: 0;
+        flex: 0 1 auto;
+        padding: 10px 15px;
+    }
+
+    .nav-icon {
+        font-size: 1rem;
+    }
+
+    /* Plate header */
+    .plate-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .plate-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .plate-info {
+        flex-direction: column;
+        gap: 5px;
+        font-size: 0.9rem;
+        width: 100%;
+    }
+
+    /* Plate grid */
+    .plate-grid-wrapper {
+        padding: 5px;
+        overflow-x: auto;
+    }
+
+    .column-headers,
+    .plate-row {
+        min-width: 500px;
+    }
+
+    .column-header,
+    .row-label {
+        font-size: 0.7rem;
+    }
+
+    .well {
+        font-size: 0.65rem;
+    }
+
+    /* Right panel sections */
+    .logs-section,
+    .concentration-section {
+        padding: 12px;
+    }
+
+    .logs-section h3,
+    .concentration-section h3 {
+        font-size: 1rem;
+    }
+
+    .logs-viewer {
+        font-size: 0.7rem;
+        max-height: 150px;
+    }
+
+    .steps-list {
+        max-height: 300px;
+    }
+
+    /* Program section */
+    .program-section {
+        padding: 20px 15px;
+    }
+
+    .program-section h2 {
+        font-size: 1.4rem;
+    }
+
+    .program-form {
+        max-width: 100%;
+        gap: 20px;
+    }
+
+    .form-group label {
+        font-size: 1rem;
+    }
+
+    .form-input {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 12px 20px;
+        font-size: 1rem;
+    }
+
+    .action-buttons .btn {
+        flex: 1 1 100%;
+        min-width: 100%;
+    }
+
+    .program-file-actions {
+        flex-direction: column;
+    }
+
+    .btn-save-program,
+    .btn-load-program {
+        flex: 1 1 100%;
+    }
+
+    /* Step display */
+    .step-group {
+        padding: 12px;
+    }
+
+    .step-group h4 {
+        font-size: 1rem;
+    }
+
+    .step-cycle {
+        padding: 10px;
+    }
+
+    .step-item {
+        font-size: 0.9rem;
+    }
+
+    .step-item-header {
+        font-size: 0.9rem;
+    }
+}
+
+/* Small mobile devices (< 480px) */
+@media (max-width: 480px) {
+    .App {
+        font-size: 13px;
+    }
+
+    /* Navigation */
+    .nav-tabs {
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .nav-tab {
+        width: 100%;
+        padding: 12px 15px;
+        font-size: 0.95rem;
+    }
+
+    .nav-tab.theme-toggle {
+        width: 100%;
+    }
+
+    /* Plate header */
+    .plate-header h2 {
+        font-size: 1rem;
+    }
+
+    .plate-info {
+        font-size: 0.85rem;
+    }
+
+    /* Plate grid - make it scrollable */
+    .column-headers,
+    .plate-row {
+        min-width: 450px;
+    }
+
+    .column-header,
+    .row-label {
+        font-size: 0.65rem;
+    }
+
+    .well {
+        font-size: 0.6rem;
+    }
+
+    /* Sections */
+    .plate-section,
+    .program-section {
+        padding: 12px;
+        border-radius: 10px;
+    }
+
+    .logs-section,
+    .concentration-section {
+        padding: 10px;
+    }
+
+    .logs-section h3,
+    .concentration-section h3 {
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+    }
+
+    .logs-viewer {
+        font-size: 0.65rem;
+        max-height: 120px;
+    }
+
+    /* Program form */
+    .program-section h2 {
+        font-size: 1.2rem;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        gap: 6px;
+    }
+
+    .form-group label {
+        font-size: 0.95rem;
+    }
+
+    .form-input {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 12px 18px;
+        font-size: 0.95rem;
+    }
+
+    /* Step display */
+    .step-group {
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+
+    .step-group h4 {
+        font-size: 0.95rem;
+        padding-bottom: 6px;
+    }
+
+    .step-cycle {
+        padding: 8px;
+    }
+
+    .step-item {
+        font-size: 0.85rem;
+        padding: 3px 0;
+    }
+
+    .step-repetition-info {
+        padding: 6px 10px;
+        margin-bottom: 8px;
+    }
+
+    .step-item-header {
+        font-size: 0.85rem;
+    }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+    .plate-container {
+        flex-direction: row;
+    }
+
+    .right-panel {
+        width: 40%;
+        min-width: 300px;
+    }
+
+    .plate-section {
+        flex: 1;
+    }
+
+    .logs-section {
+        max-height: 200px;
+    }
+
+    .steps-list {
+        max-height: 250px;
+    }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .nav-tab {
+        min-height: 44px;
+    }
+
+    .btn {
+        min-height: 44px;
+    }
+
+    .form-input,
+    .form-select {
+        min-height: 44px;
+    }
+
+    .well {
+        min-width: 30px;
+        min-height: 30px;
+    }
+}
+
+/* Prevent text selection on touch devices for better UX */
+@media (hover: none) {
+    .nav-tab,
+    .btn,
+    .well {
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
 }

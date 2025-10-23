@@ -1,18 +1,21 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-from typing import Optional, List
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-import threading
+from typing import Optional, List
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
 from pipetting_controller import PipettingController, PipettingStep
 
 # Global pipetting controller instance
 pipetting_controller: Optional[PipettingController] = None
 execution_lock = threading.Lock()
 is_executing = False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,12 +35,13 @@ async def lifespan(app: FastAPI):
     if pipetting_controller:
         pipetting_controller.cleanup()
 
+
 app = FastAPI(lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React dev server
+    allow_origins=["*"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +50,7 @@ app.add_middleware(
 # Frontend static files configuration
 FRONTEND_DIST_DIR = Path(__file__).parent / "frontend" / "dist"
 FRONTEND_DEV_DIR = Path(__file__).parent / "frontend"
+
 
 # Pydantic models for pipetting operations
 class PipettingStepRequest(BaseModel):
@@ -56,10 +61,16 @@ class PipettingStepRequest(BaseModel):
     sampleVolume: float = Field(..., gt=0, le=10, description="Volume in mL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
+    repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
+    repetitionQuantity: int = Field(1, ge=1, description="Number of times to repeat (for quantity mode)")
+    repetitionInterval: Optional[int] = Field(None, ge=0, description="Interval between repetitions in seconds (for timeFrequency mode)")
+    repetitionDuration: Optional[int] = Field(None, ge=0, description="Total duration in seconds (for timeFrequency mode)")
+
 
 class PipettingSequenceRequest(BaseModel):
     """Complete pipetting sequence"""
     steps: List[PipettingStepRequest] = Field(..., min_length=1, description="List of pipetting steps")
+
 
 class PipettingResponse(BaseModel):
     """Response for pipetting operations"""
@@ -67,10 +78,12 @@ class PipettingResponse(BaseModel):
     message: str
     steps_executed: int = 0
 
+
 class Item(BaseModel):
     name: str
     description: str = None
     price: float
+
 
 @app.get("/api/items")
 async def get_items():
@@ -79,9 +92,11 @@ async def get_items():
         {"id": 2, "name": "Item 2", "description": "Second item", "price": 20.99},
     ]
 
+
 @app.post("/api/items")
 async def create_item(item: Item):
     return {"id": 3, **item.model_dump()}
+
 
 # Pipetting API endpoints
 def run_pipetting_sequence(pipetting_steps: List[PipettingStep]):
@@ -94,6 +109,7 @@ def run_pipetting_sequence(pipetting_steps: List[PipettingStep]):
         print(f"Error during execution: {e}")
     finally:
         is_executing = False
+
 
 @app.post("/api/pipetting/execute", response_model=PipettingResponse)
 async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
@@ -138,7 +154,11 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
                 rinse_well=step.rinseWell,
                 volume_ml=step.sampleVolume,
                 wait_time=step.waitTime,
-                cycles=step.cycles
+                cycles=step.cycles,
+                repetition_mode=step.repetitionMode,
+                repetition_quantity=step.repetitionQuantity,
+                repetition_interval=step.repetitionInterval,
+                repetition_duration=step.repetitionDuration
             ))
 
         # Run in background thread so status endpoint can respond
@@ -159,6 +179,7 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
             status_code=500,
             detail=f"Error executing pipetting sequence: {str(e)}"
         )
+
 
 @app.post("/api/pipetting/stop")
 async def stop_pipetting_execution():
@@ -181,6 +202,7 @@ async def stop_pipetting_execution():
             detail=f"Error stopping execution: {str(e)}"
         )
 
+
 @app.post("/api/pipetting/home")
 async def home_pipetting_system():
     """Return pipetting system to home position (well A1)"""
@@ -198,6 +220,7 @@ async def home_pipetting_system():
             status_code=500,
             detail=f"Error homing system: {str(e)}"
         )
+
 
 @app.get("/api/pipetting/status")
 async def get_pipetting_status():
@@ -234,6 +257,7 @@ async def get_pipetting_status():
             "is_executing": False
         }
 
+
 @app.get("/api/pipetting/logs")
 async def get_pipetting_logs(last_n: int = 50):
     """
@@ -260,10 +284,12 @@ async def get_pipetting_logs(last_n: int = 50):
             "message": f"Error fetching logs: {str(e)}"
         }
 
+
 # Mount static files for frontend (serve built React app or dev version)
 if FRONTEND_DIST_DIR.exists():
     # Production mode: serve built files
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_DIR / "assets"), name="assets")
+
 
     @app.get("/{full_path:path}")
     async def serve_frontend_prod(full_path: str):
@@ -291,6 +317,7 @@ elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():
     # Mount public directory if it exists
     if (FRONTEND_DEV_DIR / "public").exists():
         app.mount("/public", StaticFiles(directory=FRONTEND_DEV_DIR / "public"), name="public")
+
 
     @app.get("/{full_path:path}")
     async def serve_frontend_dev(full_path: str):
@@ -328,4 +355,5 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

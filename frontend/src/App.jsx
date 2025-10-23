@@ -4,6 +4,10 @@ import './App.css'
 function App() {
     const [activeTab, setActiveTab] = useState('settings')
     const [selectedWell, setSelectedWell] = useState('A1')
+    const [theme, setTheme] = useState(() => {
+        // Get theme from localStorage or default to 'light'
+        return localStorage.getItem('theme') || 'light'
+    })
 
     // Program tab state
     const [cycles, setCycles] = useState(1)
@@ -17,6 +21,12 @@ function App() {
     const [systemStatus, setSystemStatus] = useState('Connecting...')
     const [logs, setLogs] = useState([])
 
+    // Repetition mode state
+    const [repetitionMode, setRepetitionMode] = useState('quantity') // 'quantity' or 'timeFrequency'
+    const [repetitionQuantity, setRepetitionQuantity] = useState(1)
+    const [repetitionInterval, setRepetitionInterval] = useState('') // in seconds
+    const [repetitionDuration, setRepetitionDuration] = useState('') // total duration in seconds
+
     const handleAddStep = () => {
         if (pickupWell) {
             const newStep = {
@@ -26,7 +36,11 @@ function App() {
                 dropoffWell,
                 rinseWell,
                 waitTime,
-                sampleVolume
+                sampleVolume,
+                repetitionMode,
+                repetitionQuantity: repetitionMode === 'quantity' ? Number(repetitionQuantity) : 1,
+                repetitionInterval: repetitionMode === 'timeFrequency' ? Number(repetitionInterval) : null,
+                repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null
             }
             setSteps([...steps, newStep])
             // Reset form
@@ -36,6 +50,10 @@ function App() {
             setRinseWell('')
             setWaitTime('')
             setSampleVolume('')
+            setRepetitionMode('quantity')
+            setRepetitionQuantity(1)
+            setRepetitionInterval('')
+            setRepetitionDuration('')
         }
     }
 
@@ -107,7 +125,7 @@ function App() {
         }
 
         const jsonString = JSON.stringify(programData, null, 2)
-        const blob = new Blob([jsonString], { type: 'application/json' })
+        const blob = new Blob([jsonString], {type: 'application/json'})
         const url = URL.createObjectURL(blob)
 
         // Create download link
@@ -163,7 +181,7 @@ function App() {
         setIsExecuting(true)
 
         try {
-            const response = await fetch('http://localhost:8000/api/pipetting/execute', {
+            const response = await fetch('/api/pipetting/execute', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -183,7 +201,7 @@ function App() {
                 alert(`Error: ${data.detail || 'Failed to execute sequence'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}\n\nMake sure the backend is running on http://localhost:8000`)
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
         } finally {
             setIsExecuting(false)
         }
@@ -195,7 +213,7 @@ function App() {
         }
 
         try {
-            const response = await fetch('http://localhost:8000/api/pipetting/stop', {
+            const response = await fetch('/api/pipetting/stop', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -219,7 +237,7 @@ function App() {
 
     const handleHome = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/pipetting/home', {
+            const response = await fetch('/api/pipetting/home', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -236,13 +254,13 @@ function App() {
                 alert(`Error: ${data.detail || 'Failed to home system'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}\n\nMake sure the backend is running on http://localhost:8000`)
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
         }
     }
 
     const fetchCurrentPosition = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/pipetting/status')
+            const response = await fetch('/api/pipetting/status')
             const data = await response.json()
 
             if (data.initialized && data.current_well) {
@@ -266,7 +284,7 @@ function App() {
 
     const fetchLogs = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/pipetting/logs?last_n=100')
+            const response = await fetch('/api/pipetting/logs?last_n=100')
             const data = await response.json()
 
             if (data.logs) {
@@ -297,7 +315,7 @@ function App() {
             interval = setInterval(() => {
                 fetchCurrentPosition()
                 fetchLogs() // Also fetch logs during execution
-            }, 300) // Poll every 300ms during execution for smooth updates
+            }, 1000) // Poll every 300ms during execution for smooth updates
         }
         return () => {
             if (interval) clearInterval(interval)
@@ -317,6 +335,18 @@ function App() {
         return () => clearInterval(interval)
     }, [])
 
+    // Theme effect
+    useEffect(() => {
+        // Apply theme to document
+        document.documentElement.setAttribute('data-theme', theme)
+        // Save to localStorage
+        localStorage.setItem('theme', theme)
+    }, [theme])
+
+    const toggleTheme = () => {
+        setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
+    }
+
     return (
         <div className="App">
             {/* Navigation */}
@@ -333,6 +363,14 @@ function App() {
                     onClick={() => setActiveTab('program')}
                 >
                     <span className="nav-icon">◇</span> Program
+                </button>
+                <button
+                    className="nav-tab theme-toggle"
+                    onClick={toggleTheme}
+                    title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                >
+                    <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
+                    {theme === 'light' ? 'Dark' : 'Light'} Mode
                 </button>
             </nav>
 
@@ -412,6 +450,61 @@ function App() {
                                     className="form-input"
                                 />
                             </div>
+
+                            <div className="form-divider"></div>
+
+                            <div className="form-group">
+                                <label>Repetition Mode:</label>
+                                <select
+                                    value={repetitionMode}
+                                    onChange={(e) => setRepetitionMode(e.target.value)}
+                                    className="form-input form-select"
+                                >
+                                    <option value="quantity">By Quantity</option>
+                                    <option value="timeFrequency">By Time Frequency</option>
+                                </select>
+                            </div>
+
+                            {repetitionMode === 'quantity' ? (
+                                <div className="form-group">
+                                    <label>Repeat Step (times):</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={repetitionQuantity}
+                                        onChange={(e) => setRepetitionQuantity(e.target.value)}
+                                        className="form-input"
+                                        placeholder="e.g., 5"
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="form-group">
+                                        <label>Interval (seconds):</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={repetitionInterval}
+                                            onChange={(e) => setRepetitionInterval(e.target.value)}
+                                            className="form-input"
+                                            placeholder="e.g., 30"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Total Duration (seconds):</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={repetitionDuration}
+                                            onChange={(e) => setRepetitionDuration(e.target.value)}
+                                            className="form-input"
+                                            placeholder="e.g., 300"
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             <button className="btn btn-add-step" onClick={handleAddStep}>
                                 Add Step
@@ -502,33 +595,53 @@ function App() {
                         <div className="concentration-section">
                             <h3>Cycles</h3>
                             <div className="steps-list">
-                                {steps.map((step, stepIndex) => (
-                                    <div key={step.id} className="step-group">
-                                        <h4>Cicle {stepIndex + 1}</h4>
-                                        {[...Array(step.cycles)].map((_, cycleIndex) => (
-                                            <div key={cycleIndex} className="step-cycle">
-                                                {step.pickupWell && (
-                                                    <div className="step-item">• Pickup from
-                                                        well: {step.pickupWell}</div>
-                                                )}
-                                                {step.sampleVolume && (
-                                                    <div className="step-item">• Sample
-                                                        volume: {step.sampleVolume} mL</div>
-                                                )}
-                                                {step.dropoffWell && (
-                                                    <div className="step-item">• Dropoff to
-                                                        well: {step.dropoffWell}</div>
-                                                )}
-                                                {step.rinseWell && (
-                                                    <div className="step-item">• Rinse at well: {step.rinseWell}</div>
-                                                )}
-                                                {step.waitTime && (
-                                                    <div className="step-item">• Wait: {step.waitTime}s</div>
+                                {steps.map((step, stepIndex) => {
+                                    // Calculate total repetitions for time frequency mode
+                                    const totalReps = step.repetitionMode === 'timeFrequency' && step.repetitionInterval && step.repetitionDuration
+                                        ? Math.floor(step.repetitionDuration / step.repetitionInterval)
+                                        : step.repetitionQuantity || 1;
+
+                                    return (
+                                        <div key={step.id} className="step-group">
+                                            <h4>Step {stepIndex + 1}</h4>
+                                            <div className="step-repetition-info">
+                                                {step.repetitionMode === 'quantity' ? (
+                                                    <div className="step-item-header">
+                                                        ↻ Repeat {step.repetitionQuantity} time(s)
+                                                    </div>
+                                                ) : (
+                                                    <div className="step-item-header">
+                                                        ⏱ Every {step.repetitionInterval}s for {step.repetitionDuration}s
+                                                        ({totalReps} times)
+                                                    </div>
                                                 )}
                                             </div>
-                                        ))}
-                                    </div>
-                                ))}
+                                            {[...Array(step.cycles)].map((_, cycleIndex) => (
+                                                <div key={cycleIndex} className="step-cycle">
+                                                    {step.pickupWell && (
+                                                        <div className="step-item">• Pickup from
+                                                            well: {step.pickupWell}</div>
+                                                    )}
+                                                    {step.sampleVolume && (
+                                                        <div className="step-item">• Sample
+                                                            volume: {step.sampleVolume} mL</div>
+                                                    )}
+                                                    {step.dropoffWell && (
+                                                        <div className="step-item">• Dropoff to
+                                                            well: {step.dropoffWell}</div>
+                                                    )}
+                                                    {step.rinseWell && (
+                                                        <div className="step-item">• Rinse at
+                                                            well: {step.rinseWell}</div>
+                                                    )}
+                                                    {step.waitTime && (
+                                                        <div className="step-item">• Wait: {step.waitTime}s</div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })}
                                 {steps.length === 0 && (
                                     <div className="step-placeholder">Add steps to see program</div>
                                 )}

@@ -28,6 +28,10 @@ class PipettingStep:
     volume_ml: float
     wait_time: int
     cycles: int = 1
+    repetition_mode: str = 'quantity'  # 'quantity' or 'timeFrequency'
+    repetition_quantity: int = 1
+    repetition_interval: Optional[int] = None  # seconds
+    repetition_duration: Optional[int] = None  # seconds
 
 
 class CoordinateMapper:
@@ -372,6 +376,36 @@ class PipettingController:
         if rinse_well:
             self.rinse(rinse_well)
 
+    def execute_step_with_cycles(self, step: PipettingStep):
+        """
+        Execute a single step with its cycles
+
+        Args:
+            step: PipettingStep object
+        """
+        for cycle in range(step.cycles):
+            # Check for stop request during cycles
+            if self.stop_requested:
+                return False
+
+            if step.cycles > 1:
+                self.log(f"  Cycle {cycle + 1}/{step.cycles}")
+
+            # Execute transfer
+            self.execute_transfer(
+                step.pickup_well,
+                step.dropoff_well,
+                step.volume_ml,
+                step.rinse_well
+            )
+
+            # Wait between cycles
+            if step.wait_time > 0 and cycle < step.cycles - 1:
+                self.log(f"  Waiting {step.wait_time} seconds...")
+                time.sleep(step.wait_time)
+
+        return True
+
     def execute_sequence(self, steps: list[PipettingStep]):
         """
         Execute a complete pipetting sequence
@@ -397,35 +431,78 @@ class PipettingController:
                 return
 
             self.log(f"--- Step {step_num}/{len(steps)} ---")
-            self.log(f"Cycles: {step.cycles}")
 
-            for cycle in range(step.cycles):
-                # Check for stop request during cycles
-                if self.stop_requested:
-                    self.log("="*60)
-                    self.log("EXECUTION STOPPED BY USER")
-                    self.log(f"Stopped at step {step_num}, cycle {cycle + 1}")
-                    self.log("="*60)
-                    self.stop_requested = False
-                    return
+            # Handle repetition based on mode
+            if step.repetition_mode == 'quantity':
+                # Quantity mode: repeat N times
+                self.log(f"Repetition: {step.repetition_quantity} time(s)")
 
-                if step.cycles > 1:
-                    self.log(f"  Cycle {cycle + 1}/{step.cycles}")
+                for rep in range(step.repetition_quantity):
+                    if self.stop_requested:
+                        break
 
-                # Execute transfer
-                self.execute_transfer(
-                    step.pickup_well,
-                    step.dropoff_well,
-                    step.volume_ml,
-                    step.rinse_well
-                )
+                    if step.repetition_quantity > 1:
+                        self.log(f"Repetition {rep + 1}/{step.repetition_quantity}")
 
-                # Wait between cycles
-                if step.wait_time > 0 and cycle < step.cycles - 1:
-                    self.log(f"  Waiting {step.wait_time} seconds...")
-                    time.sleep(step.wait_time)
+                    # Execute the step with all its cycles
+                    if not self.execute_step_with_cycles(step):
+                        break
 
-            # Wait before next step
+                    # Wait between repetitions (except after the last one)
+                    if rep < step.repetition_quantity - 1:
+                        if step.wait_time > 0:
+                            self.log(f"  Waiting {step.wait_time} seconds before next repetition...")
+                            time.sleep(step.wait_time)
+
+            elif step.repetition_mode == 'timeFrequency':
+                # Time frequency mode: repeat at intervals for a duration
+                if step.repetition_interval and step.repetition_duration:
+                    total_reps = int(step.repetition_duration / step.repetition_interval)
+                    self.log(f"Repetition: Every {step.repetition_interval}s for {step.repetition_duration}s ({total_reps} times)")
+
+                    start_time = time.time()
+                    rep_count = 0
+
+                    while (time.time() - start_time) < step.repetition_duration:
+                        if self.stop_requested:
+                            break
+
+                        rep_count += 1
+                        self.log(f"Repetition {rep_count}/{total_reps}")
+
+                        # Execute the step with all its cycles
+                        if not self.execute_step_with_cycles(step):
+                            break
+
+                        # Calculate time until next repetition
+                        elapsed = time.time() - start_time
+                        next_execution_time = rep_count * step.repetition_interval
+                        remaining_time = next_execution_time - elapsed
+
+                        # Only wait if we haven't exceeded the duration and there's time left
+                        if remaining_time > 0 and elapsed < step.repetition_duration:
+                            self.log(f"  Waiting {remaining_time:.1f} seconds until next repetition...")
+                            time.sleep(min(remaining_time, step.repetition_duration - elapsed))
+                else:
+                    self.log("Warning: Time frequency mode selected but interval/duration not specified")
+                    # Fall back to single execution
+                    self.execute_step_with_cycles(step)
+
+            else:
+                # Unknown mode, execute once
+                self.log(f"Warning: Unknown repetition mode '{step.repetition_mode}', executing once")
+                self.execute_step_with_cycles(step)
+
+            # Check for stop after step completion
+            if self.stop_requested:
+                self.log("="*60)
+                self.log("EXECUTION STOPPED BY USER")
+                self.log(f"Completed {step_num} of {len(steps)} steps")
+                self.log("="*60)
+                self.stop_requested = False
+                return
+
+            # Wait before next step (if not the last step)
             if step.wait_time > 0 and step_num < len(steps):
                 self.log(f"  Waiting {step.wait_time} seconds before next step...")
                 time.sleep(step.wait_time)
@@ -477,14 +554,16 @@ if __name__ == "__main__":
     controller = PipettingController()
 
     try:
-        # Example: Transfer from A12 to A15
+        # Example: Transfer from A12 to A15 with quantity repetition
         step = PipettingStep(
             pickup_well="A12",
             dropoff_well="B3",
             rinse_well="H12",
             volume_ml=1.0,
             wait_time=2,
-            cycles=1
+            cycles=1,
+            repetition_mode='quantity',
+            repetition_quantity=3
         )
 
         controller.execute_sequence([step])
