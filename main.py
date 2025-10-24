@@ -3,11 +3,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+# Load environment variables from .env file
+load_dotenv()
 
 from pipetting_controller import PipettingController, PipettingStep
 
