@@ -43,10 +43,10 @@ class CoordinateMapper:
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     COLUMNS = list(range(1, 13))  # 1-12
 
-    # Physical dimensions
-    WELL_SPACING = 4.0  # mm between wells
-    WELL_DIAMETER = 8.0  # mm
-    WELL_HEIGHT = 14.0  # mm
+    # Physical dimensions - read from environment variables with fallback to default values
+    WELL_SPACING = float(os.getenv('WELL_SPACING', '4.0'))  # mm between wells
+    WELL_DIAMETER = float(os.getenv('WELL_DIAMETER', '8.0'))  # mm
+    WELL_HEIGHT = float(os.getenv('WELL_HEIGHT', '14.0'))  # mm
 
     # Motor configuration (steps per mm - adjust based on your stepper setup)
     # Read from environment variables with fallback to default values
