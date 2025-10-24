@@ -2,7 +2,7 @@ import {useEffect, useState, useRef} from 'react'
 import './App.css'
 
 function App() {
-    const [activeTab, setActiveTab] = useState('settings')
+    const [activeTab, setActiveTab] = useState('protocol')
     const [selectedWell, setSelectedWell] = useState('A1') // Current motor position
     const [targetWell, setTargetWell] = useState(null) // User-clicked target well
     const [currentPipetteCount, setCurrentPipetteCount] = useState(3) // Current pipette configuration (from backend)
@@ -12,6 +12,25 @@ function App() {
         // Get theme from localStorage or default to 'light'
         return localStorage.getItem('theme') || 'light'
     })
+
+    // Configuration state
+    const [config, setConfig] = useState({
+        WELL_SPACING: 4.0,
+        WELL_DIAMETER: 8.0,
+        WELL_HEIGHT: 14.0,
+        STEPS_PER_MM_X: 100,
+        STEPS_PER_MM_Y: 100,
+        STEPS_PER_MM_Z: 100,
+        PIPETTE_STEPS_PER_ML: 1000,
+        PICKUP_DEPTH: 10.0,
+        DROPOFF_DEPTH: 5.0,
+        SAFE_HEIGHT: 20.0,
+        RINSE_CYCLES: 3,
+        TRAVEL_SPEED: 0.001,
+        PIPETTE_SPEED: 0.002
+    })
+    const [configLoading, setConfigLoading] = useState(false)
+    const [configMessage, setConfigMessage] = useState('')
 
     // Program tab state
     const [cycles, setCycles] = useState(1)
@@ -413,10 +432,59 @@ function App() {
         }
     }
 
-    // Fetch current position on component mount and poll regularly
+    const fetchConfig = async () => {
+        try {
+            const response = await fetch('/api/config')
+            const data = await response.json()
+
+            if (data.status === 'success') {
+                setConfig(data.config)
+            }
+        } catch (error) {
+            console.error('Failed to fetch configuration:', error)
+        }
+    }
+
+    const saveConfig = async () => {
+        setConfigLoading(true)
+        setConfigMessage('')
+
+        try {
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            })
+
+            const data = await response.json()
+
+            if (data.status === 'success') {
+                setConfigMessage('✓ ' + data.message)
+            } else {
+                setConfigMessage('✗ Failed to save configuration')
+            }
+        } catch (error) {
+            console.error('Failed to save configuration:', error)
+            setConfigMessage('✗ Error: ' + error.message)
+        } finally {
+            setConfigLoading(false)
+        }
+    }
+
+    const handleConfigChange = (key, value) => {
+        setConfig(prev => ({
+            ...prev,
+            [key]: value
+        }))
+    }
+
+    // Fetch current position and config on component mount
     useEffect(() => {
         // Initial fetch
         fetchCurrentPosition()
+        fetchConfig()
 
         // Poll every 1 second to keep UI in sync with backend
         const interval = setInterval(() => {
@@ -490,6 +558,12 @@ function App() {
                     onClick={() => setActiveTab('program')}
                 >
                     <span className="nav-icon">◇</span> Program
+                </button>
+                <button
+                    className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('settings')}
+                >
+                    <span className="nav-icon">⚙</span> Settings
                 </button>
                 <button
                     className="nav-tab theme-toggle"
@@ -666,6 +740,199 @@ function App() {
                                         style={{display: 'none'}}
                                     />
                                 </label>
+                            </div>
+                        </div>
+                    </div>
+                ) : activeTab === 'settings' ? (
+                    /* Settings Tab Content */
+                    <div className="settings-section">
+                        <h2>System Configuration</h2>
+                        <p className="settings-description">
+                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env file and require an application restart to take effect.
+                        </p>
+
+                        <div className="config-form">
+                            <div className="config-section">
+                                <h3>Well Plate Physical Dimensions</h3>
+                                <div className="config-grid">
+                                    <div className="form-group">
+                                        <label>Well Spacing (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.WELL_SPACING}
+                                            onChange={(e) => handleConfigChange('WELL_SPACING', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Well Diameter (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.WELL_DIAMETER}
+                                            onChange={(e) => handleConfigChange('WELL_DIAMETER', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Well Height (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.WELL_HEIGHT}
+                                            onChange={(e) => handleConfigChange('WELL_HEIGHT', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="config-section">
+                                <h3>Motor Configuration</h3>
+                                <div className="config-grid">
+                                    <div className="form-group">
+                                        <label>X-Axis Steps/mm:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={config.STEPS_PER_MM_X}
+                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_X', parseInt(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Y-Axis Steps/mm:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={config.STEPS_PER_MM_Y}
+                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_Y', parseInt(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Z-Axis Steps/mm:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={config.STEPS_PER_MM_Z}
+                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_Z', parseInt(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="config-section">
+                                <h3>Pipette Configuration</h3>
+                                <div className="config-grid">
+                                    <div className="form-group">
+                                        <label>Pipette Steps/mL:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={config.PIPETTE_STEPS_PER_ML}
+                                            onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="config-section">
+                                <h3>Pipetting Operation Parameters</h3>
+                                <div className="config-grid">
+                                    <div className="form-group">
+                                        <label>Pickup Depth (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.PICKUP_DEPTH}
+                                            onChange={(e) => handleConfigChange('PICKUP_DEPTH', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Dropoff Depth (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.DROPOFF_DEPTH}
+                                            onChange={(e) => handleConfigChange('DROPOFF_DEPTH', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Safe Height (mm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={config.SAFE_HEIGHT}
+                                            onChange={(e) => handleConfigChange('SAFE_HEIGHT', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Rinse Cycles:</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={config.RINSE_CYCLES}
+                                            onChange={(e) => handleConfigChange('RINSE_CYCLES', parseInt(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="config-section">
+                                <h3>Movement Speed Configuration</h3>
+                                <div className="config-grid">
+                                    <div className="form-group">
+                                        <label>Travel Speed (s/step):</label>
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            min="0"
+                                            value={config.TRAVEL_SPEED}
+                                            onChange={(e) => handleConfigChange('TRAVEL_SPEED', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Pipette Speed (s/step):</label>
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            min="0"
+                                            value={config.PIPETTE_SPEED}
+                                            onChange={(e) => handleConfigChange('PIPETTE_SPEED', parseFloat(e.target.value))}
+                                            className="form-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="config-actions">
+                                <button
+                                    onClick={saveConfig}
+                                    disabled={configLoading}
+                                    className="save-config-button"
+                                >
+                                    {configLoading ? 'Saving...' : 'Save Configuration'}
+                                </button>
+                                {configMessage && (
+                                    <div className={`config-message ${configMessage.startsWith('✓') ? 'success' : 'error'}`}>
+                                        {configMessage}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

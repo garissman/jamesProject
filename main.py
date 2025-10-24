@@ -1,9 +1,10 @@
+import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -362,6 +363,96 @@ async def set_pipette_count(request: SetPipetteCountRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error setting pipette count: {str(e)}"
+        )
+
+
+# Configuration management endpoints
+ENV_FILE = Path(__file__).parent / ".env"
+
+class ConfigurationModel(BaseModel):
+    """Configuration settings model"""
+    # Well Plate Physical Dimensions
+    WELL_SPACING: float = Field(..., gt=0, description="Spacing between well centers in mm")
+    WELL_DIAMETER: float = Field(..., gt=0, description="Diameter of each well in mm")
+    WELL_HEIGHT: float = Field(..., gt=0, description="Height of each well in mm")
+
+    # Motor Configuration
+    STEPS_PER_MM_X: int = Field(..., gt=0, description="X-axis steps per mm")
+    STEPS_PER_MM_Y: int = Field(..., gt=0, description="Y-axis steps per mm")
+    STEPS_PER_MM_Z: int = Field(..., gt=0, description="Z-axis steps per mm")
+
+    # Pipette Configuration
+    PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per mL")
+
+    # Pipetting Operation Parameters
+    PICKUP_DEPTH: float = Field(..., gt=0, description="Depth to descend for pickup in mm")
+    DROPOFF_DEPTH: float = Field(..., gt=0, description="Depth to descend for dropoff in mm")
+    SAFE_HEIGHT: float = Field(..., gt=0, description="Safe height above well for travel in mm")
+    RINSE_CYCLES: int = Field(..., ge=0, description="Number of rinse cycles")
+
+    # Movement Speed Configuration
+    TRAVEL_SPEED: float = Field(..., gt=0, description="Fast movement speed (seconds/step)")
+    PIPETTE_SPEED: float = Field(..., gt=0, description="Pipetting operation speed (seconds/step)")
+
+
+@app.get("/api/config")
+async def get_configuration():
+    """
+    Get current configuration settings
+    Returns current values from environment variables or defaults
+    """
+    try:
+        config = {
+            "WELL_SPACING": float(os.getenv('WELL_SPACING', '4.0')),
+            "WELL_DIAMETER": float(os.getenv('WELL_DIAMETER', '8.0')),
+            "WELL_HEIGHT": float(os.getenv('WELL_HEIGHT', '14.0')),
+            "STEPS_PER_MM_X": int(os.getenv('STEPS_PER_MM_X', '100')),
+            "STEPS_PER_MM_Y": int(os.getenv('STEPS_PER_MM_Y', '100')),
+            "STEPS_PER_MM_Z": int(os.getenv('STEPS_PER_MM_Z', '100')),
+            "PIPETTE_STEPS_PER_ML": int(os.getenv('PIPETTE_STEPS_PER_ML', '1000')),
+            "PICKUP_DEPTH": float(os.getenv('PICKUP_DEPTH', '10.0')),
+            "DROPOFF_DEPTH": float(os.getenv('DROPOFF_DEPTH', '5.0')),
+            "SAFE_HEIGHT": float(os.getenv('SAFE_HEIGHT', '20.0')),
+            "RINSE_CYCLES": int(os.getenv('RINSE_CYCLES', '3')),
+            "TRAVEL_SPEED": float(os.getenv('TRAVEL_SPEED', '0.001')),
+            "PIPETTE_SPEED": float(os.getenv('PIPETTE_SPEED', '0.002')),
+        }
+        return {
+            "status": "success",
+            "config": config
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading configuration: {str(e)}"
+        )
+
+
+@app.post("/api/config")
+async def update_configuration(config: ConfigurationModel):
+    """
+    Update configuration settings and save to .env file
+    Requires application restart to take effect
+    """
+    try:
+        # Create .env file if it doesn't exist
+        if not ENV_FILE.exists():
+            ENV_FILE.touch()
+
+        # Update each configuration value in the .env file
+        config_dict = config.model_dump()
+        for key, value in config_dict.items():
+            set_key(str(ENV_FILE), key, str(value))
+
+        return {
+            "status": "success",
+            "message": "Configuration saved successfully. Restart the application for changes to take effect.",
+            "config": config_dict
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error saving configuration: {str(e)}"
         )
 
 
