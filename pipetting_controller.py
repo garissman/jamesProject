@@ -3,6 +3,7 @@ Pipetting Controller for Laboratory Sampler
 Handles coordinate mapping and pipetting workflows
 """
 
+import os
 import time
 import json
 from pathlib import Path
@@ -48,9 +49,10 @@ class CoordinateMapper:
     WELL_HEIGHT = 14.0  # mm
 
     # Motor configuration (steps per mm - adjust based on your stepper setup)
-    STEPS_PER_MM_X = 100  # Adjust based on calibration
-    STEPS_PER_MM_Y = 100  # Adjust based on calibration
-    STEPS_PER_MM_Z = 100  # Adjust based on calibration
+    # Read from environment variables with fallback to default values
+    STEPS_PER_MM_X = int(os.getenv('STEPS_PER_MM_X', '100'))  # Adjust based on calibration
+    STEPS_PER_MM_Y = int(os.getenv('STEPS_PER_MM_Y', '100'))  # Adjust based on calibration
+    STEPS_PER_MM_Z = int(os.getenv('STEPS_PER_MM_Z', '100'))  # Adjust based on calibration
 
     # Origin offset (position of well A1)
     ORIGIN_X = 0.0  # mm
@@ -165,7 +167,8 @@ class PipettingController:
     """High-level controller for pipetting operations"""
 
     # Pipette parameters
-    PIPETTE_STEPS_PER_ML = 1000  # Steps to aspirate/dispense 1mL (adjust based on syringe)
+    # Read from environment variable with fallback to default value
+    PIPETTE_STEPS_PER_ML = int(os.getenv('PIPETTE_STEPS_PER_ML', '1000'))  # Steps to aspirate/dispense 1mL (adjust based on syringe)
     PICKUP_DEPTH = 10.0  # mm to descend into well for pickup
     DROPOFF_DEPTH = 5.0  # mm to descend into well for dropoff
     SAFE_HEIGHT = 20.0   # mm above well for travel
