@@ -748,7 +748,7 @@ function App() {
                     <div className="settings-section">
                         <h2>System Configuration</h2>
                         <p className="settings-description">
-                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env file and require an application restart to take effect.
+                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env file and applied immediately.
                         </p>
 
                         <div className="config-form">

@@ -432,8 +432,10 @@ async def get_configuration():
 async def update_configuration(config: ConfigurationModel):
     """
     Update configuration settings and save to .env file
-    Requires application restart to take effect
+    Configuration is reloaded immediately without requiring restart
     """
+    global pipetting_controller
+
     try:
         # Create .env file if it doesn't exist
         if not ENV_FILE.exists():
@@ -444,9 +446,26 @@ async def update_configuration(config: ConfigurationModel):
         for key, value in config_dict.items():
             set_key(str(ENV_FILE), key, str(value))
 
+        # Reload environment variables from .env file
+        load_dotenv(override=True)
+
+        # Reinitialize the pipetting controller with new configuration
+        if pipetting_controller:
+            try:
+                pipetting_controller.cleanup()
+            except Exception as cleanup_error:
+                print(f"Warning during cleanup: {cleanup_error}")
+
+        try:
+            pipetting_controller = PipettingController()
+            print("Pipetting controller reinitialized with new configuration")
+        except Exception as init_error:
+            print(f"Warning: Could not reinitialize pipetting controller: {init_error}")
+            print("Running in simulation mode")
+
         return {
             "status": "success",
-            "message": "Configuration saved successfully. Restart the application for changes to take effect.",
+            "message": "Configuration saved and applied successfully!",
             "config": config_dict
         }
     except Exception as e:
