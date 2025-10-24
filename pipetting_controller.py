@@ -43,10 +43,10 @@ class CoordinateMapper:
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     COLUMNS = list(range(1, 13))  # 1-12
 
-    # Physical dimensions
-    WELL_SPACING = 4.0  # mm between wells
-    WELL_DIAMETER = 8.0  # mm
-    WELL_HEIGHT = 14.0  # mm
+    # Physical dimensions - read from environment variables with fallback to default values
+    WELL_SPACING = float(os.getenv('WELL_SPACING', '4.0'))  # mm between wells
+    WELL_DIAMETER = float(os.getenv('WELL_DIAMETER', '8.0'))  # mm
+    WELL_HEIGHT = float(os.getenv('WELL_HEIGHT', '14.0'))  # mm
 
     # Motor configuration (steps per mm - adjust based on your stepper setup)
     # Read from environment variables with fallback to default values
@@ -166,17 +166,16 @@ class CoordinateMapper:
 class PipettingController:
     """High-level controller for pipetting operations"""
 
-    # Pipette parameters
-    # Read from environment variable with fallback to default value
+    # Pipette parameters - read from environment variables with fallback to default values
     PIPETTE_STEPS_PER_ML = int(os.getenv('PIPETTE_STEPS_PER_ML', '1000'))  # Steps to aspirate/dispense 1mL (adjust based on syringe)
-    PICKUP_DEPTH = 10.0  # mm to descend into well for pickup
-    DROPOFF_DEPTH = 5.0  # mm to descend into well for dropoff
-    SAFE_HEIGHT = 20.0   # mm above well for travel
-    RINSE_CYCLES = 3     # Number of rinse cycles
+    PICKUP_DEPTH = float(os.getenv('PICKUP_DEPTH', '10.0'))  # mm to descend into well for pickup
+    DROPOFF_DEPTH = float(os.getenv('DROPOFF_DEPTH', '5.0'))  # mm to descend into well for dropoff
+    SAFE_HEIGHT = float(os.getenv('SAFE_HEIGHT', '20.0'))   # mm above well for travel
+    RINSE_CYCLES = int(os.getenv('RINSE_CYCLES', '3'))     # Number of rinse cycles
 
-    # Movement speeds
-    TRAVEL_SPEED = 0.001  # Fast movement delay (seconds between steps)
-    PIPETTE_SPEED = 0.002  # Slower for pipetting operations
+    # Movement speeds - read from environment variables with fallback to default values
+    TRAVEL_SPEED = float(os.getenv('TRAVEL_SPEED', '0.001'))  # Fast movement delay (seconds between steps)
+    PIPETTE_SPEED = float(os.getenv('PIPETTE_SPEED', '0.002'))  # Slower for pipetting operations
 
     # Position persistence
     POSITION_FILE = Path(__file__).parent / "pipette_position.json"
