@@ -137,7 +137,7 @@ class CoordinateMapper:
         # Calculate physical coordinates
         # X increases with column number
         x = CoordinateMapper.ORIGIN_X + (
-                    column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+                column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
 
         # Y increases with row letter (A to H)
         y = CoordinateMapper.ORIGIN_Y + (row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
@@ -362,7 +362,7 @@ class PipettingController:
             :param volume_ml:
         """
         self.log(f"  Rinsing in well {rinse_well}...")
-        steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
+        steps = int(volume_ml)
         for i in range(self.RINSE_CYCLES):
             # Move to rinse well
             self.move_to_well(rinse_well, -self.PICKUP_DEPTH)
