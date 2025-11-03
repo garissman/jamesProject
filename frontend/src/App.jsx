@@ -84,29 +84,29 @@ function App() {
     const handleAddStep = () => {
         // Validate required fields
         if (!pickupWell || pickupWell.trim() === '') {
-            alert('Pickup well is required')
+            console.error('Pickup well is required')
             return
         }
 
         // Validate well IDs
         if (!validateWellId(pickupWell)) {
-            alert('Invalid pickup well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            console.error('Invalid pickup well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
             return
         }
 
         if (dropoffWell && !validateWellId(dropoffWell)) {
-            alert('Invalid dropoff well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            console.error('Invalid dropoff well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
             return
         }
 
         if (rinseWell && !validateWellId(rinseWell)) {
-            alert('Invalid rinse well ID. Must be in format: Row (A-H) + Column (1-12)\nExample: A1, B5, H12')
+            console.error('Invalid rinse well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
             return
         }
 
         // Validate other fields
         if (sampleVolume && (Number(sampleVolume) <= 0 || Number(sampleVolume) > 10)) {
-            alert('Sample volume must be between 0 and 10 mL')
+            console.error('Sample volume must be between 0 and 10 mL')
             return
         }
 
@@ -193,7 +193,7 @@ function App() {
 
     const handleSaveProgram = () => {
         if (steps.length === 0) {
-            alert('No program steps to save.')
+            console.error('No program steps to save.')
             return
         }
 
@@ -217,7 +217,7 @@ function App() {
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
 
-        alert(`Program saved with ${steps.length} step(s)`)
+        console.log(`Program saved with ${steps.length} step(s)`)
     }
 
     const handleLoadProgram = (event) => {
@@ -231,18 +231,18 @@ function App() {
 
                 // Validate the program data
                 if (!programData.steps || !Array.isArray(programData.steps)) {
-                    alert('Invalid program file format')
+                    console.error('Invalid program file format')
                     return
                 }
 
                 // Load the steps
                 setSteps(programData.steps)
-                alert(`Program loaded successfully with ${programData.steps.length} step(s)`)
+                console.log(`Program loaded successfully with ${programData.steps.length} step(s)`)
 
                 // Clear the file input so the same file can be loaded again if needed
                 event.target.value = null
             } catch (error) {
-                alert(`Error loading program: ${error.message}`)
+                console.error(`Error loading program: ${error.message}`)
             }
         }
 
@@ -251,7 +251,7 @@ function App() {
 
     const handleExecute = async () => {
         if (steps.length === 0) {
-            alert('No steps to execute. Please add steps first.')
+            console.error('No steps to execute. Please add steps first.')
             return
         }
 
@@ -272,16 +272,16 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`Success! ${data.message}\n\nSteps executed: ${data.steps_executed}`)
+                console.log(`Success! ${data.message} - Steps executed: ${data.steps_executed}`)
                 // Update current position after execution
                 fetchCurrentPosition()
                 // Optionally clear steps after successful execution
                 // setSteps([])
             } else {
-                alert(`Error: ${data.detail || 'Failed to execute sequence'}`)
+                console.error(`Error: ${data.detail || 'Failed to execute sequence'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         } finally {
             setIsExecuting(false)
         }
@@ -303,15 +303,15 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
                 setIsExecuting(false)
                 // Update current position after stopping
                 fetchCurrentPosition()
             } else {
-                alert(`Error: ${data.detail || 'Failed to stop execution'}`)
+                console.error(`Error: ${data.detail || 'Failed to stop execution'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
@@ -327,14 +327,14 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
                 // Update current position after homing
                 fetchCurrentPosition()
             } else {
-                alert(`Error: ${data.detail || 'Failed to home system'}`)
+                console.error(`Error: ${data.detail || 'Failed to home system'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
@@ -352,14 +352,14 @@ function App() {
 
             if (response.ok) {
                 setCurrentPipetteCount(count)
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
                 // Update status to sync with backend
                 fetchCurrentPosition()
             } else {
-                alert(`Error: ${data.detail || 'Failed to set pipette count'}`)
+                console.error(`Error: ${data.detail || 'Failed to set pipette count'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
@@ -401,13 +401,13 @@ function App() {
         const {pickup, dropoff, rinse} = quickOpWells
 
         if (!pickup || !dropoff || !rinse) {
-            alert('Please select all three wells (pickup, dropoff, and rinse)')
+            console.error('Please select all three wells (pickup, dropoff, and rinse)')
             return
         }
 
         const volume = parseFloat(quickOpVolume)
         if (isNaN(volume) || volume <= 0 || volume > 10) {
-            alert('Volume must be between 0 and 10 mL')
+            console.error('Volume must be between 0 and 10 mL')
             return
         }
 
@@ -443,15 +443,15 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`Quick operation completed successfully!`)
+                console.log('Quick operation completed successfully!')
                 fetchCurrentPosition()
                 // Reset quick op mode
                 handleCancelQuickOp()
             } else {
-                alert(`Error: ${data.detail || 'Failed to execute operation'}`)
+                console.error(`Error: ${data.detail || 'Failed to execute operation'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         } finally {
             setIsExecuting(false)
         }
@@ -474,16 +474,16 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
                 // Update current position after moving
                 fetchCurrentPosition()
                 // Clear target well
                 setTargetWell(null)
             } else {
-                alert(`Error: ${data.detail || 'Failed to move to well'}`)
+                console.error(`Error: ${data.detail || 'Failed to move to well'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
@@ -501,19 +501,19 @@ function App() {
 
             if (response.ok) {
                 setZAxisUp(!zAxisUp)
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
             } else {
-                alert(`Error: ${data.detail || 'Failed to toggle Z-axis'}`)
+                console.error(`Error: ${data.detail || 'Failed to toggle Z-axis'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
     const handleCollect = async () => {
         const volume = parseFloat(pipetteVolume)
         if (isNaN(volume) || volume <= 0 || volume > 10) {
-            alert('Volume must be between 0 and 10 mL')
+            console.error('Volume must be between 0 and 10 mL')
             return
         }
 
@@ -529,19 +529,19 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
             } else {
-                alert(`Error: ${data.detail || 'Failed to aspirate'}`)
+                console.error(`Error: ${data.detail || 'Failed to aspirate'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
     const handleDispense = async () => {
         const volume = parseFloat(pipetteVolume)
         if (isNaN(volume) || volume <= 0 || volume > 10) {
-            alert('Volume must be between 0 and 10 mL')
+            console.error('Volume must be between 0 and 10 mL')
             return
         }
 
@@ -557,12 +557,12 @@ function App() {
             const data = await response.json()
 
             if (response.ok) {
-                alert(`${data.message}`)
+                console.log(`${data.message}`)
             } else {
-                alert(`Error: ${data.detail || 'Failed to dispense'}`)
+                console.error(`Error: ${data.detail || 'Failed to dispense'}`)
             }
         } catch (error) {
-            alert(`Error: Unable to connect to backend.\n${error.message}`)
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
         }
     }
 
