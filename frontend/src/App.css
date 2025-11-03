@@ -205,6 +205,59 @@
     min-width: 150px;
 }
 
+/* Z-axis Control */
+.z-axis-control {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.btn-z-toggle {
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 180px;
+}
+
+.btn-z-toggle.z-up {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border-color: #10b981;
+}
+
+.btn-z-toggle.z-up:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-z-toggle.z-down {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    border-color: #f59e0b;
+}
+
+.btn-z-toggle.z-down:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-z-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-z-toggle:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 /* Grid */
 .plate-grid-wrapper {
     background: var(--bg-tertiary);

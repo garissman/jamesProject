@@ -1,4 +1,4 @@
-import {useEffect, useState, useRef} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import './App.css'
 
 function App() {
@@ -62,6 +62,9 @@ function App() {
     })
     const [quickOpStep, setQuickOpStep] = useState(0) // 0=pickup, 1=dropoff, 2=rinse
     const [quickOpVolume, setQuickOpVolume] = useState('1.0') // Default volume for quick ops
+
+    // Z-axis toggle state
+    const [zAxisUp, setZAxisUp] = useState(true) // true = up, false = down
 
     // Ref for auto-scrolling logs
     const logsEndRef = useRef(null)
@@ -339,7 +342,7 @@ function App() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ pipetteCount: count })
+                body: JSON.stringify({pipetteCount: count})
             })
 
             const data = await response.json()
@@ -362,15 +365,15 @@ function App() {
         if (quickOpMode) {
             if (quickOpStep === 0) {
                 // First click: set pickup well
-                setQuickOpWells(prev => ({ ...prev, pickup: wellId }))
+                setQuickOpWells(prev => ({...prev, pickup: wellId}))
                 setQuickOpStep(1)
             } else if (quickOpStep === 1) {
                 // Second click: set dropoff well
-                setQuickOpWells(prev => ({ ...prev, dropoff: wellId }))
+                setQuickOpWells(prev => ({...prev, dropoff: wellId}))
                 setQuickOpStep(2)
             } else if (quickOpStep === 2) {
                 // Third click: set rinse well
-                setQuickOpWells(prev => ({ ...prev, rinse: wellId }))
+                setQuickOpWells(prev => ({...prev, rinse: wellId}))
                 // Keep at step 2 so user can see all selections before executing
             }
         } else {
@@ -382,17 +385,17 @@ function App() {
     const handleEnableQuickOp = () => {
         setQuickOpMode(true)
         setQuickOpStep(0)
-        setQuickOpWells({ pickup: null, dropoff: null, rinse: null })
+        setQuickOpWells({pickup: null, dropoff: null, rinse: null})
     }
 
     const handleCancelQuickOp = () => {
         setQuickOpMode(false)
         setQuickOpStep(0)
-        setQuickOpWells({ pickup: null, dropoff: null, rinse: null })
+        setQuickOpWells({pickup: null, dropoff: null, rinse: null})
     }
 
     const handleExecuteQuickOp = async () => {
-        const { pickup, dropoff, rinse } = quickOpWells
+        const {pickup, dropoff, rinse} = quickOpWells
 
         if (!pickup || !dropoff || !rinse) {
             alert('Please select all three wells (pickup, dropoff, and rinse)')
@@ -431,7 +434,7 @@ function App() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ steps: [quickStep] })
+                body: JSON.stringify({steps: [quickStep]})
             })
 
             const data = await response.json()
@@ -462,7 +465,7 @@ function App() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ wellId: targetWell })
+                body: JSON.stringify({wellId: targetWell})
             })
 
             const data = await response.json()
@@ -475,6 +478,29 @@ function App() {
                 setTargetWell(null)
             } else {
                 alert(`Error: ${data.detail || 'Failed to move to well'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        }
+    }
+
+    const handleToggleZ = async () => {
+        try {
+            const response = await fetch('/api/pipetting/toggle-z', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({direction: zAxisUp ? 'down' : 'up'})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setZAxisUp(!zAxisUp)
+                alert(`${data.message}`)
+            } else {
+                alert(`Error: ${data.detail || 'Failed to toggle Z-axis'}`)
             }
         } catch (error) {
             alert(`Error: Unable to connect to backend.\n${error.message}`)
@@ -632,7 +658,7 @@ function App() {
     useEffect(() => {
         // Only scroll if logs count has increased (new logs added)
         if (logs.length > previousLogCountRef.current) {
-            logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+            logsEndRef.current?.scrollIntoView({behavior: 'smooth'})
             previousLogCountRef.current = logs.length
         }
     }, [logs])
@@ -847,7 +873,8 @@ function App() {
                     <div className="settings-section">
                         <h2>System Configuration</h2>
                         <p className="settings-description">
-                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env file and applied immediately.
+                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env
+                            file and applied immediately.
                         </p>
 
                         <div className="config-form">
@@ -1028,7 +1055,8 @@ function App() {
                                     {configLoading ? 'Saving...' : 'Save Configuration'}
                                 </button>
                                 {configMessage && (
-                                    <div className={`config-message ${configMessage.startsWith('✓') ? 'success' : 'error'}`}>
+                                    <div
+                                        className={`config-message ${configMessage.startsWith('✓') ? 'success' : 'error'}`}>
                                         {configMessage}
                                     </div>
                                 )}
@@ -1065,7 +1093,18 @@ function App() {
                                 <option value={1}>1 Pipette</option>
                                 <option value={3}>3 Pipettes</option>
                             </select>
+                            {/* Z-axis Toggle Control */}
+                            <div className="z-axis-control">
+                                <button
+                                    className={`btn btn-z-toggle ${zAxisUp ? 'z-up' : 'z-down'}`}
+                                    onClick={handleToggleZ}
+                                    disabled={isExecuting}
+                                >
+                                    Z-Axis: {zAxisUp ? '⬆ UP' : '⬇ DOWN'}
+                                </button>
+                            </div>
                         </div>
+
 
                         {/* Quick Operation Controls */}
                         <div className="quick-op-controls">
@@ -1090,13 +1129,16 @@ function App() {
                                         </button>
                                     </div>
                                     <div className="quick-op-instructions">
-                                        <div className={`quick-op-step ${quickOpStep === 0 ? 'active' : quickOpWells.pickup ? 'completed' : ''}`}>
+                                        <div
+                                            className={`quick-op-step ${quickOpStep === 0 ? 'active' : quickOpWells.pickup ? 'completed' : ''}`}>
                                             1. Click pickup well {quickOpWells.pickup && `(${quickOpWells.pickup})`}
                                         </div>
-                                        <div className={`quick-op-step ${quickOpStep === 1 ? 'active' : quickOpWells.dropoff ? 'completed' : ''}`}>
+                                        <div
+                                            className={`quick-op-step ${quickOpStep === 1 ? 'active' : quickOpWells.dropoff ? 'completed' : ''}`}>
                                             2. Click dropoff well {quickOpWells.dropoff && `(${quickOpWells.dropoff})`}
                                         </div>
-                                        <div className={`quick-op-step ${quickOpStep === 2 ? 'active' : quickOpWells.rinse ? 'completed' : ''}`}>
+                                        <div
+                                            className={`quick-op-step ${quickOpStep === 2 ? 'active' : quickOpWells.rinse ? 'completed' : ''}`}>
                                             3. Click rinse well {quickOpWells.rinse && `(${quickOpWells.rinse})`}
                                         </div>
                                     </div>
@@ -1170,7 +1212,7 @@ function App() {
                                                         ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
                                                         ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
                                                     onClick={() => handleWellClick(wellId)}
-                                                    style={{ cursor: 'pointer' }}
+                                                    style={{cursor: 'pointer'}}
                                                 >
                                                     {wellId}
                                                     {isQuickOpPickup && <span className="quick-op-badge">P</span>}
@@ -1199,7 +1241,7 @@ function App() {
                                             {log}
                                         </div>
                                     ))}
-                                    <div ref={logsEndRef} />
+                                    <div ref={logsEndRef}/>
                                 </>
                             ) : (
                                 <div className="log-placeholder">No logs available</div>

@@ -366,6 +366,40 @@ async def set_pipette_count(request: SetPipetteCountRequest):
         )
 
 
+class ToggleZRequest(BaseModel):
+    """Request to toggle Z-axis up or down"""
+    direction: str = Field(..., description="Direction: 'up' or 'down'")
+
+
+@app.post("/api/pipetting/toggle-z")
+async def toggle_z_axis(request: ToggleZRequest):
+    """Toggle the Z-axis up or down"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    if request.direction not in ['up', 'down']:
+        raise HTTPException(
+            status_code=400,
+            detail="Direction must be 'up' or 'down'"
+        )
+
+    try:
+        pipetting_controller.toggle_z(request.direction)
+        return {
+            "status": "success",
+            "message": f"Z-axis moved {request.direction}",
+            "direction": request.direction
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error toggling Z-axis: {str(e)}"
+        )
+
+
 # Configuration management endpoints
 ENV_FILE = Path(__file__).parent / ".env"
 

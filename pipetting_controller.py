@@ -593,6 +593,30 @@ class PipettingController:
         self.log(f"Pipette configuration changed to: {count} pipette(s)")
         self.save_position()  # Save the new configuration
 
+    def toggle_z(self, direction: str):
+        """
+        Toggle the Z-axis up or down
+
+        Args:
+            direction: 'up' or 'down'
+        """
+        if direction == 'up':
+            # Move Z up by SAFE_HEIGHT
+            z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
+            self.stepper_controller.move_motor(3, z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.current_position.z += self.SAFE_HEIGHT
+            self.log(f"Z-axis moved UP ({self.SAFE_HEIGHT}mm)")
+        elif direction == 'down':
+            # Move Z down by SAFE_HEIGHT
+            z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
+            self.stepper_controller.move_motor(3, z_steps, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            self.current_position.z -= self.SAFE_HEIGHT
+            self.log(f"Z-axis moved DOWN ({self.SAFE_HEIGHT}mm)")
+        else:
+            raise ValueError("Direction must be 'up' or 'down'")
+
+        self.save_position()
+
     def cleanup(self):
         """Clean up resources"""
         self.stepper_controller.cleanup()
