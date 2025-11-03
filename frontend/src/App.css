@@ -258,6 +258,152 @@
     box-shadow: none;
 }
 
+/* Pipette Controls (Dispense/Collect) */
+.pipette-controls {
+    margin: 15px 0;
+    padding: 15px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.pipette-controls:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.pipette-control-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pipette-control-row label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+}
+
+.pipette-control-row label::before {
+    content: '💧';
+    margin-right: 6px;
+    font-size: 16px;
+}
+
+.pipette-control-row input {
+    width: 90px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid var(--input-border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.pipette-control-row input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: var(--input-focus-bg);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.pipette-control-row input:hover:not(:disabled) {
+    border-color: var(--border-hover);
+}
+
+.btn-collect,
+.btn-dispense {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-collect::before,
+.btn-dispense::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: left 0.5s ease;
+}
+
+.btn-collect:hover::before,
+.btn-dispense:hover::before {
+    left: 100%;
+}
+
+.btn-collect {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn-collect:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-collect:active:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
+}
+
+.btn-dispense {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.btn-dispense:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-dispense:active:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+}
+
+.btn-collect:disabled,
+.btn-dispense:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+.btn-collect:disabled:hover,
+.btn-dispense:disabled:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-collect:disabled::before,
+.btn-dispense:disabled::before {
+    display: none;
+}
+
 /* Grid */
 .plate-grid-wrapper {
     background: var(--bg-tertiary);
@@ -933,6 +1079,69 @@
         width: 100%;
     }
 
+    /* Pipette Config Control */
+    .pipette-config-control {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pipette-config-control label {
+        margin-bottom: 5px;
+    }
+
+    .pipette-config-control select {
+        min-width: 100%;
+    }
+
+    /* Z-axis Control */
+    .z-axis-control {
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    .btn-z-toggle {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    /* Pipette Controls */
+    .pipette-controls {
+        margin: 15px 0;
+        padding: 12px;
+    }
+
+    .pipette-control-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .pipette-control-row label {
+        width: 100%;
+        font-size: 13px;
+        margin-bottom: 5px;
+    }
+
+    .pipette-control-row label::before {
+        font-size: 14px;
+        margin-right: 5px;
+    }
+
+    .pipette-control-row input {
+        width: 100%;
+        max-width: 100%;
+        padding: 10px 12px;
+        font-size: 16px;
+        margin-bottom: 5px;
+    }
+
+    .btn-collect,
+    .btn-dispense {
+        flex: 1 1 calc(50% - 4px);
+        min-width: calc(50% - 4px);
+        padding: 12px 10px;
+        font-size: 13px;
+    }
+
     /* Plate grid */
     .plate-grid-wrapper {
         padding: 15px;
@@ -1079,6 +1288,45 @@
 
     .plate-info {
         font-size: 0.85rem;
+    }
+
+    /* Pipette Config Control */
+    .pipette-config-control {
+        padding: 12px;
+    }
+
+    /* Z-axis Control */
+    .btn-z-toggle {
+        padding: 12px 20px;
+        font-size: 0.9rem;
+    }
+
+    /* Pipette Controls */
+    .pipette-controls {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 10px;
+    }
+
+    .pipette-control-row {
+        gap: 6px;
+    }
+
+    .pipette-control-row label {
+        font-size: 12px;
+    }
+
+    .pipette-control-row input {
+        padding: 10px;
+        font-size: 16px;
+    }
+
+    .btn-collect,
+    .btn-dispense {
+        padding: 11px 8px;
+        font-size: 12px;
+        flex: 1 1 calc(50% - 3px);
+        min-width: calc(50% - 3px);
     }
 
     /* Plate grid - make it scrollable */
@@ -1234,6 +1482,33 @@
         min-width: 36px;
         min-height: 36px;
         padding: 2px;
+    }
+
+    /* Pipette Controls Touch Optimization */
+    .btn-z-toggle {
+        min-height: 48px;
+    }
+
+    .pipette-control-row input {
+        min-height: 48px;
+        font-size: 16px;
+    }
+
+    .btn-collect,
+    .btn-dispense {
+        min-height: 48px;
+        font-size: 14px;
+    }
+
+    /* Disable hover animations on touch devices */
+    .pipette-controls:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-collect:hover::before,
+    .btn-dispense:hover::before {
+        display: none;
     }
 }
 

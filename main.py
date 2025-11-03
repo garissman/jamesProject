@@ -400,6 +400,57 @@ async def toggle_z_axis(request: ToggleZRequest):
         )
 
 
+class VolumeRequest(BaseModel):
+    """Request for aspirate/dispense operations"""
+    volume: float = Field(..., gt=0, le=10, description="Volume in mL (0-10)")
+
+
+@app.post("/api/pipetting/aspirate")
+async def aspirate_liquid(request: VolumeRequest):
+    """Aspirate (collect) liquid into pipette"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        pipetting_controller.aspirate(request.volume)
+        return {
+            "status": "success",
+            "message": f"Aspirated {request.volume} mL",
+            "volume": request.volume
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error aspirating liquid: {str(e)}"
+        )
+
+
+@app.post("/api/pipetting/dispense")
+async def dispense_liquid(request: VolumeRequest):
+    """Dispense liquid from pipette"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        pipetting_controller.dispense(request.volume)
+        return {
+            "status": "success",
+            "message": f"Dispensed {request.volume} mL",
+            "volume": request.volume
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error dispensing liquid: {str(e)}"
+        )
+
+
 # Configuration management endpoints
 ENV_FILE = Path(__file__).parent / ".env"
 

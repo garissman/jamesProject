@@ -66,6 +66,9 @@ function App() {
     // Z-axis toggle state
     const [zAxisUp, setZAxisUp] = useState(true) // true = up, false = down
 
+    // Dispense/Collect state
+    const [pipetteVolume, setPipetteVolume] = useState('1.0') // Volume for manual dispense/collect
+
     // Ref for auto-scrolling logs
     const logsEndRef = useRef(null)
     const previousLogCountRef = useRef(0)
@@ -501,6 +504,62 @@ function App() {
                 alert(`${data.message}`)
             } else {
                 alert(`Error: ${data.detail || 'Failed to toggle Z-axis'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        }
+    }
+
+    const handleCollect = async () => {
+        const volume = parseFloat(pipetteVolume)
+        if (isNaN(volume) || volume <= 0 || volume > 10) {
+            alert('Volume must be between 0 and 10 mL')
+            return
+        }
+
+        try {
+            const response = await fetch('/api/pipetting/aspirate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({volume: volume})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                alert(`${data.message}`)
+            } else {
+                alert(`Error: ${data.detail || 'Failed to aspirate'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        }
+    }
+
+    const handleDispense = async () => {
+        const volume = parseFloat(pipetteVolume)
+        if (isNaN(volume) || volume <= 0 || volume > 10) {
+            alert('Volume must be between 0 and 10 mL')
+            return
+        }
+
+        try {
+            const response = await fetch('/api/pipetting/dispense', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({volume: volume})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                alert(`${data.message}`)
+            } else {
+                alert(`Error: ${data.detail || 'Failed to dispense'}`)
             }
         } catch (error) {
             alert(`Error: Unable to connect to backend.\n${error.message}`)
@@ -1093,6 +1152,7 @@ function App() {
                                 <option value={1}>1 Pipette</option>
                                 <option value={3}>3 Pipettes</option>
                             </select>
+
                             {/* Z-axis Toggle Control */}
                             <div className="z-axis-control">
                                 <button
@@ -1103,8 +1163,38 @@ function App() {
                                     Z-Axis: {zAxisUp ? '⬆ UP' : '⬇ DOWN'}
                                 </button>
                             </div>
-                        </div>
 
+                            {/* Dispense/Collect Controls */}
+                            <div className="pipette-controls">
+                                <div className="pipette-control-row">
+                                    <label>Volume (mL):</label>
+                                    <input
+                                        type="number"
+                                        min="0.1"
+                                        max="10"
+                                        step="0.1"
+                                        value={pipetteVolume}
+                                        onChange={(e) => setPipetteVolume(e.target.value)}
+                                        className="form-input"
+                                        disabled={isExecuting}
+                                    />
+                                    <button
+                                        className="btn btn-collect"
+                                        onClick={handleCollect}
+                                        disabled={isExecuting}
+                                    >
+                                        🔵 Collect
+                                    </button>
+                                    <button
+                                        className="btn btn-dispense"
+                                        onClick={handleDispense}
+                                        disabled={isExecuting}
+                                    >
+                                        🟢 Dispense
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Quick Operation Controls */}
                         <div className="quick-op-controls">
