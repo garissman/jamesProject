@@ -3,12 +3,13 @@ Pipetting Controller for Laboratory Sampler
 Handles coordinate mapping and pipetting workflows
 """
 
+import json
 import os
 import time
-import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple, Optional
-from dataclasses import dataclass
+
 from stepper_control import StepperController, Direction
 
 
@@ -135,7 +136,8 @@ class CoordinateMapper:
 
         # Calculate physical coordinates
         # X increases with column number
-        x = CoordinateMapper.ORIGIN_X + (column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+        x = CoordinateMapper.ORIGIN_X + (
+                    column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
 
         # Y increases with row letter (A to H)
         y = CoordinateMapper.ORIGIN_Y + (row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
@@ -167,11 +169,12 @@ class PipettingController:
     """High-level controller for pipetting operations"""
 
     # Pipette parameters - read from environment variables with fallback to default values
-    PIPETTE_STEPS_PER_ML = int(os.getenv('PIPETTE_STEPS_PER_ML', '1000'))  # Steps to aspirate/dispense 1mL (adjust based on syringe)
+    PIPETTE_STEPS_PER_ML = int(
+        os.getenv('PIPETTE_STEPS_PER_ML', '1000'))  # Steps to aspirate/dispense 1mL (adjust based on syringe)
     PICKUP_DEPTH = float(os.getenv('PICKUP_DEPTH', '10.0'))  # mm to descend into well for pickup
     DROPOFF_DEPTH = float(os.getenv('DROPOFF_DEPTH', '5.0'))  # mm to descend into well for dropoff
-    SAFE_HEIGHT = float(os.getenv('SAFE_HEIGHT', '20.0'))   # mm above well for travel
-    RINSE_CYCLES = int(os.getenv('RINSE_CYCLES', '3'))     # Number of rinse cycles
+    SAFE_HEIGHT = float(os.getenv('SAFE_HEIGHT', '20.0'))  # mm above well for travel
+    RINSE_CYCLES = int(os.getenv('RINSE_CYCLES', '3'))  # Number of rinse cycles
 
     # Movement speeds - read from environment variables with fallback to default values
     TRAVEL_SPEED = float(os.getenv('TRAVEL_SPEED', '0.001'))  # Fast movement delay (seconds between steps)
@@ -186,7 +189,7 @@ class PipettingController:
         self.mapper = CoordinateMapper()
         self.stop_requested = False
         self.log_buffer = []  # Store log messages for UI display
-        self.max_logs = 100   # Maximum number of logs to keep
+        self.max_logs = 100  # Maximum number of logs to keep
         self.current_pipette_count = 1  # Current pipette configuration (default: 1)
         self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
         self.operation_well = None  # Well where current operation is happening
@@ -350,29 +353,31 @@ class PipettingController:
         self.current_operation = "idle"
         self.operation_well = None
 
-    def rinse(self, rinse_well: str):
+    def rinse(self, rinse_well: str, volume_ml: float):
         """
         Rinse the pipette tip
 
         Args:
             rinse_well: Well ID containing rinse solution
+            :param volume_ml:
         """
         self.log(f"  Rinsing in well {rinse_well}...")
+        steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         for i in range(self.RINSE_CYCLES):
             # Move to rinse well
             self.move_to_well(rinse_well, -self.PICKUP_DEPTH)
 
             # Aspirate rinse solution
-            self.aspirate(0.5)  # Use half volume for rinsing
+            self.aspirate(steps)  # Use half volume for rinsing
 
             # Dispense
-            self.dispense(0.5)
+            self.dispense(steps)
 
         # Move back up
         self.move_to_well(rinse_well, 0)
 
     def execute_transfer(self, pickup_well: str, dropoff_well: str,
-                        volume_ml: float, rinse_well: Optional[str] = None):
+                         volume_ml: float, rinse_well: Optional[str] = None):
         """
         Execute a single liquid transfer
 
@@ -400,7 +405,7 @@ class PipettingController:
 
         # Rinse if specified
         if rinse_well:
-            self.rinse(rinse_well)
+            self.rinse(rinse_well, volume_ml)
 
     def execute_step_with_cycles(self, step: PipettingStep):
         """
@@ -442,17 +447,17 @@ class PipettingController:
         # Reset stop flag at the start
         self.stop_requested = False
 
-        self.log("="*60)
+        self.log("=" * 60)
         self.log(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
-        self.log("="*60)
+        self.log("=" * 60)
 
         for step_num, step in enumerate(steps, 1):
             # Check for stop request
             if self.stop_requested:
-                self.log("="*60)
+                self.log("=" * 60)
                 self.log("EXECUTION STOPPED BY USER")
                 self.log(f"Completed {step_num - 1} of {len(steps)} steps")
-                self.log("="*60)
+                self.log("=" * 60)
                 self.stop_requested = False
                 return
 
@@ -488,7 +493,8 @@ class PipettingController:
                 # Time frequency mode: repeat at intervals for a duration
                 if step.repetition_interval and step.repetition_duration:
                     total_reps = int(step.repetition_duration / step.repetition_interval)
-                    self.log(f"Repetition: Every {step.repetition_interval}s for {step.repetition_duration}s ({total_reps} times)")
+                    self.log(
+                        f"Repetition: Every {step.repetition_interval}s for {step.repetition_duration}s ({total_reps} times)")
 
                     start_time = time.time()
                     rep_count = 0
@@ -525,10 +531,10 @@ class PipettingController:
 
             # Check for stop after step completion
             if self.stop_requested:
-                self.log("="*60)
+                self.log("=" * 60)
                 self.log("EXECUTION STOPPED BY USER")
                 self.log(f"Completed {step_num} of {len(steps)} steps")
-                self.log("="*60)
+                self.log("=" * 60)
                 self.stop_requested = False
                 return
 
@@ -537,9 +543,9 @@ class PipettingController:
                 self.log(f"  Waiting {step.wait_time} seconds before next step...")
                 time.sleep(step.wait_time)
 
-        self.log("="*60)
+        self.log("=" * 60)
         self.log("SEQUENCE COMPLETE")
-        self.log("="*60)
+        self.log("=" * 60)
 
     def stop(self):
         """Request to stop the current execution"""

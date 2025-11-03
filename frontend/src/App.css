@@ -253,6 +253,7 @@
 }
 
 .well {
+    position: relative;
     aspect-ratio: 1;
     border-radius: 50%;
     display: flex;
@@ -1292,4 +1293,188 @@
         -webkit-tap-highlight-color: transparent;
         user-select: none;
     }
+}
+
+/* Quick Operation Mode Styles */
+.quick-op-controls {
+    margin: 20px 0;
+    padding: 15px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.btn-enable-quick-op {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-enable-quick-op:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-enable-quick-op:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.quick-op-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.quick-op-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.quick-op-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.btn-cancel-small {
+    padding: 6px 12px;
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cancel-small:hover:not(:disabled) {
+    background: rgba(244, 67, 54, 0.2);
+}
+
+.quick-op-instructions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-op-step {
+    padding: 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.quick-op-step.active {
+    background: rgba(33, 150, 243, 0.1);
+    border-color: #2196F3;
+    color: #2196F3;
+    font-weight: 600;
+    animation: pulse 2s infinite;
+}
+
+.quick-op-step.completed {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: #4CAF50;
+    color: #4CAF50;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.quick-op-volume {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quick-op-volume label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 80px;
+}
+
+.btn-execute-quick-op {
+    padding: 12px;
+    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-execute-quick-op:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.btn-execute-quick-op:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Quick Op Well Highlighting */
+.well.quick-op-pickup {
+    border: 2px solid #2196F3 !important;
+    background: rgba(33, 150, 243, 0.2) !important;
+    box-shadow: 0 0 10px rgba(33, 150, 243, 0.4);
+}
+
+.well.quick-op-dropoff {
+    border: 2px solid #4CAF50 !important;
+    background: rgba(76, 175, 80, 0.2) !important;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+}
+
+.well.quick-op-rinse {
+    border: 2px solid #FF9800 !important;
+    background: rgba(255, 152, 0, 0.2) !important;
+    box-shadow: 0 0 10px rgba(255, 152, 0, 0.4);
+}
+
+.quick-op-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 3px;
+    line-height: 1;
+}
+
+.well.quick-op-pickup .quick-op-badge {
+    background: #2196F3;
+}
+
+.well.quick-op-dropoff .quick-op-badge {
+    background: #4CAF50;
+}
+
+.well.quick-op-rinse .quick-op-badge {
+    background: #FF9800;
 }

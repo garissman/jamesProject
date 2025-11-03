@@ -53,6 +53,16 @@ function App() {
     // Pipette configuration state
     const [pipetteCount, setPipetteCount] = useState(3) // 1 or 3 pipettes (default: 3)
 
+    // Quick operation state (3-well click mode in Plate Layout tab)
+    const [quickOpMode, setQuickOpMode] = useState(false) // Enable/disable quick operation mode
+    const [quickOpWells, setQuickOpWells] = useState({
+        pickup: null,
+        dropoff: null,
+        rinse: null
+    })
+    const [quickOpStep, setQuickOpStep] = useState(0) // 0=pickup, 1=dropoff, 2=rinse
+    const [quickOpVolume, setQuickOpVolume] = useState('1.0') // Default volume for quick ops
+
     // Ref for auto-scrolling logs
     const logsEndRef = useRef(null)
     const previousLogCountRef = useRef(0)
@@ -348,8 +358,97 @@ function App() {
     }
 
     const handleWellClick = (wellId) => {
-        // Set the target well when user clicks
-        setTargetWell(wellId)
+        // If quick operation mode is enabled, capture wells in sequence
+        if (quickOpMode) {
+            if (quickOpStep === 0) {
+                // First click: set pickup well
+                setQuickOpWells(prev => ({ ...prev, pickup: wellId }))
+                setQuickOpStep(1)
+            } else if (quickOpStep === 1) {
+                // Second click: set dropoff well
+                setQuickOpWells(prev => ({ ...prev, dropoff: wellId }))
+                setQuickOpStep(2)
+            } else if (quickOpStep === 2) {
+                // Third click: set rinse well
+                setQuickOpWells(prev => ({ ...prev, rinse: wellId }))
+                // Keep at step 2 so user can see all selections before executing
+            }
+        } else {
+            // Default behavior: set the target well for moving
+            setTargetWell(wellId)
+        }
+    }
+
+    const handleEnableQuickOp = () => {
+        setQuickOpMode(true)
+        setQuickOpStep(0)
+        setQuickOpWells({ pickup: null, dropoff: null, rinse: null })
+    }
+
+    const handleCancelQuickOp = () => {
+        setQuickOpMode(false)
+        setQuickOpStep(0)
+        setQuickOpWells({ pickup: null, dropoff: null, rinse: null })
+    }
+
+    const handleExecuteQuickOp = async () => {
+        const { pickup, dropoff, rinse } = quickOpWells
+
+        if (!pickup || !dropoff || !rinse) {
+            alert('Please select all three wells (pickup, dropoff, and rinse)')
+            return
+        }
+
+        const volume = parseFloat(quickOpVolume)
+        if (isNaN(volume) || volume <= 0 || volume > 10) {
+            alert('Volume must be between 0 and 10 mL')
+            return
+        }
+
+        // Create a step with the selected wells
+        const quickStep = {
+            id: Date.now(),
+            cycles: 1,
+            pickupWell: pickup,
+            dropoffWell: dropoff,
+            rinseWell: rinse,
+            waitTime: 0,
+            sampleVolume: volume,
+            repetitionMode: 'quantity',
+            repetitionQuantity: 1,
+            repetitionInterval: null,
+            repetitionDuration: null,
+            pipetteCount: currentPipetteCount
+        }
+
+        // Switch to plate layout tab to show real-time position
+        setActiveTab('protocol')
+        setIsExecuting(true)
+
+        try {
+            const response = await fetch('/api/pipetting/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ steps: [quickStep] })
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                alert(`Quick operation completed successfully!`)
+                fetchCurrentPosition()
+                // Reset quick op mode
+                handleCancelQuickOp()
+            } else {
+                alert(`Error: ${data.detail || 'Failed to execute operation'}`)
+            }
+        } catch (error) {
+            alert(`Error: Unable to connect to backend.\n${error.message}`)
+        } finally {
+            setIsExecuting(false)
+        }
     }
 
     const handleMoveToWell = async () => {
@@ -968,6 +1067,63 @@ function App() {
                             </select>
                         </div>
 
+                        {/* Quick Operation Controls */}
+                        <div className="quick-op-controls">
+                            {!quickOpMode ? (
+                                <button
+                                    className="btn btn-enable-quick-op"
+                                    onClick={handleEnableQuickOp}
+                                    disabled={isExecuting}
+                                >
+                                    Quick Operation Mode
+                                </button>
+                            ) : (
+                                <div className="quick-op-panel">
+                                    <div className="quick-op-header">
+                                        <h3>Quick Operation Mode</h3>
+                                        <button
+                                            className="btn btn-cancel-small"
+                                            onClick={handleCancelQuickOp}
+                                            disabled={isExecuting}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="quick-op-instructions">
+                                        <div className={`quick-op-step ${quickOpStep === 0 ? 'active' : quickOpWells.pickup ? 'completed' : ''}`}>
+                                            1. Click pickup well {quickOpWells.pickup && `(${quickOpWells.pickup})`}
+                                        </div>
+                                        <div className={`quick-op-step ${quickOpStep === 1 ? 'active' : quickOpWells.dropoff ? 'completed' : ''}`}>
+                                            2. Click dropoff well {quickOpWells.dropoff && `(${quickOpWells.dropoff})`}
+                                        </div>
+                                        <div className={`quick-op-step ${quickOpStep === 2 ? 'active' : quickOpWells.rinse ? 'completed' : ''}`}>
+                                            3. Click rinse well {quickOpWells.rinse && `(${quickOpWells.rinse})`}
+                                        </div>
+                                    </div>
+                                    <div className="quick-op-volume">
+                                        <label>Volume (mL):</label>
+                                        <input
+                                            type="number"
+                                            min="0.1"
+                                            max="10"
+                                            step="0.1"
+                                            value={quickOpVolume}
+                                            onChange={(e) => setQuickOpVolume(e.target.value)}
+                                            className="form-input"
+                                            disabled={isExecuting}
+                                        />
+                                    </div>
+                                    <button
+                                        className="btn btn-execute-quick-op"
+                                        onClick={handleExecuteQuickOp}
+                                        disabled={isExecuting || !quickOpWells.pickup || !quickOpWells.dropoff || !quickOpWells.rinse}
+                                    >
+                                        {isExecuting ? 'Executing...' : 'Execute Operation'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="plate-grid-wrapper">
                             {/* Column headers */}
                             <div className="column-headers">
@@ -997,6 +1153,11 @@ function App() {
                                             const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
                                             const operationClass = isOperating ? `operation-${currentOperation}` : ''
 
+                                            // Check if this well is selected in quick op mode
+                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
+                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
+
                                             return (
                                                 <div
                                                     key={wellId}
@@ -1004,11 +1165,17 @@ function App() {
                                                         ${isCenterPipette ? 'selected' : ''}
                                                         ${isSidePipette ? 'pipette-side' : ''}
                                                         ${targetWell === wellId ? 'target' : ''}
-                                                        ${operationClass}`}
+                                                        ${operationClass}
+                                                        ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                        ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                        ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
                                                     onClick={() => handleWellClick(wellId)}
                                                     style={{ cursor: 'pointer' }}
                                                 >
                                                     {wellId}
+                                                    {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                    {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                    {isQuickOpRinse && <span className="quick-op-badge">R</span>}
                                                 </div>
                                             )
                                         })}
