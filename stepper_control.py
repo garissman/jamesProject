@@ -6,6 +6,7 @@ Uses stepper motor drivers (DRV8825/A4988) with STEP and DIR pins
 
 try:
     import RPi.GPIO as GPIO
+
     GPIO_AVAILABLE = True
 except (ImportError, RuntimeError):
     print("Warning: RPi.GPIO not available. Running in simulation mode.")
@@ -75,7 +76,7 @@ class StepperMotor:
         self.current_position += position_delta
 
     def rotate_degrees(self, degrees: float, direction: Direction = Direction.CLOCKWISE,
-                      steps_per_revolution: int = 200, delay: float = 0.001):
+                       steps_per_revolution: int = 200, delay: float = 0.001):
         """
         Rotate motor by specified degrees
 
@@ -108,10 +109,12 @@ class StepperController:
 
     # GPIO pin configuration from CLAUDE.md (Pulse Pin, Direction Pin)
     MOTOR_PINS = {
-        1: (4, 17),     # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
-        2: (27, 22),    # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
-        3: (23, 24),    # Motor 3 Z-axis: Pulse=GPIO23, Dir=GPIO24
-        4: (25, 5)      # Motor 4 Pipette: Pulse=GPIO25, Dir=GPIO05
+        1: (4, 17),  # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
+        2: (27, 22),  # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
+        # 3: (23, 24),    # Motor 3 Z-axis: Pulse=GPIO23, Dir=GPIO24
+        3: (5, 6),  # Motor 3 Z-axis: Pulse=GPIO05, Dir=GPIO06, use this pins For Better PCB Design
+        # 4: (25, 5)  # Motor 4 Pipette: Pulse=GPIO25, Dir=GPIO05
+        4: (13, 19)  # Motor 4 Pipette: Pulse=GPIO13, Dir=GPIO19, use this pins For Better PCB Design
     }
 
     def __init__(self):
