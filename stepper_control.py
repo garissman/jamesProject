@@ -107,7 +107,7 @@ class StepperMotor:
 class StepperController:
     """Main controller for all 4 stepper motors"""
 
-    # GPIO pin configuration from CLAUDE.md (Pulse Pin, Direction Pin)
+    # GPIO pin configuration (Pulse Pin, Direction Pin)
     MOTOR_PINS = {
         1: (4, 17),  # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
         2: (27, 22),  # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
