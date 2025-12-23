@@ -2,6 +2,12 @@
  * Stepper Motor Controller for Arduino UNO Q (STM32U585 MCU)
  * Laboratory Sampler - 4 Stepper Motor Control with Limit Switches
  *
+ * With LED status animations:
+ * - Idle: Slow breathing effect
+ * - Moving: Fast blinking
+ * - Homing: Double blink pattern
+ * - Error: Rapid flash
+ *
  * Receives JSON commands via Serial from the Linux MPU
  * Controls stepper motors using DRV8825/A4988 drivers
  *
@@ -19,6 +25,30 @@
 
 // Number of motors
 #define NUM_MOTORS 4
+
+// LED Configuration - Use built-in LED or define custom pin
+#ifndef LED_BUILTIN
+  #define LED_BUILTIN 25  // Fallback for Arduino UNO Q
+#endif
+
+#define LED_PIN LED_BUILTIN
+#define LED_PIN_2 A0  // Optional second LED for status (analog pin as digital)
+
+// LED Animation States
+enum LedState {
+  LED_IDLE,
+  LED_MOVING,
+  LED_HOMING,
+  LED_ERROR,
+  LED_SUCCESS
+};
+
+LedState currentLedState = LED_IDLE;
+unsigned long lastLedUpdate = 0;
+int ledBrightness = 0;
+int ledDirection = 1;
+bool ledOn = false;
+int ledBlinkCount = 0;
 
 // Motor pin definitions
 struct MotorConfig {
@@ -50,6 +80,15 @@ unsigned long lastLimitCheck = 0;
 const unsigned long LIMIT_DEBOUNCE_MS = 5;
 
 void setup() {
+  // Initialize LED pins
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(LED_PIN_2, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(LED_PIN_2, LOW);
+
+  // Startup animation
+  startupAnimation();
+
   // Initialize serial communication
   Serial.begin(115200);
   while (!Serial) {
@@ -61,11 +100,17 @@ void setup() {
     initMotor(i);
   }
 
+  // Success blink
+  setLedState(LED_SUCCESS);
+
   // Send ready message
   sendResponse("ready", "Stepper controller initialized");
 }
 
 void loop() {
+  // Update LED animation
+  updateLedAnimation();
+
   // Check for serial input
   while (Serial.available()) {
     char c = Serial.read();
@@ -89,6 +134,109 @@ void loop() {
     lastLimitCheck = millis();
   }
 }
+
+// ============== LED Animation Functions ==============
+
+void startupAnimation() {
+  // Knight Rider style sweep
+  for (int j = 0; j < 3; j++) {
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(LED_PIN, HIGH);
+      delay(50);
+      digitalWrite(LED_PIN, LOW);
+      delay(50);
+    }
+    delay(200);
+  }
+}
+
+void setLedState(LedState state) {
+  currentLedState = state;
+  lastLedUpdate = millis();
+  ledBlinkCount = 0;
+
+  if (state == LED_SUCCESS) {
+    // Quick success flash
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(LED_PIN_2, HIGH);
+      delay(100);
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(LED_PIN_2, LOW);
+      delay(100);
+    }
+    currentLedState = LED_IDLE;
+  }
+}
+
+void updateLedAnimation() {
+  unsigned long now = millis();
+
+  switch (currentLedState) {
+    case LED_IDLE:
+      // Slow breathing effect (sine wave simulation)
+      if (now - lastLedUpdate >= 30) {
+        lastLedUpdate = now;
+        ledBrightness += ledDirection * 5;
+        if (ledBrightness >= 255) {
+          ledBrightness = 255;
+          ledDirection = -1;
+        } else if (ledBrightness <= 0) {
+          ledBrightness = 0;
+          ledDirection = 1;
+        }
+        analogWrite(LED_PIN, ledBrightness);
+      }
+      break;
+
+    case LED_MOVING:
+      // Fast alternating blink
+      if (now - lastLedUpdate >= 100) {
+        lastLedUpdate = now;
+        ledOn = !ledOn;
+        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
+        digitalWrite(LED_PIN_2, ledOn ? LOW : HIGH);  // Alternate
+      }
+      break;
+
+    case LED_HOMING:
+      // Double blink pattern
+      if (now - lastLedUpdate >= 150) {
+        lastLedUpdate = now;
+        ledBlinkCount++;
+        if (ledBlinkCount <= 2) {
+          ledOn = !ledOn;
+        } else if (ledBlinkCount == 4) {
+          ledBlinkCount = 0;
+        }
+        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
+        digitalWrite(LED_PIN_2, ledOn ? HIGH : LOW);
+      }
+      break;
+
+    case LED_ERROR:
+      // Rapid flash
+      if (now - lastLedUpdate >= 50) {
+        lastLedUpdate = now;
+        ledOn = !ledOn;
+        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
+        digitalWrite(LED_PIN_2, ledOn ? HIGH : LOW);
+      }
+      break;
+
+    default:
+      break;
+  }
+}
+
+void ledPulseOnStep() {
+  // Quick pulse during each step - toggle LED
+  static bool stepLedState = false;
+  stepLedState = !stepLedState;
+  digitalWrite(LED_PIN, stepLedState ? HIGH : LOW);
+}
+
+// ============== Motor Functions ==============
 
 void initMotor(int motorIndex) {
   if (motorIndex < 0 || motorIndex >= NUM_MOTORS) return;
@@ -126,12 +274,14 @@ void processCommand(String& input) {
   DeserializationError error = deserializeJson(docIn, input);
 
   if (error) {
+    setLedState(LED_ERROR);
     sendError("JSON parse error");
     return;
   }
 
   const char* cmd = docIn["cmd"];
   if (!cmd) {
+    setLedState(LED_ERROR);
     sendError("Missing command");
     return;
   }
@@ -161,12 +311,38 @@ void processCommand(String& input) {
   else if (strcmp(cmd, "get_limits") == 0) {
     cmdGetLimits();
   }
+  else if (strcmp(cmd, "led_test") == 0) {
+    cmdLedTest();
+  }
   else if (strcmp(cmd, "ping") == 0) {
+    setLedState(LED_SUCCESS);
     sendResponse("pong", "OK");
   }
   else {
+    setLedState(LED_ERROR);
     sendError("Unknown command");
   }
+}
+
+void cmdLedTest() {
+  const char* pattern = docIn["pattern"] | "all";
+
+  if (strcmp(pattern, "idle") == 0) {
+    setLedState(LED_IDLE);
+  } else if (strcmp(pattern, "moving") == 0) {
+    setLedState(LED_MOVING);
+  } else if (strcmp(pattern, "homing") == 0) {
+    setLedState(LED_HOMING);
+  } else if (strcmp(pattern, "error") == 0) {
+    setLedState(LED_ERROR);
+  } else if (strcmp(pattern, "success") == 0) {
+    setLedState(LED_SUCCESS);
+  } else {
+    // Test all patterns
+    startupAnimation();
+  }
+
+  sendResponse("ok", "LED test running");
 }
 
 void cmdInitMotor() {
@@ -176,6 +352,7 @@ void cmdInitMotor() {
   int limitPin = docIn["limit_pin"] | -1;
 
   if (motorId < 1 || motorId > NUM_MOTORS) {
+    setLedState(LED_ERROR);
     sendError("Invalid motor_id");
     return;
   }
@@ -190,6 +367,7 @@ void cmdInitMotor() {
   // Initialize motor
   initMotor(idx);
 
+  setLedState(LED_SUCCESS);
   sendResponse("ok", "Motor initialized");
 }
 
@@ -201,6 +379,7 @@ void cmdStep() {
   bool respectLimit = docIn["respect_limit"] | true;
 
   if (motorId < 1 || motorId > NUM_MOTORS) {
+    setLedState(LED_ERROR);
     sendError("Invalid motor_id");
     return;
   }
@@ -208,12 +387,19 @@ void cmdStep() {
   int idx = motorId - 1;
 
   if (!motors[idx].initialized) {
+    setLedState(LED_ERROR);
     sendError("Motor not initialized");
     return;
   }
 
+  // Set LED to moving state
+  setLedState(LED_MOVING);
+
   // Execute steps
   int stepsExecuted = executeSteps(idx, direction, steps, delayUs, respectLimit);
+
+  // Return to idle
+  setLedState(LED_IDLE);
 
   // Send response with steps executed
   docOut.clear();
@@ -232,6 +418,7 @@ int executeSteps(int motorIndex, int direction, int steps, long delayUs, bool re
   delayMicroseconds(5);
 
   int stepsExecuted = 0;
+  int ledToggleInterval = max(1, steps / 20);  // Toggle LED ~20 times during move
 
   // Generate step pulses
   for (int i = 0; i < steps; i++) {
@@ -245,6 +432,11 @@ int executeSteps(int motorIndex, int direction, int steps, long delayUs, bool re
     digitalWrite(motors[motorIndex].pulsePin, LOW);
     delayMicroseconds(delayUs);
     stepsExecuted++;
+
+    // LED animation during movement
+    if (stepsExecuted % ledToggleInterval == 0) {
+      ledPulseOnStep();
+    }
   }
 
   return stepsExecuted;
@@ -254,6 +446,7 @@ void cmdStop() {
   int motorId = docIn["motor_id"] | -1;
 
   if (motorId < 1 || motorId > NUM_MOTORS) {
+    setLedState(LED_ERROR);
     sendError("Invalid motor_id");
     return;
   }
@@ -264,6 +457,7 @@ void cmdStop() {
   digitalWrite(motors[idx].pulsePin, LOW);
   digitalWrite(motors[idx].dirPin, LOW);
 
+  setLedState(LED_IDLE);
   sendResponse("ok", "Motor stopped");
 }
 
@@ -274,6 +468,7 @@ void cmdStopAll() {
       digitalWrite(motors[i].dirPin, LOW);
     }
   }
+  setLedState(LED_IDLE);
   sendResponse("ok", "All motors stopped");
 }
 
@@ -284,6 +479,7 @@ void cmdHomeMotor() {
   int maxSteps = docIn["max_steps"] | 10000;  // Safety limit
 
   if (motorId < 1 || motorId > NUM_MOTORS) {
+    setLedState(LED_ERROR);
     sendError("Invalid motor_id");
     return;
   }
@@ -291,15 +487,20 @@ void cmdHomeMotor() {
   int idx = motorId - 1;
 
   if (!motors[idx].initialized) {
+    setLedState(LED_ERROR);
     sendError("Motor not initialized");
     return;
   }
+
+  // Set LED to homing state
+  setLedState(LED_HOMING);
 
   // Set direction toward home
   digitalWrite(motors[idx].dirPin, direction ? HIGH : LOW);
   delayMicroseconds(5);
 
   int stepsExecuted = 0;
+  int ledToggleInterval = 50;  // Toggle LED every 50 steps
 
   // Move until limit switch is triggered or max steps reached
   while (stepsExecuted < maxSteps) {
@@ -312,6 +513,18 @@ void cmdHomeMotor() {
     digitalWrite(motors[idx].pulsePin, LOW);
     delayMicroseconds(delayUs);
     stepsExecuted++;
+
+    // LED animation
+    if (stepsExecuted % ledToggleInterval == 0) {
+      ledPulseOnStep();
+    }
+  }
+
+  // Success or continue to idle
+  if (isLimitTriggered(idx)) {
+    setLedState(LED_SUCCESS);
+  } else {
+    setLedState(LED_IDLE);
   }
 
   // Send response
@@ -332,6 +545,9 @@ void cmdHomeAll() {
   int stepsToHome[NUM_MOTORS] = {0};
   bool homed[NUM_MOTORS] = {false};
 
+  // Set LED to homing state
+  setLedState(LED_HOMING);
+
   // Home each motor sequentially
   for (int i = 0; i < NUM_MOTORS; i++) {
     if (!motors[i].initialized) continue;
@@ -339,6 +555,8 @@ void cmdHomeAll() {
     // Set direction
     digitalWrite(motors[i].dirPin, direction ? HIGH : LOW);
     delayMicroseconds(5);
+
+    int ledToggleInterval = 50;
 
     // Move until limit
     while (stepsToHome[i] < maxSteps) {
@@ -352,7 +570,27 @@ void cmdHomeAll() {
       digitalWrite(motors[i].pulsePin, LOW);
       delayMicroseconds(delayUs);
       stepsToHome[i]++;
+
+      // LED animation
+      if (stepsToHome[i] % ledToggleInterval == 0) {
+        ledPulseOnStep();
+      }
     }
+  }
+
+  // Check if all homed successfully
+  bool allHomed = true;
+  for (int i = 0; i < NUM_MOTORS; i++) {
+    if (motors[i].initialized && !homed[i]) {
+      allHomed = false;
+      break;
+    }
+  }
+
+  if (allHomed) {
+    setLedState(LED_SUCCESS);
+  } else {
+    setLedState(LED_IDLE);
   }
 
   // Send response
@@ -391,9 +629,13 @@ void cmdMoveBatch() {
   bool respectLimits = docIn["respect_limits"] | true;
 
   if (movements.isNull()) {
+    setLedState(LED_ERROR);
     sendError("Missing movements array");
     return;
   }
+
+  // Set LED to moving state
+  setLedState(LED_MOVING);
 
   // Find the maximum steps across all movements
   int maxSteps = 0;
@@ -436,6 +678,8 @@ void cmdMoveBatch() {
     }
   }
 
+  int ledToggleInterval = max(1, maxSteps / 20);
+
   // Execute steps in lockstep
   for (int step = 0; step < maxSteps; step++) {
     // Pulse high for motors with remaining steps
@@ -463,7 +707,15 @@ void cmdMoveBatch() {
     }
 
     delayMicroseconds(minDelay);
+
+    // LED animation
+    if (step % ledToggleInterval == 0) {
+      ledPulseOnStep();
+    }
   }
+
+  // Return to idle
+  setLedState(LED_IDLE);
 
   // Send response with details
   docOut.clear();
