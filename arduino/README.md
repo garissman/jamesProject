@@ -68,6 +68,7 @@ Limit Switch Wiring:
 
 Install via Arduino IDE Library Manager:
 - **ArduinoJson** by Benoit Blanchon (v7.x recommended)
+- **Arduino_LED_Matrix** (included with Arduino UNO Q board package)
 
 ## Upload Instructions
 
@@ -178,6 +179,57 @@ Moves motor until limit switch is triggered or max_steps reached.
 ```json
 {"cmd": "ping"}
 ```
+
+**LED Test (Visual Feedback Test):**
+```json
+{"cmd": "led_test", "pattern": "all"}
+```
+
+Available patterns:
+- `"all"` - Full test sequence (matrix sweep, progress bar, motor indicators, status patterns)
+- `"matrix"` - LED matrix sweep animation
+- `"rgb"` - RGB LED color cycle test
+- `"progress"` - Show progress bar (use `"value": 0-100` for percentage)
+- `"motor"` - Show motor indicator (use `"value": 0-3` for motor X/Y/Z/P)
+- `"idle"` - Idle state animation (breathing pattern)
+- `"moving"` - Moving state (fast blue pulse)
+- `"homing"` - Homing animation (use `"value": 0-3` for motor)
+- `"error"` - Error pattern (red X on matrix)
+- `"success"` - Success pattern (green checkmark)
+
+**Examples:**
+```json
+{"cmd": "led_test", "pattern": "progress", "value": 75}
+{"cmd": "led_test", "pattern": "motor", "value": 2}
+{"cmd": "led_test", "pattern": "matrix"}
+```
+
+### Visual Feedback System
+
+The Arduino UNO Q provides rich visual feedback:
+
+**LED Matrix (8x12 Blue LEDs):**
+- Progress bars during motor movements
+- Motor indicators showing X, Y, Z, P letters
+- Animated patterns for idle, homing, error states
+- Checkmark for success, X for error
+
+**RGB LEDs (LED3 & LED4 - MCU controlled):**
+| State | LED3 Color | LED4 Color |
+|-------|-----------|-----------|
+| Idle | Green | Dim Green |
+| Moving | Blue | Cyan |
+| Homing | Yellow | Orange |
+| Error | Red | Red |
+| Success | Green | Green |
+
+**Motor-Specific Colors (LED3):**
+| Motor | Color |
+|-------|-------|
+| X-axis | Magenta |
+| Y-axis | Cyan |
+| Z-axis | Purple |
+| Pipette | Cyan |
 
 ### Responses
 

@@ -4,7 +4,17 @@
       "Bash(npm create:*)",
       "Bash(npm install)",
       "Bash(npm run dev:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(arduino-cli compile:*)",
+      "Bash(arduino-cli upload:*)",
+      "Bash(tree:*)",
+      "Bash(xargs:*)",
+      "Bash(arduino-cli version:*)",
+      "Bash(arduino-cli board:*)",
+      "Bash(grep:*)",
+      "Bash(pip3 install:*)",
+      "Bash(find:*)",
+      "Bash(arduino-cli lib install:*)"
     ],
     "deny": [],
     "ask": []

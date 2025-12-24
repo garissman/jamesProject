@@ -2,11 +2,17 @@
  * Stepper Motor Controller for Arduino UNO Q (STM32U585 MCU)
  * Laboratory Sampler - 4 Stepper Motor Control with Limit Switches
  *
- * With LED status animations:
- * - Idle: Slow breathing effect
- * - Moving: Fast blinking
- * - Homing: Double blink pattern
- * - Error: Rapid flash
+ * Visual Feedback System:
+ * - 8x13 Blue LED Matrix: Progress bars, motor indicators, patterns
+ * - RGB LED 3 & 4 (MCU): Color-coded status (active-low)
+ * - Built-in LED: Fallback status indicator
+ *
+ * Status Colors (RGB LEDs):
+ * - Idle: Green breathing
+ * - Moving: Blue pulsing
+ * - Homing: Yellow/Orange
+ * - Error: Red flashing
+ * - Success: Green flash
  *
  * Receives JSON commands via Serial from the Linux MPU
  * Controls stepper motors using DRV8825/A4988 drivers
@@ -22,17 +28,40 @@
  */
 
 #include <ArduinoJson.h>
+#include <ArduinoGraphics.h>
+#include <Arduino_LED_Matrix.h>
 
 // Number of motors
 #define NUM_MOTORS 4
 
-// LED Configuration - Use built-in LED or define custom pin
-#ifndef LED_BUILTIN
-  #define LED_BUILTIN 25  // Fallback for Arduino UNO Q
-#endif
+// ============== LED Matrix Configuration ==============
+// 8 rows x 13 columns (104 LEDs) - Arduino UNO Q matrix
+ArduinoLEDMatrix matrix;
 
-#define LED_PIN LED_BUILTIN
-#define LED_PIN_2 A0  // Optional second LED for status (analog pin as digital)
+// Matrix dimensions (8 rows x 13 columns = 104 LEDs)
+#define MATRIX_ROWS 8
+#define MATRIX_COLS 13
+
+// Frame buffer for LED matrix - flat array for draw() function
+uint8_t matrixFrame[MATRIX_ROWS * MATRIX_COLS];
+
+// ============== MCU RGB LED Configuration ==============
+// RGB LED 3 & 4 are defined in variant.h:
+// LED3_R, LED3_G, LED3_B, LED4_R, LED4_G, LED4_B
+// Active-low: LOW = ON, HIGH = OFF
+#define RGB_ON LOW
+#define RGB_OFF HIGH
+
+// Flag to enable/disable RGB LEDs (set to false if pins not available)
+#define ENABLE_RGB_LEDS true
+
+// ============== Built-in LED (fallback) ==============
+#define STATUS_LED LED_BUILTIN
+#define LED_ON HIGH
+#define LED_OFF LOW
+
+// Debug flag
+#define DEBUG_SERIAL true
 
 // LED Animation States
 enum LedState {
@@ -40,7 +69,11 @@ enum LedState {
   LED_MOVING,
   LED_HOMING,
   LED_ERROR,
-  LED_SUCCESS
+  LED_SUCCESS,
+  LED_MOTOR_X,
+  LED_MOTOR_Y,
+  LED_MOTOR_Z,
+  LED_MOTOR_P
 };
 
 LedState currentLedState = LED_IDLE;
@@ -49,6 +82,20 @@ int ledBrightness = 0;
 int ledDirection = 1;
 bool ledOn = false;
 int ledBlinkCount = 0;
+int currentMotorActive = -1;
+int progressPercent = 0;
+
+// Forward declarations
+void setLedState(LedState state);
+void initRgbLeds();
+void setRgbColor(int ledNum, uint8_t r, uint8_t g, uint8_t b);
+void clearMatrix();
+void updateMatrixDisplay();
+void showMotorIndicator(int motorIndex, bool active);
+void showProgressBar(int percent);
+void showIdlePattern();
+void showErrorPattern();
+void showSuccessPattern();
 
 // Motor pin definitions
 struct MotorConfig {
@@ -80,35 +127,70 @@ unsigned long lastLimitCheck = 0;
 const unsigned long LIMIT_DEBOUNCE_MS = 5;
 
 void setup() {
-  // Initialize LED pins
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(LED_PIN_2, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
-  digitalWrite(LED_PIN_2, LOW);
-
-  // Startup animation
-  startupAnimation();
-
-  // Initialize serial communication
+  // Initialize serial communication first for debug
   Serial.begin(115200);
-  while (!Serial) {
-    ; // Wait for serial port to connect
+  delay(1000);  // Wait for serial to stabilize
+
+  if (DEBUG_SERIAL) {
+    Serial.println("{\"status\":\"debug\",\"message\":\"Starting setup...\"}");
   }
+
+  // Initialize status LED (fallback)
+  pinMode(STATUS_LED, OUTPUT);
+  digitalWrite(STATUS_LED, LED_OFF);
+
+  // Initialize RGB LEDs
+  initRgbLeds();
+
+  if (DEBUG_SERIAL) {
+    Serial.println("{\"status\":\"debug\",\"message\":\"RGB LEDs initialized\"}");
+  }
+
+  // Initialize LED Matrix
+  matrix.begin();
+  clearMatrix();
+
+  if (DEBUG_SERIAL) {
+    Serial.println("{\"status\":\"debug\",\"message\":\"LED Matrix initialized\"}");
+  }
+
+  // Startup animation - sweep across matrix
+  for (int col = 0; col < MATRIX_COLS; col++) {
+    clearMatrix();
+    for (int row = 0; row < MATRIX_ROWS; row++) {
+      setPixel(row, col, 1);
+    }
+    updateMatrixDisplay();
+    // RGB color sweep during startup
+    setRgbColor(3, col * 20, 0, 255 - col * 20);
+    setRgbColor(4, 255 - col * 20, col * 20, 0);
+    delay(50);
+  }
+
+  // Clear and show ready pattern
+  clearMatrix();
+  setRgbColor(3, 0, 255, 0);  // Green
+  setRgbColor(4, 0, 255, 0);  // Green
 
   // Initialize all motor pins
   for (int i = 0; i < NUM_MOTORS; i++) {
     initMotor(i);
   }
 
-  // Success blink
+  if (DEBUG_SERIAL) {
+    Serial.println("{\"status\":\"debug\",\"message\":\"Motors initialized\"}");
+  }
+
+  // Success indication
+  showSuccessPattern();
   setLedState(LED_SUCCESS);
 
   // Send ready message
-  sendResponse("ready", "Stepper controller initialized");
+  sendResponse("ready", "Stepper controller initialized with LED matrix");
 }
 
 void loop() {
-  // Update LED animation
+  // Update LED animation based on current state
   updateLedAnimation();
 
   // Check for serial input
@@ -135,38 +217,301 @@ void loop() {
   }
 }
 
-// ============== LED Animation Functions ==============
+// ============== RGB LED Functions ==============
 
-void startupAnimation() {
-  // Knight Rider style sweep
-  for (int j = 0; j < 3; j++) {
-    for (int i = 0; i < 5; i++) {
-      digitalWrite(LED_PIN, HIGH);
-      delay(50);
-      digitalWrite(LED_PIN, LOW);
-      delay(50);
-    }
-    delay(200);
+void initRgbLeds() {
+#if ENABLE_RGB_LEDS
+  // Initialize RGB LED 3 pins (defined in variant.h)
+  pinMode(LED3_R, OUTPUT);
+  pinMode(LED3_G, OUTPUT);
+  pinMode(LED3_B, OUTPUT);
+
+  // Initialize RGB LED 4 pins
+  pinMode(LED4_R, OUTPUT);
+  pinMode(LED4_G, OUTPUT);
+  pinMode(LED4_B, OUTPUT);
+
+  // Turn off all (active-low, so HIGH = off)
+  digitalWrite(LED3_R, RGB_OFF);
+  digitalWrite(LED3_G, RGB_OFF);
+  digitalWrite(LED3_B, RGB_OFF);
+  digitalWrite(LED4_R, RGB_OFF);
+  digitalWrite(LED4_G, RGB_OFF);
+  digitalWrite(LED4_B, RGB_OFF);
+#endif
+}
+
+void setRgbColor(int ledNum, uint8_t r, uint8_t g, uint8_t b) {
+#if ENABLE_RGB_LEDS
+  // Convert 0-255 to on/off (simple threshold) - active low
+  // For PWM support, use analogWrite if available
+  if (ledNum == 3) {
+    digitalWrite(LED3_R, r > 127 ? RGB_ON : RGB_OFF);
+    digitalWrite(LED3_G, g > 127 ? RGB_ON : RGB_OFF);
+    digitalWrite(LED3_B, b > 127 ? RGB_ON : RGB_OFF);
+  } else if (ledNum == 4) {
+    digitalWrite(LED4_R, r > 127 ? RGB_ON : RGB_OFF);
+    digitalWrite(LED4_G, g > 127 ? RGB_ON : RGB_OFF);
+    digitalWrite(LED4_B, b > 127 ? RGB_ON : RGB_OFF);
+  }
+#endif
+}
+
+void setRgbOff(int ledNum) {
+  setRgbColor(ledNum, 0, 0, 0);
+}
+
+// ============== LED Matrix Functions ==============
+
+// Helper to set a pixel in the flat frame buffer
+inline void setPixel(int row, int col, uint8_t value) {
+  if (row >= 0 && row < MATRIX_ROWS && col >= 0 && col < MATRIX_COLS) {
+    matrixFrame[row * MATRIX_COLS + col] = value;
   }
 }
+
+// Helper to get a pixel from the flat frame buffer
+inline uint8_t getPixel(int row, int col) {
+  if (row >= 0 && row < MATRIX_ROWS && col >= 0 && col < MATRIX_COLS) {
+    return matrixFrame[row * MATRIX_COLS + col];
+  }
+  return 0;
+}
+
+void clearMatrix() {
+  memset(matrixFrame, 0, sizeof(matrixFrame));
+}
+
+void updateMatrixDisplay() {
+  // Use draw() with the flat array
+  matrix.draw(matrixFrame);
+}
+
+void showProgressBar(int percent) {
+  clearMatrix();
+
+  // Calculate how many columns to fill (0-13 based on percent)
+  int filledCols = (percent * MATRIX_COLS) / 100;
+
+  // Fill the progress bar (rows 2-5 for a centered bar)
+  for (int col = 0; col < filledCols; col++) {
+    for (int row = 2; row < 6; row++) {
+      setPixel(row, col, 1);
+    }
+  }
+
+  // Add border dots at ends
+  setPixel(1, 0, 1);
+  setPixel(6, 0, 1);
+  setPixel(1, MATRIX_COLS-1, 1);
+  setPixel(6, MATRIX_COLS-1, 1);
+
+  updateMatrixDisplay();
+}
+
+void showMotorIndicator(int motorIndex, bool active) {
+  // Show which motor is active in the bottom row
+  // Motor positions: X=cols 0-3, Y=cols 3-6, Z=cols 6-9, P=cols 9-12
+  clearMatrix();
+
+  int startCol = motorIndex * 3;
+
+  if (active) {
+    // Show filled block for active motor
+    for (int row = 5; row < 8; row++) {
+      for (int col = startCol; col < startCol + 3 && col < MATRIX_COLS; col++) {
+        setPixel(row, col, 1);
+      }
+    }
+
+    // Show motor letter above (X, Y, Z, P patterns)
+    // Row 0-4 for letter indication
+    switch (motorIndex) {
+      case 0: // X pattern
+        setPixel(1, startCol, 1);
+        setPixel(1, startCol+2, 1);
+        setPixel(2, startCol+1, 1);
+        setPixel(3, startCol, 1);
+        setPixel(3, startCol+2, 1);
+        break;
+      case 1: // Y pattern
+        setPixel(1, startCol, 1);
+        setPixel(1, startCol+2, 1);
+        setPixel(2, startCol+1, 1);
+        setPixel(3, startCol+1, 1);
+        break;
+      case 2: // Z pattern
+        setPixel(1, startCol, 1);
+        setPixel(1, startCol+1, 1);
+        setPixel(1, startCol+2, 1);
+        setPixel(2, startCol+1, 1);
+        setPixel(3, startCol, 1);
+        setPixel(3, startCol+1, 1);
+        setPixel(3, startCol+2, 1);
+        break;
+      case 3: // P pattern (Pipette)
+        setPixel(1, startCol, 1);
+        setPixel(1, startCol+1, 1);
+        setPixel(2, startCol, 1);
+        setPixel(2, startCol+1, 1);
+        setPixel(3, startCol, 1);
+        break;
+    }
+  }
+
+  updateMatrixDisplay();
+}
+
+void showIdlePattern() {
+  // Breathing dots pattern
+  static int idlePhase = 0;
+  clearMatrix();
+
+  // Center dot breathing
+  int centerRow = MATRIX_ROWS / 2;
+  int centerCol = MATRIX_COLS / 2;
+
+  // Expanding/contracting circle pattern
+  int radius = (idlePhase % 4);
+  for (int dr = -radius; dr <= radius; dr++) {
+    for (int dc = -radius; dc <= radius; dc++) {
+      int r = centerRow + dr;
+      int c = centerCol + dc;
+      if (abs(dr) + abs(dc) == radius) {  // Diamond shape
+        setPixel(r, c, 1);
+      }
+    }
+  }
+
+  idlePhase++;
+  updateMatrixDisplay();
+}
+
+void showErrorPattern() {
+  // X pattern for error
+  clearMatrix();
+
+  for (int i = 0; i < min(MATRIX_ROWS, MATRIX_COLS); i++) {
+    setPixel(i, i, 1);
+    setPixel(i, MATRIX_COLS - 1 - i, 1);
+  }
+
+  updateMatrixDisplay();
+}
+
+void showSuccessPattern() {
+  // Checkmark pattern
+  clearMatrix();
+
+  // Draw checkmark
+  setPixel(5, 2, 1);
+  setPixel(6, 3, 1);
+  setPixel(7, 4, 1);
+  setPixel(6, 5, 1);
+  setPixel(5, 6, 1);
+  setPixel(4, 7, 1);
+  setPixel(3, 8, 1);
+  setPixel(2, 9, 1);
+
+  updateMatrixDisplay();
+}
+
+void showHomingPattern(int motorIndex) {
+  // Animated arrows pointing to home
+  static int homingPhase = 0;
+  clearMatrix();
+
+  // Show motor indicator at bottom
+  int startCol = motorIndex * 3;
+  for (int col = startCol; col < startCol + 3 && col < MATRIX_COLS; col++) {
+    setPixel(7, col, 1);
+  }
+
+  // Animated arrow pointing left (toward home)
+  int arrowCol = (homingPhase % 8) + 2;
+  setPixel(3, arrowCol, 1);
+  setPixel(2, arrowCol - 1, 1);
+  setPixel(4, arrowCol - 1, 1);
+  setPixel(1, arrowCol - 2, 1);
+  setPixel(5, arrowCol - 2, 1);
+
+  homingPhase++;
+  updateMatrixDisplay();
+}
+
+// ============== LED Animation Functions ==============
 
 void setLedState(LedState state) {
   currentLedState = state;
   lastLedUpdate = millis();
   ledBlinkCount = 0;
 
-  if (state == LED_SUCCESS) {
-    // Quick success flash
-    for (int i = 0; i < 3; i++) {
-      digitalWrite(LED_PIN, HIGH);
-      digitalWrite(LED_PIN_2, HIGH);
-      delay(100);
-      digitalWrite(LED_PIN, LOW);
-      digitalWrite(LED_PIN_2, LOW);
-      delay(100);
-    }
-    currentLedState = LED_IDLE;
+  // Immediate visual feedback based on state
+  switch (state) {
+    case LED_SUCCESS:
+      // Quick success flash on RGB and matrix
+      setRgbColor(3, 0, 255, 0);  // Green
+      setRgbColor(4, 0, 255, 0);
+      showSuccessPattern();
+      for (int i = 0; i < 3; i++) {
+        digitalWrite(STATUS_LED, LED_ON);
+        delay(100);
+        digitalWrite(STATUS_LED, LED_OFF);
+        delay(100);
+      }
+      currentLedState = LED_IDLE;
+      break;
+
+    case LED_ERROR:
+      setRgbColor(3, 255, 0, 0);  // Red
+      setRgbColor(4, 255, 0, 0);
+      showErrorPattern();
+      break;
+
+    case LED_MOVING:
+      setRgbColor(3, 0, 0, 255);  // Blue
+      setRgbColor(4, 0, 0, 255);
+      break;
+
+    case LED_HOMING:
+      setRgbColor(3, 255, 255, 0);  // Yellow
+      setRgbColor(4, 255, 128, 0);  // Orange
+      break;
+
+    case LED_IDLE:
+      setRgbColor(3, 0, 255, 0);  // Green
+      setRgbColor(4, 0, 128, 0);  // Dim green
+      break;
+
+    default:
+      break;
   }
+}
+
+void setMotorActive(int motorIndex) {
+  currentMotorActive = motorIndex;
+  showMotorIndicator(motorIndex, true);
+
+  // Set specific color based on motor
+  switch (motorIndex) {
+    case 0: // X - Red tint
+      setRgbColor(3, 255, 0, 128);
+      break;
+    case 1: // Y - Green tint
+      setRgbColor(3, 0, 255, 128);
+      break;
+    case 2: // Z - Blue tint
+      setRgbColor(3, 128, 0, 255);
+      break;
+    case 3: // Pipette - Cyan
+      setRgbColor(3, 0, 255, 255);
+      break;
+  }
+}
+
+void updateProgress(int percent) {
+  progressPercent = percent;
+  showProgressBar(percent);
 }
 
 void updateLedAnimation() {
@@ -174,33 +519,42 @@ void updateLedAnimation() {
 
   switch (currentLedState) {
     case LED_IDLE:
-      // Slow breathing effect (sine wave simulation)
-      if (now - lastLedUpdate >= 30) {
+      // Slow blink (500ms) with idle pattern
+      if (now - lastLedUpdate >= 500) {
         lastLedUpdate = now;
-        ledBrightness += ledDirection * 5;
-        if (ledBrightness >= 255) {
-          ledBrightness = 255;
-          ledDirection = -1;
-        } else if (ledBrightness <= 0) {
-          ledBrightness = 0;
-          ledDirection = 1;
+        ledOn = !ledOn;
+        digitalWrite(STATUS_LED, ledOn ? LED_ON : LED_OFF);
+        showIdlePattern();
+        // Toggle dim green
+        if (ledOn) {
+          setRgbColor(3, 0, 255, 0);
+          setRgbColor(4, 0, 128, 0);
+        } else {
+          setRgbColor(3, 0, 128, 0);
+          setRgbColor(4, 0, 255, 0);
         }
-        analogWrite(LED_PIN, ledBrightness);
       }
       break;
 
     case LED_MOVING:
-      // Fast alternating blink
+      // Fast blink (100ms)
       if (now - lastLedUpdate >= 100) {
         lastLedUpdate = now;
         ledOn = !ledOn;
-        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
-        digitalWrite(LED_PIN_2, ledOn ? LOW : HIGH);  // Alternate
+        digitalWrite(STATUS_LED, ledOn ? LED_ON : LED_OFF);
+        // Pulse blue
+        if (ledOn) {
+          setRgbColor(3, 0, 0, 255);
+          setRgbColor(4, 0, 128, 255);
+        } else {
+          setRgbColor(3, 0, 128, 255);
+          setRgbColor(4, 0, 0, 255);
+        }
       }
       break;
 
     case LED_HOMING:
-      // Double blink pattern
+      // Double blink pattern with homing animation
       if (now - lastLedUpdate >= 150) {
         lastLedUpdate = now;
         ledBlinkCount++;
@@ -209,18 +563,29 @@ void updateLedAnimation() {
         } else if (ledBlinkCount == 4) {
           ledBlinkCount = 0;
         }
-        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
-        digitalWrite(LED_PIN_2, ledOn ? HIGH : LOW);
+        digitalWrite(STATUS_LED, ledOn ? LED_ON : LED_OFF);
+        if (currentMotorActive >= 0) {
+          showHomingPattern(currentMotorActive);
+        }
       }
       break;
 
     case LED_ERROR:
-      // Rapid flash
+      // Rapid flash (50ms) with error pattern
       if (now - lastLedUpdate >= 50) {
         lastLedUpdate = now;
         ledOn = !ledOn;
-        digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
-        digitalWrite(LED_PIN_2, ledOn ? HIGH : LOW);
+        digitalWrite(STATUS_LED, ledOn ? LED_ON : LED_OFF);
+        if (ledOn) {
+          setRgbColor(3, 255, 0, 0);
+          setRgbColor(4, 255, 0, 0);
+          showErrorPattern();
+        } else {
+          setRgbOff(3);
+          setRgbOff(4);
+          clearMatrix();
+          updateMatrixDisplay();
+        }
       }
       break;
 
@@ -230,10 +595,10 @@ void updateLedAnimation() {
 }
 
 void ledPulseOnStep() {
-  // Quick pulse during each step - toggle LED
+  // Quick pulse during each step
   static bool stepLedState = false;
   stepLedState = !stepLedState;
-  digitalWrite(LED_PIN, stepLedState ? HIGH : LOW);
+  digitalWrite(STATUS_LED, stepLedState ? LED_ON : LED_OFF);
 }
 
 // ============== Motor Functions ==============
@@ -326,20 +691,102 @@ void processCommand(String& input) {
 
 void cmdLedTest() {
   const char* pattern = docIn["pattern"] | "all";
+  int value = docIn["value"] | 0;
 
   if (strcmp(pattern, "idle") == 0) {
     setLedState(LED_IDLE);
   } else if (strcmp(pattern, "moving") == 0) {
     setLedState(LED_MOVING);
   } else if (strcmp(pattern, "homing") == 0) {
+    currentMotorActive = value;  // Set motor for homing animation
     setLedState(LED_HOMING);
   } else if (strcmp(pattern, "error") == 0) {
     setLedState(LED_ERROR);
   } else if (strcmp(pattern, "success") == 0) {
     setLedState(LED_SUCCESS);
+  } else if (strcmp(pattern, "motor") == 0) {
+    // Show specific motor indicator (value = motor index 0-3)
+    setMotorActive(value);
+  } else if (strcmp(pattern, "progress") == 0) {
+    // Show progress bar (value = percentage 0-100)
+    updateProgress(value);
+  } else if (strcmp(pattern, "rgb") == 0) {
+    // Test RGB LEDs - cycle through colors
+    for (int i = 0; i < 8; i++) {
+      uint8_t r = (i & 1) ? 255 : 0;
+      uint8_t g = (i & 2) ? 255 : 0;
+      uint8_t b = (i & 4) ? 255 : 0;
+      setRgbColor(3, r, g, b);
+      setRgbColor(4, b, g, r);  // Opposite on LED4
+      delay(300);
+    }
+    setRgbOff(3);
+    setRgbOff(4);
+  } else if (strcmp(pattern, "matrix") == 0) {
+    // Test matrix - sweep pattern
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      clearMatrix();
+      for (int row = 0; row < MATRIX_ROWS; row++) {
+        setPixel(row, col, 1);
+      }
+      updateMatrixDisplay();
+      delay(100);
+    }
+    clearMatrix();
+    updateMatrixDisplay();
+  } else if (strcmp(pattern, "all") == 0) {
+    // Full LED test sequence
+    // 1. Matrix sweep
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      clearMatrix();
+      for (int row = 0; row < MATRIX_ROWS; row++) {
+        setPixel(row, col, 1);
+      }
+      updateMatrixDisplay();
+      setRgbColor(3, col * 20, 255 - col * 10, col * 15);
+      setRgbColor(4, 255 - col * 20, col * 10, 255 - col * 15);
+      delay(50);
+    }
+
+    // 2. Progress bar demo
+    for (int p = 0; p <= 100; p += 10) {
+      updateProgress(p);
+      delay(100);
+    }
+
+    // 3. Motor indicators
+    for (int m = 0; m < NUM_MOTORS; m++) {
+      setMotorActive(m);
+      delay(500);
+    }
+
+    // 4. Status patterns
+    showSuccessPattern();
+    setRgbColor(3, 0, 255, 0);
+    setRgbColor(4, 0, 255, 0);
+    delay(500);
+
+    showErrorPattern();
+    setRgbColor(3, 255, 0, 0);
+    setRgbColor(4, 255, 0, 0);
+    delay(500);
+
+    // Return to idle
+    clearMatrix();
+    updateMatrixDisplay();
+    setLedState(LED_IDLE);
   } else {
-    // Test all patterns
-    startupAnimation();
+    // Default: simple blink test
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(STATUS_LED, LED_ON);
+      setRgbColor(3, 255, 255, 255);
+      setRgbColor(4, 255, 255, 255);
+      delay(100);
+      digitalWrite(STATUS_LED, LED_OFF);
+      setRgbOff(3);
+      setRgbOff(4);
+      delay(100);
+    }
   }
 
   sendResponse("ok", "LED test running");
@@ -419,6 +866,10 @@ int executeSteps(int motorIndex, int direction, int steps, long delayUs, bool re
 
   int stepsExecuted = 0;
   int ledToggleInterval = max(1, steps / 20);  // Toggle LED ~20 times during move
+  int progressUpdateInterval = max(1, steps / 10);  // Update progress ~10 times
+
+  // Show which motor is active
+  setMotorActive(motorIndex);
 
   // Generate step pulses
   for (int i = 0; i < steps; i++) {
@@ -437,7 +888,16 @@ int executeSteps(int motorIndex, int direction, int steps, long delayUs, bool re
     if (stepsExecuted % ledToggleInterval == 0) {
       ledPulseOnStep();
     }
+
+    // Update progress bar on matrix
+    if (stepsExecuted % progressUpdateInterval == 0) {
+      int percent = (stepsExecuted * 100) / steps;
+      updateProgress(percent);
+    }
   }
+
+  // Show completion
+  updateProgress(100);
 
   return stepsExecuted;
 }
