@@ -33,6 +33,15 @@ uint8_t matrixFrame[MATRIX_ROWS * MATRIX_COLS];
 #define LED_ON HIGH
 #define LED_OFF LOW
 
+// ============== RGB LED Configuration ==============
+// RGB LEDs 3 & 4 on Arduino UNO Q - Active LOW (LOW = ON, HIGH = OFF)
+#define RGB_ON LOW
+#define RGB_OFF HIGH
+
+// Current RGB state
+uint8_t rgb3_r = 0, rgb3_g = 0, rgb3_b = 0;
+uint8_t rgb4_r = 0, rgb4_g = 0, rgb4_b = 0;
+
 // Motor pin definitions
 struct MotorConfig {
   int pulsePin;
@@ -65,23 +74,76 @@ void updateMatrixDisplay() {
   matrix.draw(matrixFrame);
 }
 
+// ============== RGB LED Functions ==============
+
+void initRgbLeds() {
+  // Initialize RGB LED 3 pins
+  pinMode(LED3_R, OUTPUT);
+  pinMode(LED3_G, OUTPUT);
+  pinMode(LED3_B, OUTPUT);
+
+  // Initialize RGB LED 4 pins
+  pinMode(LED4_R, OUTPUT);
+  pinMode(LED4_G, OUTPUT);
+  pinMode(LED4_B, OUTPUT);
+
+  // Turn off all (active-low, so HIGH = off)
+  digitalWrite(LED3_R, RGB_OFF);
+  digitalWrite(LED3_G, RGB_OFF);
+  digitalWrite(LED3_B, RGB_OFF);
+  digitalWrite(LED4_R, RGB_OFF);
+  digitalWrite(LED4_G, RGB_OFF);
+  digitalWrite(LED4_B, RGB_OFF);
+}
+
+void setRgbLed3(uint8_t r, uint8_t g, uint8_t b) {
+  rgb3_r = r; rgb3_g = g; rgb3_b = b;
+  // Active-low: LOW = ON, HIGH = OFF
+  digitalWrite(LED3_R, r > 127 ? RGB_ON : RGB_OFF);
+  digitalWrite(LED3_G, g > 127 ? RGB_ON : RGB_OFF);
+  digitalWrite(LED3_B, b > 127 ? RGB_ON : RGB_OFF);
+}
+
+void setRgbLed4(uint8_t r, uint8_t g, uint8_t b) {
+  rgb4_r = r; rgb4_g = g; rgb4_b = b;
+  // Active-low: LOW = ON, HIGH = OFF
+  digitalWrite(LED4_R, r > 127 ? RGB_ON : RGB_OFF);
+  digitalWrite(LED4_G, g > 127 ? RGB_ON : RGB_OFF);
+  digitalWrite(LED4_B, b > 127 ? RGB_ON : RGB_OFF);
+}
+
+void setRgbBoth(uint8_t r, uint8_t g, uint8_t b) {
+  setRgbLed3(r, g, b);
+  setRgbLed4(r, g, b);
+}
+
+void rgbOff() {
+  setRgbBoth(0, 0, 0);
+}
+
 void showProgressBar(int percent) {
   clearMatrix();
   int filledCols = (percent * MATRIX_COLS) / 100;
   for (int col = 0; col < filledCols; col++) {
-    for (int row = 2; row < 6; row++) {
+    for (int row = 1; row < 5; row++) {  // Shifted up: rows 1-4 instead of 2-5
       setPixel(row, col, 1);
     }
   }
   updateMatrixDisplay();
+  // RGB: Blue gradient based on progress
+  setRgbLed3(0, 0, 255);
+  setRgbLed4(0, percent * 2, 255 - percent);
 }
 
 void showSuccessPattern() {
   clearMatrix();
-  setPixel(5, 2, 1); setPixel(6, 3, 1); setPixel(7, 4, 1);
-  setPixel(6, 5, 1); setPixel(5, 6, 1); setPixel(4, 7, 1);
-  setPixel(3, 8, 1); setPixel(2, 9, 1);
+  // Checkmark shifted up by 2 rows
+  setPixel(3, 2, 1); setPixel(4, 3, 1); setPixel(5, 4, 1);
+  setPixel(4, 5, 1); setPixel(3, 6, 1); setPixel(2, 7, 1);
+  setPixel(1, 8, 1); setPixel(0, 9, 1);
   updateMatrixDisplay();
+  // RGB: Green for success
+  setRgbBoth(0, 255, 0);
 }
 
 void showErrorPattern() {
@@ -91,12 +153,14 @@ void showErrorPattern() {
     setPixel(i, MATRIX_COLS - 1 - i, 1);
   }
   updateMatrixDisplay();
+  // RGB: Red for error
+  setRgbBoth(255, 0, 0);
 }
 
 void showIdlePattern() {
   static int phase = 0;
   clearMatrix();
-  int centerRow = MATRIX_ROWS / 2;
+  int centerRow = 3;  // Shifted up: was MATRIX_ROWS/2 (4), now 3
   int centerCol = MATRIX_COLS / 2;
   int radius = (phase % 4);
   for (int dr = -radius; dr <= radius; dr++) {
@@ -108,36 +172,57 @@ void showIdlePattern() {
   }
   phase++;
   updateMatrixDisplay();
+  // RGB status: Alternating colors between LED3 and LED4
+  static uint8_t colorPhase = 0;
+  colorPhase++;
+
+  // Alternate between LED3 and LED4 with complementary colors
+  if (colorPhase % 2 == 0) {
+    setRgbLed3(0, 128, 255);   // Cyan
+    setRgbLed4(255, 128, 0);   // Orange
+  } else {
+    setRgbLed3(255, 128, 0);   // Orange
+    setRgbLed4(0, 128, 255);   // Cyan
+  }
 }
 
 void showMotorIndicator(int motorIndex) {
   clearMatrix();
   int startCol = motorIndex * 3;
-  for (int row = 5; row < 8; row++) {
+  // Motor block - shifted up: rows 3-5 instead of 5-7
+  for (int row = 3; row < 6; row++) {
     for (int col = startCol; col < startCol + 3 && col < MATRIX_COLS; col++) {
       setPixel(row, col, 1);
     }
   }
-  // Motor letter
+  // Motor letter - shifted up: rows 0-2 instead of 1-3
   switch (motorIndex) {
-    case 0: // X
-      setPixel(1, startCol, 1); setPixel(1, startCol+2, 1);
-      setPixel(2, startCol+1, 1);
-      setPixel(3, startCol, 1); setPixel(3, startCol+2, 1);
+    case 0: // X - Red
+      setPixel(0, startCol, 1); setPixel(0, startCol+2, 1);
+      setPixel(1, startCol+1, 1);
+      setPixel(2, startCol, 1); setPixel(2, startCol+2, 1);
+      setRgbLed3(255, 0, 0);
+      setRgbLed4(255, 128, 0);
       break;
-    case 1: // Y
-      setPixel(1, startCol, 1); setPixel(1, startCol+2, 1);
-      setPixel(2, startCol+1, 1); setPixel(3, startCol+1, 1);
+    case 1: // Y - Green
+      setPixel(0, startCol, 1); setPixel(0, startCol+2, 1);
+      setPixel(1, startCol+1, 1); setPixel(2, startCol+1, 1);
+      setRgbLed3(0, 255, 0);
+      setRgbLed4(128, 255, 0);
       break;
-    case 2: // Z
-      setPixel(1, startCol, 1); setPixel(1, startCol+1, 1); setPixel(1, startCol+2, 1);
-      setPixel(2, startCol+1, 1);
-      setPixel(3, startCol, 1); setPixel(3, startCol+1, 1); setPixel(3, startCol+2, 1);
+    case 2: // Z - Blue
+      setPixel(0, startCol, 1); setPixel(0, startCol+1, 1); setPixel(0, startCol+2, 1);
+      setPixel(1, startCol+1, 1);
+      setPixel(2, startCol, 1); setPixel(2, startCol+1, 1); setPixel(2, startCol+2, 1);
+      setRgbLed3(0, 0, 255);
+      setRgbLed4(0, 128, 255);
       break;
-    case 3: // P
+    case 3: // P (Pipette) - Magenta
+      setPixel(0, startCol, 1); setPixel(0, startCol+1, 1);
       setPixel(1, startCol, 1); setPixel(1, startCol+1, 1);
-      setPixel(2, startCol, 1); setPixel(2, startCol+1, 1);
-      setPixel(3, startCol, 1);
+      setPixel(2, startCol, 1);
+      setRgbLed3(255, 0, 255);
+      setRgbLed4(255, 0, 128);
       break;
   }
   updateMatrixDisplay();
@@ -271,7 +356,7 @@ int rpc_stop_all() {
 }
 
 // led_test(pattern_id) -> 1 if success
-// pattern_id: 0=idle, 1=success, 2=error, 3=progress50, 4=motor0, 5=motor1, 6=motor2, 7=motor3, 8=sweep, 9=all
+// pattern_id: 0=idle, 1=success, 2=error, 3=progress50, 4-7=motors, 8=sweep, 9=all, 10=rgb_cycle
 int rpc_led_test(int pattern_id) {
   switch (pattern_id) {
     case 0:
@@ -293,38 +378,84 @@ int rpc_led_test(int pattern_id) {
       showMotorIndicator(pattern_id - 4);
       break;
     case 8:
-      // Sweep pattern
+      // Sweep pattern with RGB rainbow
       for (int col = 0; col < MATRIX_COLS; col++) {
         clearMatrix();
         for (int row = 0; row < MATRIX_ROWS; row++) {
           setPixel(row, col, 1);
         }
         updateMatrixDisplay();
+        // Rainbow RGB effect during sweep
+        int hue = (col * 255) / MATRIX_COLS;
+        if (hue < 85) {
+          setRgbLed3(255 - hue * 3, hue * 3, 0);
+          setRgbLed4(hue * 3, 0, 255 - hue * 3);
+        } else if (hue < 170) {
+          hue -= 85;
+          setRgbLed3(0, 255 - hue * 3, hue * 3);
+          setRgbLed4(255 - hue * 3, hue * 3, 0);
+        } else {
+          hue -= 170;
+          setRgbLed3(hue * 3, 0, 255 - hue * 3);
+          setRgbLed4(0, 255 - hue * 3, hue * 3);
+        }
         delay(50);
       }
       clearMatrix();
       updateMatrixDisplay();
+      rgbOff();
       break;
     case 9:
-      // Full test
+      // Full test with RGB
+      // Sweep with rainbow
       for (int col = 0; col < MATRIX_COLS; col++) {
         clearMatrix();
         for (int row = 0; row < MATRIX_ROWS; row++) {
           setPixel(row, col, 1);
         }
         updateMatrixDisplay();
+        int hue = (col * 255) / MATRIX_COLS;
+        if (hue < 85) {
+          setRgbBoth(255 - hue * 3, hue * 3, 0);
+        } else if (hue < 170) {
+          setRgbBoth(0, 255 - (hue-85) * 3, (hue-85) * 3);
+        } else {
+          setRgbBoth((hue-170) * 3, 0, 255 - (hue-170) * 3);
+        }
         delay(30);
       }
+      // Progress bar
       for (int p = 0; p <= 100; p += 10) {
         showProgressBar(p);
         delay(50);
       }
+      // Motor indicators (each with unique color)
       for (int m = 0; m < NUM_MOTORS; m++) {
         showMotorIndicator(m);
         delay(300);
       }
       showSuccessPattern();
       delay(500);
+      break;
+    case 10:
+      // RGB cycle only
+      for (int i = 0; i < 3; i++) {
+        setRgbBoth(255, 0, 0);   // Red
+        delay(200);
+        setRgbBoth(0, 255, 0);   // Green
+        delay(200);
+        setRgbBoth(0, 0, 255);   // Blue
+        delay(200);
+        setRgbBoth(255, 255, 0); // Yellow
+        delay(200);
+        setRgbBoth(0, 255, 255); // Cyan
+        delay(200);
+        setRgbBoth(255, 0, 255); // Magenta
+        delay(200);
+        setRgbBoth(255, 255, 255); // White
+        delay(200);
+      }
+      rgbOff();
       break;
     default:
       showIdlePattern();
@@ -336,6 +467,21 @@ int rpc_led_test(int pattern_id) {
 int rpc_init_motor(int motor_id) {
   if (motor_id < 1 || motor_id > NUM_MOTORS) return -1;
   initMotor(motor_id - 1);
+  return 1;
+}
+
+// set_rgb(led_num, r, g, b) -> 1 if success
+// led_num: 3 or 4, or 0 for both
+int rpc_set_rgb(int led_num, int r, int g, int b) {
+  if (led_num == 0) {
+    setRgbBoth(r, g, b);
+  } else if (led_num == 3) {
+    setRgbLed3(r, g, b);
+  } else if (led_num == 4) {
+    setRgbLed4(r, g, b);
+  } else {
+    return -1;
+  }
   return 1;
 }
 
@@ -357,6 +503,10 @@ void setup() {
   // Initialize status LED
   pinMode(STATUS_LED, OUTPUT);
   digitalWrite(STATUS_LED, LED_OFF);
+
+  // Initialize RGB LEDs
+  initRgbLeds();
+  setRgbBoth(255, 255, 0);  // Yellow during startup
 
   // Startup sweep animation
   for (int col = 0; col < MATRIX_COLS; col++) {
@@ -382,6 +532,7 @@ void setup() {
   Bridge.provide("stop_all", rpc_stop_all);
   Bridge.provide("led_test", rpc_led_test);
   Bridge.provide("init_motor", rpc_init_motor);
+  Bridge.provide("set_rgb", rpc_set_rgb);
 
   // Show success
   showSuccessPattern();
@@ -394,13 +545,9 @@ void setup() {
 void loop() {
   // Idle animation every 500ms
   static unsigned long lastIdle = 0;
+
   if (millis() - lastIdle >= 500) {
     lastIdle = millis();
     showIdlePattern();
-
-    // Blink status LED
-    static bool ledState = false;
-    ledState = !ledState;
-    digitalWrite(STATUS_LED, ledState ? LED_ON : LED_OFF);
   }
 }

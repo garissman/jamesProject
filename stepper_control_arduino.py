@@ -316,10 +316,10 @@ class StepperController:
 
     def led_test(self, pattern: str = "all", value: int = 0) -> bool:
         """
-        Run LED test pattern on the matrix
+        Run LED test pattern on the matrix and RGB LEDs
 
         Args:
-            pattern: Test pattern name (idle, success, error, progress, motor0-3, sweep, all)
+            pattern: Test pattern name (idle, success, error, progress, motor0-3, sweep, all, rgb)
             value: Optional value for pattern
 
         Returns:
@@ -339,14 +339,32 @@ class StepperController:
             "sweep": 8,
             "matrix": 8,
             "all": 9,
+            "rgb": 10,
+            "rgb_cycle": 10,
         }
 
         pattern_id = pattern_map.get(pattern.lower(), 0)
 
-        # Longer timeout for full test
-        timeout = 15 if pattern_id == 9 else 5
+        # Longer timeout for full test or RGB cycle
+        timeout = 15 if pattern_id in [9, 10] else 5
 
         result = self._call_rpc("led_test", pattern_id, timeout=timeout)
+        return result == 1
+
+    def set_rgb(self, led_num: int, r: int, g: int, b: int) -> bool:
+        """
+        Set RGB LED color directly
+
+        Args:
+            led_num: LED number (0=both, 3=LED3, 4=LED4)
+            r: Red value (0-255)
+            g: Green value (0-255)
+            b: Blue value (0-255)
+
+        Returns:
+            True if successful
+        """
+        result = self._call_rpc("set_rgb", led_num, r, g, b)
         return result == 1
 
     def cleanup(self):
