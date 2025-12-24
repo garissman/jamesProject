@@ -1,6 +1,7 @@
 """
-Pipetting Controller for Laboratory Sampler
+Pipetting Controller for Laboratory Sampler - Arduino UNO Q Version
 Handles coordinate mapping and pipetting workflows
+Communicates with MCU via arduino-router bridge
 """
 
 import json
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple, Optional
 
-from stepper_control import StepperController, Direction
+from stepper_control_arduino import StepperController, Direction
 
 
 @dataclass
@@ -288,28 +289,31 @@ class PipettingController:
         y_delta = target_steps[1] - current_steps[1]
         z_delta = target_steps[2] - current_steps[2]
 
+        # Convert speed from seconds to microseconds for Arduino
+        travel_delay_us = int(self.TRAVEL_SPEED * 1_000_000)
+
         # Move Z up to safe height first (if moving down)
         if z_delta < 0:
             safe_z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, travel_delay_us)
 
         # Move X and Y
         if x_delta != 0:
             direction = Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE
-            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(1, abs(x_delta), direction, travel_delay_us)
 
         if y_delta != 0:
             direction = Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE
-            self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(2, abs(y_delta), direction, travel_delay_us)
 
         # Move Z to target position
         if z_delta != 0:
             # Account for safe height movement
             if z_delta < 0:
                 total_z = abs(z_delta) + int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-                self.stepper_controller.move_motor(3, total_z, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+                self.stepper_controller.move_motor(3, total_z, Direction.COUNTERCLOCKWISE, travel_delay_us)
             else:
-                self.stepper_controller.move_motor(3, abs(z_delta), Direction.CLOCKWISE, self.TRAVEL_SPEED)
+                self.stepper_controller.move_motor(3, abs(z_delta), Direction.CLOCKWISE, travel_delay_us)
 
         # Update current position
         self.current_position = target_coords
@@ -332,7 +336,8 @@ class PipettingController:
         self.operation_well = self.get_current_well()
         self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
-        self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, self.PIPETTE_SPEED)
+        pipette_delay_us = int(self.PIPETTE_SPEED * 1_000_000)
+        self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, pipette_delay_us)
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -348,7 +353,8 @@ class PipettingController:
         self.operation_well = self.get_current_well()
         self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
-        self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, self.PIPETTE_SPEED)
+        pipette_delay_us = int(self.PIPETTE_SPEED * 1_000_000)
+        self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, pipette_delay_us)
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -560,7 +566,8 @@ class PipettingController:
         # First, raise Z to safe height if needed
         if self.current_position.z < 0:
             safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            travel_delay_us = int(self.TRAVEL_SPEED * 1_000_000)
+            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, travel_delay_us)
 
         # Move to well A1 (home position)
         self.move_to_well("A1", 0)
@@ -600,16 +607,17 @@ class PipettingController:
         Args:
             direction: 'up' or 'down'
         """
+        travel_delay_us = int(self.TRAVEL_SPEED * 1_000_000)
         if direction == 'up':
             # Move Z up by SAFE_HEIGHT
             z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, z_steps, Direction.CLOCKWISE, travel_delay_us)
             self.current_position.z += self.SAFE_HEIGHT
             self.log(f"Z-axis moved UP ({self.SAFE_HEIGHT}mm)")
         elif direction == 'down':
             # Move Z down by SAFE_HEIGHT
             z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, z_steps, Direction.COUNTERCLOCKWISE, travel_delay_us)
             self.current_position.z -= self.SAFE_HEIGHT
             self.log(f"Z-axis moved DOWN ({self.SAFE_HEIGHT}mm)")
         else:
