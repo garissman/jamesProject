@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 from pipetting_controller import PipettingController, PipettingStep
+from stepper_control_arduino import StepperController
 
 # Global pipetting controller instance
 pipetting_controller: Optional[PipettingController] = None
@@ -30,9 +31,24 @@ async def lifespan(app: FastAPI):
     try:
         pipetting_controller = PipettingController()
         print("Pipetting controller initialized successfully")
+
+        # Test MCU connection
+        try:
+            if pipetting_controller.stepper_controller.ping():
+                print("✓ MCU connection verified - ping successful")
+                # Run a quick LED test to confirm visual feedback
+                pipetting_controller.stepper_controller.led_test("idle")
+                print("✓ LED test sent - you should see the LED matrix light up")
+            else:
+                print("✗ MCU ping failed - no response from arduino-router")
+        except Exception as ping_error:
+            print(f"✗ MCU communication error: {ping_error}")
+
     except Exception as e:
         print(f"Warning: Could not initialize pipetting controller: {e}")
         print("Running in simulation mode")
+        print("Note: Make sure FastAPI is running ON the Arduino UNO Q")
+        print("      The unix socket /var/run/arduino-router.sock must be accessible")
 
     yield
 
@@ -448,6 +464,82 @@ async def dispense_liquid(request: VolumeRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error dispensing liquid: {str(e)}"
+        )
+
+
+# LED Test endpoint
+class LedTestRequest(BaseModel):
+    """Request for LED test"""
+    pattern: str = Field("all", description="LED pattern: all, matrix, rgb, progress, motor, idle, moving, homing, error, success")
+    value: int = Field(0, description="Optional value for pattern (e.g., percentage for progress)")
+
+
+@app.post("/api/led/test")
+async def test_led(request: LedTestRequest):
+    """Test LED matrix and RGB LEDs on Arduino UNO Q"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        result = pipetting_controller.stepper_controller.led_test(request.pattern, request.value)
+        return {
+            "status": "success" if result else "failed",
+            "message": f"LED test '{request.pattern}' executed",
+            "pattern": request.pattern,
+            "value": request.value
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error running LED test: {str(e)}"
+        )
+
+
+@app.get("/api/mcu/ping")
+async def ping_mcu():
+    """Ping the MCU to verify communication"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        result = pipetting_controller.stepper_controller.ping()
+        return {
+            "status": "success" if result else "failed",
+            "connected": result,
+            "message": "MCU responded with pong" if result else "No response from MCU"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error pinging MCU: {str(e)}"
+        )
+
+
+@app.get("/api/mcu/limits")
+async def get_limit_switches():
+    """Get state of all limit switches"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        limits = pipetting_controller.stepper_controller.get_limit_states()
+        return {
+            "status": "success",
+            "limits": limits
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting limit states: {str(e)}"
         )
 
 
