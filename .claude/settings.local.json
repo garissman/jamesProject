@@ -18,7 +18,8 @@
       "Bash(ping:*)",
       "Bash(ssh:*)",
       "Bash(sshpass:*)",
-      "Bash(arduino-cli lib search:*)"
+      "Bash(arduino-cli lib search:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
