@@ -30,6 +30,7 @@
 #include <ArduinoJson.h>
 #include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
+#include <Arduino_RouterBridge.h>
 
 // Number of motors
 #define NUM_MOTORS 4
@@ -53,7 +54,8 @@ uint8_t matrixFrame[MATRIX_ROWS * MATRIX_COLS];
 #define RGB_OFF HIGH
 
 // Flag to enable/disable RGB LEDs (set to false if pins not available)
-#define ENABLE_RGB_LEDS true
+// Disabled for now - may cause issues on some UNO Q boards
+#define ENABLE_RGB_LEDS false
 
 // ============== Built-in LED (fallback) ==============
 #define STATUS_LED LED_BUILTIN
@@ -127,32 +129,31 @@ unsigned long lastLimitCheck = 0;
 const unsigned long LIMIT_DEBOUNCE_MS = 5;
 
 void setup() {
-  // Initialize serial communication first for debug
-  Serial.begin(115200);
-  delay(1000);  // Wait for serial to stabilize
+  // Initialize LED Matrix FIRST - this is the most reliable indicator
+  matrix.begin();
 
-  if (DEBUG_SERIAL) {
-    Serial.println("{\"status\":\"debug\",\"message\":\"Starting setup...\"}");
+  // Immediate visual feedback - fill entire matrix
+  memset(matrixFrame, 1, sizeof(matrixFrame));
+  matrix.draw(matrixFrame);
+  delay(500);
+
+  // Initialize Bridge and Monitor for MPU communication
+  if (!Bridge.begin()) {
+    showErrorPattern();
+    while(1); // Halt on bridge init failure
+  }
+
+  if (!Monitor.begin()) {
+    showErrorPattern();
+    while(1); // Halt on monitor init failure
   }
 
   // Initialize status LED (fallback)
   pinMode(STATUS_LED, OUTPUT);
   digitalWrite(STATUS_LED, LED_OFF);
 
-  // Initialize RGB LEDs
+  // Initialize RGB LEDs (if enabled)
   initRgbLeds();
-
-  if (DEBUG_SERIAL) {
-    Serial.println("{\"status\":\"debug\",\"message\":\"RGB LEDs initialized\"}");
-  }
-
-  // Initialize LED Matrix
-  matrix.begin();
-  clearMatrix();
-
-  if (DEBUG_SERIAL) {
-    Serial.println("{\"status\":\"debug\",\"message\":\"LED Matrix initialized\"}");
-  }
 
   // Startup animation - sweep across matrix
   for (int col = 0; col < MATRIX_COLS; col++) {
@@ -161,29 +162,20 @@ void setup() {
       setPixel(row, col, 1);
     }
     updateMatrixDisplay();
-    // RGB color sweep during startup
-    setRgbColor(3, col * 20, 0, 255 - col * 20);
-    setRgbColor(4, 255 - col * 20, col * 20, 0);
     delay(50);
   }
-
-  // Clear and show ready pattern
-  clearMatrix();
-  setRgbColor(3, 0, 255, 0);  // Green
-  setRgbColor(4, 0, 255, 0);  // Green
 
   // Initialize all motor pins
   for (int i = 0; i < NUM_MOTORS; i++) {
     initMotor(i);
   }
 
-  if (DEBUG_SERIAL) {
-    Serial.println("{\"status\":\"debug\",\"message\":\"Motors initialized\"}");
-  }
-
-  // Success indication
+  // Success indication - checkmark pattern
   showSuccessPattern();
-  setLedState(LED_SUCCESS);
+  delay(1000);
+
+  // Set to idle state
+  currentLedState = LED_IDLE;
 
   // Send ready message
   sendResponse("ready", "Stepper controller initialized with LED matrix");
@@ -193,9 +185,9 @@ void loop() {
   // Update LED animation based on current state
   updateLedAnimation();
 
-  // Check for serial input
-  while (Serial.available()) {
-    char c = Serial.read();
+  // Check for monitor input (from MPU via Bridge)
+  while (Monitor.available()) {
+    char c = Monitor.read();
     if (c == '\n') {
       inputComplete = true;
     } else {
@@ -853,8 +845,8 @@ void cmdStep() {
   docOut["status"] = "ok";
   docOut["steps_executed"] = stepsExecuted;
   docOut["limit_triggered"] = isLimitTriggered(idx);
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 int executeSteps(int motorIndex, int direction, int steps, long delayUs, bool respectLimit) {
@@ -993,8 +985,8 @@ void cmdHomeMotor() {
   docOut["motor_id"] = motorId;
   docOut["steps_to_home"] = stepsExecuted;
   docOut["homed"] = isLimitTriggered(idx);
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 void cmdHomeAll() {
@@ -1062,8 +1054,8 @@ void cmdHomeAll() {
     stepsArray.add(stepsToHome[i]);
     homedArray.add(homed[i]);
   }
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 void cmdGetLimits() {
@@ -1080,8 +1072,8 @@ void cmdGetLimits() {
     limitObj["pin"] = motors[i].limitPin;
   }
 
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 void cmdMoveBatch() {
@@ -1189,16 +1181,16 @@ void cmdMoveBatch() {
       result["limit_hit"] = limitHit[i];
     }
   }
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 void sendResponse(const char* status, const char* message) {
   docOut.clear();
   docOut["status"] = status;
   docOut["message"] = message;
-  serializeJson(docOut, Serial);
-  Serial.println();
+  serializeJson(docOut, Monitor);
+  Monitor.println();
 }
 
 void sendError(const char* message) {

@@ -14,7 +14,11 @@
       "Bash(grep:*)",
       "Bash(pip3 install:*)",
       "Bash(find:*)",
-      "Bash(arduino-cli lib install:*)"
+      "Bash(arduino-cli lib install:*)",
+      "Bash(ping:*)",
+      "Bash(ssh:*)",
+      "Bash(sshpass:*)",
+      "Bash(arduino-cli lib search:*)"
     ],
     "deny": [],
     "ask": []
