@@ -21,6 +21,18 @@ pipetting_controller: Optional[PipettingController] = None
 execution_lock = threading.Lock()
 is_executing = False
 
+# Drift test state
+drift_test_thread: Optional[threading.Thread] = None
+drift_test_running = False
+drift_test_results: Dict = {
+    "status": "idle",
+    "current_cycle": 0,
+    "total_cycles": 0,
+    "cycles": [],
+    "summary": None,
+    "error": None
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -518,6 +530,172 @@ async def get_axis_positions():
             status_code=500,
             detail=f"Error getting positions: {str(e)}"
         )
+
+
+# Motor Drift Test endpoints
+class DriftTestRequest(BaseModel):
+    """Request to start a drift test"""
+    cycles: int = Field(default=10, gt=0, le=1000, description="Number of test cycles")
+    motor_speed: float = Field(default=0.001, gt=0, le=0.1, description="Motor speed (delay between steps)")
+    steps_per_mm: int = Field(default=200, gt=0, le=10000, description="Steps per millimeter")
+
+
+def run_drift_test_simulation(cycles: int, motor_speed: float, steps_per_mm: int):
+    """Run a simulated drift test (for development without hardware)"""
+    global drift_test_running, drift_test_results
+    import random
+    import time
+    from datetime import datetime
+
+    drift_test_results = {
+        "status": "running",
+        "current_cycle": 0,
+        "total_cycles": cycles,
+        "cycles": [],
+        "summary": None,
+        "error": None,
+        "start_time": datetime.now().isoformat()
+    }
+
+    try:
+        for cycle in range(1, cycles + 1):
+            if not drift_test_running:
+                drift_test_results["status"] = "stopped"
+                break
+
+            drift_test_results["current_cycle"] = cycle
+
+            # Simulate motor movement with random variation
+            base_steps = random.randint(8000, 12000)
+            fwd_steps = base_steps + random.randint(-50, 50)
+            back_steps = base_steps + random.randint(-50, 50)
+            step_difference = abs(fwd_steps - back_steps)
+            drift_mm = step_difference / steps_per_mm
+
+            cycle_data = {
+                "cycle_number": cycle,
+                "timestamp": datetime.now().isoformat(),
+                "forward_steps": fwd_steps,
+                "forward_time": random.uniform(5.0, 8.0),
+                "backward_steps": back_steps,
+                "backward_time": random.uniform(5.0, 8.0),
+                "total_cycle_time": random.uniform(12.0, 18.0),
+                "step_difference": step_difference,
+                "drift_mm": round(drift_mm, 3)
+            }
+
+            drift_test_results["cycles"].append(cycle_data)
+
+            # Simulate time for each cycle
+            time.sleep(0.5)
+
+        # Calculate summary
+        if drift_test_results["cycles"]:
+            drifts = [c["drift_mm"] for c in drift_test_results["cycles"]]
+            fwd_steps_list = [c["forward_steps"] for c in drift_test_results["cycles"]]
+            back_steps_list = [c["backward_steps"] for c in drift_test_results["cycles"]]
+
+            drift_test_results["summary"] = {
+                "total_cycles": len(drift_test_results["cycles"]),
+                "avg_forward_steps": round(sum(fwd_steps_list) / len(fwd_steps_list), 1),
+                "avg_backward_steps": round(sum(back_steps_list) / len(back_steps_list), 1),
+                "avg_drift_mm": round(sum(drifts) / len(drifts), 3),
+                "max_drift_mm": round(max(drifts), 3),
+                "min_drift_mm": round(min(drifts), 3)
+            }
+
+        if drift_test_results["status"] == "running":
+            drift_test_results["status"] = "completed"
+
+    except Exception as e:
+        drift_test_results["status"] = "error"
+        drift_test_results["error"] = str(e)
+
+    finally:
+        drift_test_running = False
+        drift_test_results["end_time"] = datetime.now().isoformat()
+
+
+@app.post("/api/drift-test/start")
+async def start_drift_test(request: DriftTestRequest):
+    """Start a motor drift test"""
+    global drift_test_thread, drift_test_running, drift_test_results
+
+    if drift_test_running:
+        raise HTTPException(
+            status_code=400,
+            detail="Drift test is already running"
+        )
+
+    drift_test_running = True
+
+    # Start the test in a background thread
+    drift_test_thread = threading.Thread(
+        target=run_drift_test_simulation,
+        args=(request.cycles, request.motor_speed, request.steps_per_mm)
+    )
+    drift_test_thread.start()
+
+    return {
+        "status": "started",
+        "message": f"Drift test started with {request.cycles} cycles",
+        "cycles": request.cycles
+    }
+
+
+@app.post("/api/drift-test/stop")
+async def stop_drift_test():
+    """Stop the running drift test"""
+    global drift_test_running
+
+    if not drift_test_running:
+        raise HTTPException(
+            status_code=400,
+            detail="No drift test is running"
+        )
+
+    drift_test_running = False
+
+    return {
+        "status": "stopping",
+        "message": "Drift test stop requested"
+    }
+
+
+@app.get("/api/drift-test/status")
+async def get_drift_test_status():
+    """Get the current drift test status and results"""
+    return {
+        "status": "success",
+        "running": drift_test_running,
+        "data": drift_test_results
+    }
+
+
+@app.post("/api/drift-test/clear")
+async def clear_drift_test_results():
+    """Clear drift test results"""
+    global drift_test_results
+
+    if drift_test_running:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot clear results while test is running"
+        )
+
+    drift_test_results = {
+        "status": "idle",
+        "current_cycle": 0,
+        "total_cycles": 0,
+        "cycles": [],
+        "summary": None,
+        "error": None
+    }
+
+    return {
+        "status": "success",
+        "message": "Drift test results cleared"
+    }
 
 
 # Configuration management endpoints

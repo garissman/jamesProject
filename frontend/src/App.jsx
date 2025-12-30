@@ -70,6 +70,11 @@ function App() {
     const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, motor_steps: {}})
     const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
 
+    // Drift test state
+    const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.001, steps_per_mm: 200})
+    const [driftTestRunning, setDriftTestRunning] = useState(false)
+    const [driftTestResults, setDriftTestResults] = useState(null)
+
     // Dispense/Collect state
     const [pipetteVolume, setPipetteVolume] = useState('1.0') // Volume for manual dispense/collect
 
@@ -610,6 +615,64 @@ function App() {
         }
     }
 
+    // Drift test functions
+    const startDriftTest = async () => {
+        try {
+            const response = await fetch('/api/drift-test/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(driftTestConfig)
+            })
+            const data = await response.json()
+            if (response.ok) {
+                setDriftTestRunning(true)
+                console.log(data.message)
+            } else {
+                console.error(`Error: ${data.detail}`)
+            }
+        } catch (error) {
+            console.error('Failed to start drift test:', error)
+        }
+    }
+
+    const stopDriftTest = async () => {
+        try {
+            const response = await fetch('/api/drift-test/stop', {method: 'POST'})
+            const data = await response.json()
+            if (response.ok) {
+                console.log(data.message)
+            }
+        } catch (error) {
+            console.error('Failed to stop drift test:', error)
+        }
+    }
+
+    const fetchDriftTestStatus = async () => {
+        try {
+            const response = await fetch('/api/drift-test/status')
+            const data = await response.json()
+            if (data.status === 'success') {
+                setDriftTestRunning(data.running)
+                setDriftTestResults(data.data)
+            }
+        } catch (error) {
+            console.error('Failed to fetch drift test status:', error)
+        }
+    }
+
+    const clearDriftTestResults = async () => {
+        try {
+            const response = await fetch('/api/drift-test/clear', {method: 'POST'})
+            const data = await response.json()
+            if (response.ok) {
+                setDriftTestResults(null)
+                console.log(data.message)
+            }
+        } catch (error) {
+            console.error('Failed to clear drift test results:', error)
+        }
+    }
+
     const fetchCurrentPosition = async () => {
         try {
             const response = await fetch('/api/pipetting/status')
@@ -721,10 +784,24 @@ function App() {
             if (activeTab === 'manual') {
                 fetchAxisPositions()
             }
+            if (activeTab === 'drift-test') {
+                fetchDriftTestStatus()
+            }
         }, 1000) // Poll every second
 
         return () => clearInterval(interval)
     }, [activeTab])
+
+    // Faster polling when drift test is running
+    useEffect(() => {
+        if (!driftTestRunning) return
+
+        const interval = setInterval(() => {
+            fetchDriftTestStatus()
+        }, 500)
+
+        return () => clearInterval(interval)
+    }, [driftTestRunning])
 
     // Increase polling frequency during execution
     useEffect(() => {
@@ -796,6 +873,12 @@ function App() {
                     onClick={() => setActiveTab('manual')}
                 >
                     <span className="nav-icon">↔</span> Manual
+                </button>
+                <button
+                    className={`nav-tab ${activeTab === 'drift-test' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('drift-test')}
+                >
+                    <span className="nav-icon">⟳</span> Drift Test
                 </button>
                 <button
                     className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -1139,6 +1222,191 @@ function App() {
                             <p>Current Well: {selectedWell || 'Unknown'}</p>
                             <p>Status: {systemStatus}</p>
                         </div>
+                    </div>
+                ) : activeTab === 'drift-test' ? (
+                    /* Drift Test Tab Content */
+                    <div className="drift-test-section">
+                        <h2>Motor Drift Test</h2>
+                        <p className="drift-test-description">
+                            Test X-axis stepper motor precision by running back-and-forth cycles.
+                            Measures drift using limit switches.
+                        </p>
+
+                        {/* Test Configuration */}
+                        <div className="drift-test-config">
+                            <h3>Test Configuration</h3>
+                            <div className="config-grid">
+                                <div className="form-group">
+                                    <label>Number of Cycles:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="1000"
+                                        value={driftTestConfig.cycles}
+                                        onChange={(e) => setDriftTestConfig(prev => ({
+                                            ...prev,
+                                            cycles: parseInt(e.target.value) || 1
+                                        }))}
+                                        className="form-input"
+                                        disabled={driftTestRunning}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Motor Speed (s):</label>
+                                    <input
+                                        type="number"
+                                        min="0.0001"
+                                        max="0.1"
+                                        step="0.0001"
+                                        value={driftTestConfig.motor_speed}
+                                        onChange={(e) => setDriftTestConfig(prev => ({
+                                            ...prev,
+                                            motor_speed: parseFloat(e.target.value) || 0.001
+                                        }))}
+                                        className="form-input"
+                                        disabled={driftTestRunning}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Steps per mm:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10000"
+                                        value={driftTestConfig.steps_per_mm}
+                                        onChange={(e) => setDriftTestConfig(prev => ({
+                                            ...prev,
+                                            steps_per_mm: parseInt(e.target.value) || 200
+                                        }))}
+                                        className="form-input"
+                                        disabled={driftTestRunning}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="drift-test-actions">
+                                {!driftTestRunning ? (
+                                    <button
+                                        className="btn btn-start-test"
+                                        onClick={startDriftTest}
+                                    >
+                                        Start Drift Test
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="btn btn-stop-test"
+                                        onClick={stopDriftTest}
+                                    >
+                                        Stop Test
+                                    </button>
+                                )}
+                                <button
+                                    className="btn btn-clear-results"
+                                    onClick={clearDriftTestResults}
+                                    disabled={driftTestRunning}
+                                >
+                                    Clear Results
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Test Status */}
+                        {driftTestResults && (
+                            <div className="drift-test-status">
+                                <h3>Test Status</h3>
+                                <div className="status-grid">
+                                    <div className="status-item">
+                                        <span className="status-label">Status:</span>
+                                        <span className={`status-value status-${driftTestResults.status}`}>
+                                            {driftTestResults.status?.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="status-item">
+                                        <span className="status-label">Progress:</span>
+                                        <span className="status-value">
+                                            {driftTestResults.current_cycle} / {driftTestResults.total_cycles} cycles
+                                        </span>
+                                    </div>
+                                    {driftTestResults.total_cycles > 0 && (
+                                        <div className="progress-bar-container">
+                                            <div
+                                                className="progress-bar"
+                                                style={{
+                                                    width: `${(driftTestResults.current_cycle / driftTestResults.total_cycles) * 100}%`
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Test Summary */}
+                        {driftTestResults?.summary && (
+                            <div className="drift-test-summary">
+                                <h3>Test Summary</h3>
+                                <div className="summary-grid">
+                                    <div className="summary-item">
+                                        <span className="summary-label">Total Cycles:</span>
+                                        <span className="summary-value">{driftTestResults.summary.total_cycles}</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <span className="summary-label">Avg Forward Steps:</span>
+                                        <span className="summary-value">{driftTestResults.summary.avg_forward_steps}</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <span className="summary-label">Avg Backward Steps:</span>
+                                        <span className="summary-value">{driftTestResults.summary.avg_backward_steps}</span>
+                                    </div>
+                                    <div className="summary-item highlight">
+                                        <span className="summary-label">Avg Drift:</span>
+                                        <span className="summary-value">{driftTestResults.summary.avg_drift_mm} mm</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <span className="summary-label">Max Drift:</span>
+                                        <span className="summary-value">{driftTestResults.summary.max_drift_mm} mm</span>
+                                    </div>
+                                    <div className="summary-item">
+                                        <span className="summary-label">Min Drift:</span>
+                                        <span className="summary-value">{driftTestResults.summary.min_drift_mm} mm</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Cycle Data Table */}
+                        {driftTestResults?.cycles?.length > 0 && (
+                            <div className="drift-test-data">
+                                <h3>Cycle Data</h3>
+                                <div className="data-table-container">
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Cycle</th>
+                                                <th>Forward Steps</th>
+                                                <th>Backward Steps</th>
+                                                <th>Difference</th>
+                                                <th>Drift (mm)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {driftTestResults.cycles.slice(-20).map((cycle, index) => (
+                                                <tr key={index}>
+                                                    <td>{cycle.cycle_number}</td>
+                                                    <td>{cycle.forward_steps}</td>
+                                                    <td>{cycle.backward_steps}</td>
+                                                    <td>{cycle.step_difference}</td>
+                                                    <td>{cycle.drift_mm}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {driftTestResults.cycles.length > 20 && (
+                                    <p className="table-note">Showing last 20 cycles of {driftTestResults.cycles.length}</p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : activeTab === 'settings' ? (
                     /* Settings Tab Content */
