@@ -278,7 +278,7 @@ class StepperMotor:
                           max_steps: int = 100000) -> Tuple[int, str]:
         """
         Simple: Move in direction until ANY limit switch is hit.
-        No escape logic - just move and count steps.
+        Checks limit AFTER each step so we can move away from current limit.
 
         Args:
             direction: Direction to move
@@ -294,6 +294,11 @@ class StepperMotor:
         self.clear_limit_trigger()
         self.stop_requested = False
 
+        # Remember if we started at a limit (so we can ignore it until we leave)
+        started_at_min = self.check_min_limit()
+        started_at_max = self.check_max_limit()
+        left_starting_limit = not (started_at_min or started_at_max)
+
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
@@ -305,16 +310,7 @@ class StepperMotor:
             if self.stop_requested:
                 break
 
-            # Check limits BEFORE stepping
-            if self.check_min_limit():
-                print(f"{self.name}: Hit MIN at step {steps_taken}")
-                return steps_taken, 'min'
-
-            if self.check_max_limit():
-                print(f"{self.name}: Hit MAX at step {steps_taken}")
-                return steps_taken, 'max'
-
-            # Take one step
+            # Take one step FIRST
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
                 time.sleep(actual_delay)
@@ -328,6 +324,25 @@ class StepperMotor:
                     self.simulated_position -= 1
 
             steps_taken += 1
+
+            # Check if we've left the starting limit
+            if not left_starting_limit:
+                if started_at_min and not self.check_min_limit():
+                    left_starting_limit = True
+                    print(f"{self.name}: Left MIN limit at step {steps_taken}")
+                elif started_at_max and not self.check_max_limit():
+                    left_starting_limit = True
+                    print(f"{self.name}: Left MAX limit at step {steps_taken}")
+
+            # Only check for hitting limits AFTER we've left the starting limit
+            if left_starting_limit:
+                if self.check_min_limit():
+                    print(f"{self.name}: Hit MIN at step {steps_taken}")
+                    return steps_taken, 'min'
+
+                if self.check_max_limit():
+                    print(f"{self.name}: Hit MAX at step {steps_taken}")
+                    return steps_taken, 'max'
 
         print(f"Warning: {self.name} max steps reached ({max_steps})")
         return steps_taken, 'none'
