@@ -1875,6 +1875,48 @@
     border-radius: 6px;
 }
 
+.axis-step-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.axis-step-input label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.step-input {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.step-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: var(--input-focus-bg);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.step-input:hover:not(:disabled) {
+    border-color: var(--border-hover);
+}
+
+.step-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .axis-buttons {
     display: flex;
     gap: 10px;
@@ -1883,14 +1925,14 @@
 
 .axis-btn {
     flex: 1;
-    padding: 12px 8px;
-    font-size: 1rem;
+    padding: 14px 20px;
+    font-size: 1.1rem;
     font-weight: 700;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 60px;
+    min-width: 100px;
 }
 
 .axis-btn:hover:not(:disabled) {
@@ -1981,14 +2023,24 @@
         font-size: 1.1rem;
     }
 
+    .axis-step-input {
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .step-input {
+        padding: 8px 10px;
+        font-size: 1rem;
+    }
+
     .axis-buttons {
         gap: 8px;
     }
 
     .axis-btn {
-        padding: 10px 6px;
-        font-size: 0.9rem;
-        min-width: 50px;
+        padding: 12px 10px;
+        font-size: 0.95rem;
+        min-width: 80px;
     }
 
     .manual-info {
@@ -1999,8 +2051,13 @@
 
 @media (max-width: 480px) {
     .axis-btn {
-        padding: 10px 4px;
-        font-size: 0.85rem;
-        min-width: 45px;
+        padding: 10px 8px;
+        font-size: 0.9rem;
+        min-width: 70px;
+    }
+
+    .step-input {
+        padding: 8px;
+        font-size: 0.95rem;
     }
 }

@@ -68,6 +68,7 @@ function App() {
 
     // Axis positions state (for Manual tab)
     const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, motor_steps: {}})
+    const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
 
     // Dispense/Collect state
     const [pipetteVolume, setPipetteVolume] = useState('1.0') // Volume for manual dispense/collect
@@ -995,34 +996,32 @@ function App() {
                                     <h3>X-Axis</h3>
                                     <span className="axis-position">{axisPositions.x} mm</span>
                                 </div>
+                                <div className="axis-step-input">
+                                    <label>Steps:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10000"
+                                        value={axisStepInputs.x}
+                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, x: parseInt(e.target.value) || 1}))}
+                                        className="step-input"
+                                        disabled={isExecuting}
+                                    />
+                                </div>
                                 <div className="axis-buttons">
                                     <button
-                                        className="axis-btn axis-btn-neg-large"
-                                        onClick={() => handleAxisMove('x', 100, 'ccw')}
-                                        disabled={isExecuting}
-                                    >
-                                        -100
-                                    </button>
-                                    <button
                                         className="axis-btn axis-btn-neg"
-                                        onClick={() => handleAxisMove('x', 10, 'ccw')}
+                                        onClick={() => handleAxisMove('x', axisStepInputs.x, 'ccw')}
                                         disabled={isExecuting}
                                     >
-                                        -10
+                                        - {axisStepInputs.x}
                                     </button>
                                     <button
                                         className="axis-btn axis-btn-pos"
-                                        onClick={() => handleAxisMove('x', 10, 'cw')}
+                                        onClick={() => handleAxisMove('x', axisStepInputs.x, 'cw')}
                                         disabled={isExecuting}
                                     >
-                                        +10
-                                    </button>
-                                    <button
-                                        className="axis-btn axis-btn-pos-large"
-                                        onClick={() => handleAxisMove('x', 100, 'cw')}
-                                        disabled={isExecuting}
-                                    >
-                                        +100
+                                        + {axisStepInputs.x}
                                     </button>
                                 </div>
                             </div>
@@ -1033,34 +1032,32 @@ function App() {
                                     <h3>Y-Axis</h3>
                                     <span className="axis-position">{axisPositions.y} mm</span>
                                 </div>
+                                <div className="axis-step-input">
+                                    <label>Steps:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10000"
+                                        value={axisStepInputs.y}
+                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, y: parseInt(e.target.value) || 1}))}
+                                        className="step-input"
+                                        disabled={isExecuting}
+                                    />
+                                </div>
                                 <div className="axis-buttons">
                                     <button
-                                        className="axis-btn axis-btn-neg-large"
-                                        onClick={() => handleAxisMove('y', 100, 'ccw')}
-                                        disabled={isExecuting}
-                                    >
-                                        -100
-                                    </button>
-                                    <button
                                         className="axis-btn axis-btn-neg"
-                                        onClick={() => handleAxisMove('y', 10, 'ccw')}
+                                        onClick={() => handleAxisMove('y', axisStepInputs.y, 'ccw')}
                                         disabled={isExecuting}
                                     >
-                                        -10
+                                        - {axisStepInputs.y}
                                     </button>
                                     <button
                                         className="axis-btn axis-btn-pos"
-                                        onClick={() => handleAxisMove('y', 10, 'cw')}
+                                        onClick={() => handleAxisMove('y', axisStepInputs.y, 'cw')}
                                         disabled={isExecuting}
                                     >
-                                        +10
-                                    </button>
-                                    <button
-                                        className="axis-btn axis-btn-pos-large"
-                                        onClick={() => handleAxisMove('y', 100, 'cw')}
-                                        disabled={isExecuting}
-                                    >
-                                        +100
+                                        + {axisStepInputs.y}
                                     </button>
                                 </div>
                             </div>
@@ -1071,34 +1068,32 @@ function App() {
                                     <h3>Z-Axis</h3>
                                     <span className="axis-position">{axisPositions.z} mm</span>
                                 </div>
+                                <div className="axis-step-input">
+                                    <label>Steps:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10000"
+                                        value={axisStepInputs.z}
+                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, z: parseInt(e.target.value) || 1}))}
+                                        className="step-input"
+                                        disabled={isExecuting}
+                                    />
+                                </div>
                                 <div className="axis-buttons">
                                     <button
-                                        className="axis-btn axis-btn-neg-large"
-                                        onClick={() => handleAxisMove('z', 100, 'ccw')}
-                                        disabled={isExecuting}
-                                    >
-                                        -100
-                                    </button>
-                                    <button
                                         className="axis-btn axis-btn-neg"
-                                        onClick={() => handleAxisMove('z', 10, 'ccw')}
+                                        onClick={() => handleAxisMove('z', axisStepInputs.z, 'ccw')}
                                         disabled={isExecuting}
                                     >
-                                        -10
+                                        - {axisStepInputs.z}
                                     </button>
                                     <button
                                         className="axis-btn axis-btn-pos"
-                                        onClick={() => handleAxisMove('z', 10, 'cw')}
+                                        onClick={() => handleAxisMove('z', axisStepInputs.z, 'cw')}
                                         disabled={isExecuting}
                                     >
-                                        +10
-                                    </button>
-                                    <button
-                                        className="axis-btn axis-btn-pos-large"
-                                        onClick={() => handleAxisMove('z', 100, 'cw')}
-                                        disabled={isExecuting}
-                                    >
-                                        +100
+                                        + {axisStepInputs.z}
                                     </button>
                                 </div>
                             </div>
@@ -1109,34 +1104,32 @@ function App() {
                                     <h3>Pipette</h3>
                                     <span className="axis-position">Motor 4</span>
                                 </div>
+                                <div className="axis-step-input">
+                                    <label>Steps:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10000"
+                                        value={axisStepInputs.pipette}
+                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, pipette: parseInt(e.target.value) || 1}))}
+                                        className="step-input"
+                                        disabled={isExecuting}
+                                    />
+                                </div>
                                 <div className="axis-buttons">
                                     <button
-                                        className="axis-btn axis-btn-neg-large"
-                                        onClick={() => handleAxisMove('pipette', 100, 'ccw')}
-                                        disabled={isExecuting}
-                                    >
-                                        -100
-                                    </button>
-                                    <button
                                         className="axis-btn axis-btn-neg"
-                                        onClick={() => handleAxisMove('pipette', 10, 'ccw')}
+                                        onClick={() => handleAxisMove('pipette', axisStepInputs.pipette, 'ccw')}
                                         disabled={isExecuting}
                                     >
-                                        -10
+                                        - {axisStepInputs.pipette}
                                     </button>
                                     <button
                                         className="axis-btn axis-btn-pos"
-                                        onClick={() => handleAxisMove('pipette', 10, 'cw')}
+                                        onClick={() => handleAxisMove('pipette', axisStepInputs.pipette, 'cw')}
                                         disabled={isExecuting}
                                     >
-                                        +10
-                                    </button>
-                                    <button
-                                        className="axis-btn axis-btn-pos-large"
-                                        onClick={() => handleAxisMove('pipette', 100, 'cw')}
-                                        disabled={isExecuting}
-                                    >
-                                        +100
+                                        + {axisStepInputs.pipette}
                                     </button>
                                 </div>
                             </div>
