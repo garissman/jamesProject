@@ -310,26 +310,19 @@ class StepperMotor:
 
         steps_taken = 0
 
-        # PHASE 1: If starting at a limit, step AWAY from it until we're clear
+        # PHASE 1: If starting at a limit, we need to move away from it
+        # Use the REQUESTED direction to escape - this will work if we're moving toward the opposite limit
+        # The steps count toward our total since we're moving in the requested direction
         if starting_at_min or starting_at_max:
-            # Determine escape direction - OPPOSITE of the limit we're at
-            if starting_at_min:
-                escape_dir = Direction.CLOCKWISE  # Move away from MIN
-            else:
-                escape_dir = Direction.COUNTERCLOCKWISE  # Move away from MAX
+            which_limit = 'MIN' if starting_at_min else 'MAX'
+            print(f"{self.name}: Starting at {which_limit} limit, escaping in {direction.name}...")
 
-            print(f"{self.name}: Starting at {'MIN' if starting_at_min else 'MAX'} limit, escaping {escape_dir.name}...")
-
-            # Set escape direction
-            if GPIO_AVAILABLE:
-                GPIO.output(self.dir_pin, escape_dir.value)
-                time.sleep(0.005)
-
+            # Direction is already set from above, just step until we clear the limit
             escape_steps = 0
-            max_escape_steps = 500  # Max steps to escape a limit
+            max_escape_steps = 500
 
             while escape_steps < max_escape_steps:
-                # Take a step in escape direction
+                # Take a step in requested direction
                 if GPIO_AVAILABLE:
                     GPIO.output(self.pulse_pin, GPIO.HIGH)
                     time.sleep(actual_delay)
@@ -337,12 +330,13 @@ class StepperMotor:
                     time.sleep(actual_delay)
                 else:
                     time.sleep(actual_delay * 0.01)
-                    if escape_dir == Direction.CLOCKWISE:
+                    if direction == Direction.CLOCKWISE:
                         self.simulated_position += 1
                     else:
                         self.simulated_position -= 1
 
                 escape_steps += 1
+                steps_taken += 1  # Count these steps - we're moving in requested direction
 
                 # Check if we've cleared the starting limit
                 if starting_at_min and not self.check_min_limit():
@@ -353,15 +347,9 @@ class StepperMotor:
                     break
 
             if escape_steps >= max_escape_steps:
-                print(f"Warning: {self.name} could not escape starting limit after {max_escape_steps} steps")
+                print(f"Warning: {self.name} could not escape {which_limit} limit after {max_escape_steps} steps")
 
-            # Now set the ACTUAL requested direction for PHASE 2
-            if GPIO_AVAILABLE:
-                GPIO.output(self.dir_pin, direction.value)
-                time.sleep(0.005)
-
-            # Small delay after escaping limit
-            time.sleep(0.05)
+            time.sleep(0.02)
 
         # PHASE 2: Move until we hit ANY limit (polling every step)
         print(f"{self.name}: Now moving until limit...")
