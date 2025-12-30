@@ -274,133 +274,53 @@ class StepperMotor:
 
         return steps_taken, self.check_limit_switch(limit_pin)
 
-    def move_until_any_limit(self, direction: Direction, delay: float = 0.001,
-                              max_steps: int = 50000) -> Tuple[int, str]:
+    def move_until_limit(self, direction: Direction, delay: float = 0.001,
+                          max_steps: int = 100000) -> Tuple[int, str]:
         """
-        Move motor until ANY limit switch is triggered (min or max)
-        Uses polling for reliable limit detection.
+        Simple: Move in direction until ANY limit switch is hit.
+        No escape logic - just move and count steps.
 
         Args:
             direction: Direction to move
-            delay: Step delay in seconds (minimum 0.0001 = 100 microseconds)
-            max_steps: Maximum steps before giving up (safety limit)
+            delay: Step delay in seconds (minimum 0.0001)
+            max_steps: Safety limit
 
         Returns:
             Tuple of (steps_taken, which_limit: 'min'|'max'|'none')
         """
-        # Enforce minimum delay for reliable GPIO reading
-        MIN_DELAY = 0.0001  # 100 microseconds minimum
+        MIN_DELAY = 0.0001
         actual_delay = max(delay, MIN_DELAY)
-        if delay < MIN_DELAY:
-            print(f"{self.name}: Warning: delay {delay} too small, using {MIN_DELAY}")
 
-        # Clear any previous trigger and reset stop flag
         self.clear_limit_trigger()
-
-        # Check starting position
-        starting_at_min = self.check_min_limit()
-        starting_at_max = self.check_max_limit()
-
-        print(f"{self.name}: move_until_any_limit {direction.name}, delay={actual_delay}, starting at min={starting_at_min}, max={starting_at_max}")
+        self.stop_requested = False
 
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
-            time.sleep(0.005)  # Delay for direction change
+            time.sleep(0.005)
 
         steps_taken = 0
 
-        # PHASE 1: If starting at a limit, we need to move away from it
-        # Use the REQUESTED direction to escape - this will work if we're moving toward the opposite limit
-        # The steps count toward our total since we're moving in the requested direction
-        if starting_at_min or starting_at_max:
-            which_limit = 'MIN' if starting_at_min else 'MAX'
-            print(f"{self.name}: Starting at {which_limit} limit, escaping in {direction.name}...")
-
-            # Direction is already set from above, just step until we clear the limit
-            escape_steps = 0
-            max_escape_steps = 5000  # Increased from 500 to allow more travel to escape
-
-            while escape_steps < max_escape_steps:
-                # Take a step in requested direction
-                if GPIO_AVAILABLE:
-                    GPIO.output(self.pulse_pin, GPIO.HIGH)
-                    time.sleep(actual_delay)
-                    GPIO.output(self.pulse_pin, GPIO.LOW)
-                    time.sleep(actual_delay)
-                else:
-                    time.sleep(actual_delay * 0.01)
-                    if direction == Direction.CLOCKWISE:
-                        self.simulated_position += 1
-                    else:
-                        self.simulated_position -= 1
-
-                escape_steps += 1
-                steps_taken += 1  # Count these steps - we're moving in requested direction
-
-                # Check if we've cleared the starting limit
-                if starting_at_min and not self.check_min_limit():
-                    print(f"{self.name}: Cleared MIN limit after {escape_steps} steps")
-                    break
-                if starting_at_max and not self.check_max_limit():
-                    print(f"{self.name}: Cleared MAX limit after {escape_steps} steps")
-                    break
-
-                # Also check if we hit the OPPOSITE limit during escape - that means we're done!
-                if starting_at_min and self.check_max_limit():
-                    print(f"{self.name}: Hit MAX limit during escape at step {escape_steps}")
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    return steps_taken, 'max'
-                if starting_at_max and self.check_min_limit():
-                    print(f"{self.name}: Hit MIN limit during escape at step {escape_steps}")
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    return steps_taken, 'min'
-
-            if escape_steps >= max_escape_steps:
-                print(f"Warning: {self.name} could not escape {which_limit} limit after {max_escape_steps} steps")
-
-            time.sleep(0.02)
-
-        # PHASE 2: Move until we hit ANY limit (polling every step)
-        print(f"{self.name}: Now moving until limit...")
-
         while steps_taken < max_steps:
-            # Check for external stop request
             if self.stop_requested:
-                if self.limit_triggered:
-                    print(f"{self.name}: Stop requested with {self.limit_triggered.upper()} limit at step {steps_taken}")
-                    result = self.limit_triggered
-                    self.clear_limit_trigger()
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    return steps_taken, result
                 break
 
-            # POLL: Check BOTH limit switches BEFORE stepping
+            # Check limits BEFORE stepping
             if self.check_min_limit():
-                print(f"{self.name}: Hit MIN limit at step {steps_taken}")
-                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                self.current_position += position_delta
-                self.clear_limit_trigger()
+                print(f"{self.name}: Hit MIN at step {steps_taken}")
                 return steps_taken, 'min'
 
             if self.check_max_limit():
-                print(f"{self.name}: Hit MAX limit at step {steps_taken}")
-                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                self.current_position += position_delta
-                self.clear_limit_trigger()
+                print(f"{self.name}: Hit MAX at step {steps_taken}")
                 return steps_taken, 'max'
 
-            # Take a step
+            # Take one step
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
                 time.sleep(actual_delay)
                 GPIO.output(self.pulse_pin, GPIO.LOW)
                 time.sleep(actual_delay)
             else:
-                # Simulation mode
                 time.sleep(actual_delay * 0.01)
                 if direction == Direction.CLOCKWISE:
                     self.simulated_position += 1
@@ -409,12 +329,13 @@ class StepperMotor:
 
             steps_taken += 1
 
-        # Reached max steps or stopped
-        print(f"Warning: {self.name} finished with {steps_taken} steps, no limit detected")
-        position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-        self.current_position += position_delta
-        self.clear_limit_trigger()
+        print(f"Warning: {self.name} max steps reached ({max_steps})")
         return steps_taken, 'none'
+
+    def move_until_any_limit(self, direction: Direction, delay: float = 0.001,
+                              max_steps: int = 100000) -> Tuple[int, str]:
+        """Alias for move_until_limit for backwards compatibility"""
+        return self.move_until_limit(direction, delay, max_steps)
 
     def home(self, delay: float = 0.001, max_steps: int = 50000) -> bool:
         """

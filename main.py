@@ -576,11 +576,13 @@ class DriftTestRequest(BaseModel):
 
 
 def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
-    """Run the actual motor drift test using the stepper controller"""
+    """
+    Simple drift test: move back and forth between limits, count steps.
+    """
     global drift_test_running, drift_test_results, pipetting_controller
     import time
     from datetime import datetime
-    from stepper_control import Direction, LimitSwitchState
+    from stepper_control import Direction
 
     drift_test_results = {
         "status": "running",
@@ -593,115 +595,36 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
     }
 
     try:
-        # Get the stepper controller from pipetting controller
         if pipetting_controller is None:
             raise Exception("Pipetting controller not initialized")
 
         stepper = pipetting_controller.stepper_controller
-        motor_id = 1  # X-axis motor for drift test
+        motor = stepper.get_motor(1)  # X-axis
 
-        # Check if limit switches are available
-        motor = stepper.get_motor(motor_id)
         has_limits = motor.limit_min_pin is not None and motor.limit_max_pin is not None
-
         if not has_limits:
-            print("Warning: No limit switches configured for X-axis, running step-based test")
+            raise Exception("No limit switches configured for X-axis")
 
-        # Initial homing - find first limit switch
+        # Start by moving CLOCKWISE until we hit something
         drift_test_results["status"] = "homing"
-        print("Drift Test: Finding first limit switch...")
+        print("Drift Test: Moving CW to find first limit...")
 
-        if has_limits:
-            # Check if already at a limit
-            current_limit = None
-            if motor.check_min_limit():
-                current_limit = 'min'
-                print("Drift Test: Already at MIN limit")
-            elif motor.check_max_limit():
-                current_limit = 'max'
-                print("Drift Test: Already at MAX limit")
+        current_dir = Direction.CLOCKWISE
+        steps, hit = motor.move_until_limit(current_dir, motor_speed)
 
-            # If not at a limit, move until we find one (checking both limits)
-            if current_limit is None:
-                print("Drift Test: Moving to find a limit switch...")
-                steps, which_limit = motor.move_until_any_limit(Direction.CLOCKWISE, motor_speed, 50000)
-                if which_limit == 'none':
-                    # Try other direction
-                    steps, which_limit = motor.move_until_any_limit(Direction.COUNTERCLOCKWISE, motor_speed, 50000)
-                current_limit = which_limit
+        if hit == 'none':
+            # Try other direction
+            current_dir = Direction.COUNTERCLOCKWISE
+            steps, hit = motor.move_until_limit(current_dir, motor_speed)
 
-            if current_limit == 'none':
-                raise Exception("Failed to reach any limit switch - check wiring")
+        if hit == 'none':
+            raise Exception("Could not find any limit switch")
 
-            print(f"Drift Test: At {current_limit.upper()} limit")
-
-            # Determine which direction moves AWAY from current limit
-            # Try moving away from the current limit first
-            print("Drift Test: Discovering correct travel direction...")
-
-            # Choose initial direction based on which limit we're at
-            # If at MIN, try CLOCKWISE first (typically away from MIN)
-            # If at MAX, try COUNTERCLOCKWISE first (typically away from MAX)
-            if current_limit == 'min':
-                first_dir = Direction.CLOCKWISE
-                second_dir = Direction.COUNTERCLOCKWISE
-            else:  # at MAX
-                first_dir = Direction.COUNTERCLOCKWISE
-                second_dir = Direction.CLOCKWISE
-
-            # Move in first direction and see which limit we hit
-            test_steps, hit_limit = motor.move_until_any_limit(first_dir, motor_speed, 50000)
-            used_dir = first_dir
-
-            if hit_limit == 'none':
-                # Try the other direction
-                print("Drift Test: First direction failed, trying opposite...")
-                test_steps, hit_limit = motor.move_until_any_limit(second_dir, motor_speed, 50000)
-                used_dir = second_dir
-
-            if hit_limit == 'none':
-                raise Exception("Failed to find opposite limit - check wiring")
-
-            # The direction we used leads to the limit we hit
-            # The opposite direction leads to the opposite limit
-            opposite_dir = Direction.COUNTERCLOCKWISE if used_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
-
-            if hit_limit == 'max':
-                dir_to_max = used_dir
-                dir_to_min = opposite_dir
-            else:  # hit_limit == 'min'
-                dir_to_min = used_dir
-                dir_to_max = opposite_dir
-
-            print(f"Drift Test: {dir_to_max.name} → MAX, {dir_to_min.name} → MIN")
-            print(f"Drift Test: Currently at {hit_limit.upper()} limit after discovery")
-
-            # Determine first direction based on where we are after discovery
-            # If at MAX, go to MIN first. If at MIN, go to MAX first.
-            if hit_limit == 'max':
-                first_cycle_dir = dir_to_min
-                second_cycle_dir = dir_to_max
-                first_label = 'MIN'
-                second_label = 'MAX'
-            else:
-                first_cycle_dir = dir_to_max
-                second_cycle_dir = dir_to_min
-                first_label = 'MAX'
-                second_label = 'MIN'
-
-            motor.reset_position()
-        else:
-            # No limit switches - just reset position
-            motor.reset_position()
-            first_cycle_dir = Direction.CLOCKWISE
-            second_cycle_dir = Direction.COUNTERCLOCKWISE
-            first_label = 'END1'
-            second_label = 'END2'
-
+        print(f"Drift Test: Found {hit.upper()} limit. Ready to start cycles.")
         drift_test_results["status"] = "running"
-        time.sleep(0.5)
+        time.sleep(0.3)
 
-        # Run test cycles
+        # Now just go back and forth
         for cycle in range(1, cycles + 1):
             if not drift_test_running:
                 drift_test_results["status"] = "stopped"
@@ -710,39 +633,27 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
             drift_test_results["current_cycle"] = cycle
             cycle_start = time.time()
 
-            if has_limits:
-                # Move to first limit (away from where we started)
-                print(f"Cycle {cycle}: Moving to {first_label}...")
-                fwd_start = time.time()
-                fwd_steps, fwd_limit = motor.move_until_any_limit(first_cycle_dir, motor_speed, 50000)
-                fwd_time = time.time() - fwd_start
+            # Reverse direction
+            current_dir = Direction.COUNTERCLOCKWISE if current_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
 
-                if fwd_limit == 'none' and not motor.stop_requested:
-                    print(f"Warning: Cycle {cycle} - Failed to reach {first_label}")
+            # Move until we hit the other limit
+            print(f"Cycle {cycle}: Moving {current_dir.name}...")
+            fwd_start = time.time()
+            fwd_steps, fwd_limit = motor.move_until_limit(current_dir, motor_speed)
+            fwd_time = time.time() - fwd_start
+            print(f"Cycle {cycle}: Hit {fwd_limit.upper()} after {fwd_steps} steps")
 
-                time.sleep(0.3)  # Brief pause at limit
+            time.sleep(0.3)
 
-                # Move to second limit (back to where we started)
-                print(f"Cycle {cycle}: Moving to {second_label}...")
-                back_start = time.time()
-                back_steps, back_limit = motor.move_until_any_limit(second_cycle_dir, motor_speed, 50000)
-                back_time = time.time() - back_start
+            # Reverse again
+            current_dir = Direction.COUNTERCLOCKWISE if current_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
 
-                if back_limit == 'none' and not motor.stop_requested:
-                    print(f"Warning: Cycle {cycle} - Failed to reach {second_label}")
-            else:
-                # No limit switches - move fixed number of steps
-                test_steps = 5000  # Fixed test distance
-
-                fwd_start = time.time()
-                fwd_steps, _ = motor.step(Direction.CLOCKWISE, test_steps, motor_speed, check_limits=False)
-                fwd_time = time.time() - fwd_start
-
-                time.sleep(0.3)
-
-                back_start = time.time()
-                back_steps, _ = motor.step(Direction.COUNTERCLOCKWISE, test_steps, motor_speed, check_limits=False)
-                back_time = time.time() - back_start
+            # Move back
+            print(f"Cycle {cycle}: Moving {current_dir.name}...")
+            back_start = time.time()
+            back_steps, back_limit = motor.move_until_limit(current_dir, motor_speed)
+            back_time = time.time() - back_start
+            print(f"Cycle {cycle}: Hit {back_limit.upper()} after {back_steps} steps")
 
             cycle_elapsed = time.time() - cycle_start
 
