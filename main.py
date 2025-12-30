@@ -451,6 +451,75 @@ async def dispense_liquid(request: VolumeRequest):
         )
 
 
+# Manual axis control endpoints
+class AxisMoveRequest(BaseModel):
+    """Request to move a specific axis"""
+    axis: str = Field(..., description="Axis to move: 'x', 'y', 'z', or 'pipette'")
+    steps: int = Field(..., gt=0, le=10000, description="Number of steps to move")
+    direction: str = Field(..., description="Direction: 'cw' (clockwise) or 'ccw' (counterclockwise)")
+
+
+@app.post("/api/axis/move")
+async def move_axis(request: AxisMoveRequest):
+    """Move a specific axis by a number of steps"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    if request.axis.lower() not in ['x', 'y', 'z', 'pipette']:
+        raise HTTPException(
+            status_code=400,
+            detail="Axis must be 'x', 'y', 'z', or 'pipette'"
+        )
+
+    if request.direction not in ['cw', 'ccw']:
+        raise HTTPException(
+            status_code=400,
+            detail="Direction must be 'cw' or 'ccw'"
+        )
+
+    try:
+        positions = pipetting_controller.move_axis(
+            request.axis,
+            request.steps,
+            request.direction
+        )
+        return {
+            "status": "success",
+            "message": f"Moved {request.axis.upper()}-axis {request.steps} steps {request.direction.upper()}",
+            "positions": positions
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error moving axis: {str(e)}"
+        )
+
+
+@app.get("/api/axis/positions")
+async def get_axis_positions():
+    """Get current positions of all axes"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        positions = pipetting_controller.get_axis_positions()
+        return {
+            "status": "success",
+            "positions": positions
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting positions: {str(e)}"
+        )
+
+
 # Configuration management endpoints
 ENV_FILE = Path(__file__).parent / ".env"
 

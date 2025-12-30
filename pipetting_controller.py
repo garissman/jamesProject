@@ -617,6 +617,69 @@ class PipettingController:
 
         self.save_position()
 
+    def move_axis(self, axis: str, steps: int, direction: str) -> dict:
+        """
+        Move a specific axis by a number of steps
+
+        Args:
+            axis: 'x', 'y', 'z', or 'pipette'
+            steps: Number of steps to move (positive integer)
+            direction: 'cw' (clockwise) or 'ccw' (counterclockwise)
+
+        Returns:
+            dict with axis positions
+        """
+        axis = axis.lower()
+        steps = abs(steps)
+
+        # Map axis to motor ID
+        axis_motor_map = {
+            'x': 1,
+            'y': 2,
+            'z': 3,
+            'pipette': 4
+        }
+
+        if axis not in axis_motor_map:
+            raise ValueError(f"Invalid axis: {axis}. Must be 'x', 'y', 'z', or 'pipette'")
+
+        motor_id = axis_motor_map[axis]
+        motor_direction = Direction.CLOCKWISE if direction == 'cw' else Direction.COUNTERCLOCKWISE
+
+        self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
+        self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED)
+
+        # Update position tracking for X, Y, Z axes
+        if axis == 'x':
+            delta = steps / self.mapper.STEPS_PER_MM_X
+            self.current_position.x += delta if direction == 'cw' else -delta
+        elif axis == 'y':
+            delta = steps / self.mapper.STEPS_PER_MM_Y
+            self.current_position.y += delta if direction == 'cw' else -delta
+        elif axis == 'z':
+            delta = steps / self.mapper.STEPS_PER_MM_Z
+            self.current_position.z += delta if direction == 'cw' else -delta
+
+        self.save_position()
+
+        # Return current positions
+        return self.get_axis_positions()
+
+    def get_axis_positions(self) -> dict:
+        """
+        Get current positions of all axes
+
+        Returns:
+            dict with x, y, z positions in mm and motor step counts
+        """
+        motor_positions = self.stepper_controller.get_all_positions()
+        return {
+            'x': round(self.current_position.x, 2),
+            'y': round(self.current_position.y, 2),
+            'z': round(self.current_position.z, 2),
+            'motor_steps': motor_positions
+        }
+
     def cleanup(self):
         """Clean up resources"""
         self.stepper_controller.cleanup()

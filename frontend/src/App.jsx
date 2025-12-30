@@ -66,6 +66,9 @@ function App() {
     // Z-axis toggle state
     const [zAxisUp, setZAxisUp] = useState(true) // true = up, false = down
 
+    // Axis positions state (for Manual tab)
+    const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, motor_steps: {}})
+
     // Dispense/Collect state
     const [pipetteVolume, setPipetteVolume] = useState('1.0') // Volume for manual dispense/collect
 
@@ -566,6 +569,46 @@ function App() {
         }
     }
 
+    const handleAxisMove = async (axis, steps, direction) => {
+        try {
+            const response = await fetch('/api/axis/move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({axis, steps, direction})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                console.log(`${data.message}`)
+                if (data.positions) {
+                    setAxisPositions(data.positions)
+                }
+                // Also update the current position display
+                fetchCurrentPosition()
+            } else {
+                console.error(`Error: ${data.detail || 'Failed to move axis'}`)
+            }
+        } catch (error) {
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
+        }
+    }
+
+    const fetchAxisPositions = async () => {
+        try {
+            const response = await fetch('/api/axis/positions')
+            const data = await response.json()
+
+            if (data.status === 'success' && data.positions) {
+                setAxisPositions(data.positions)
+            }
+        } catch (error) {
+            console.error('Failed to fetch axis positions:', error)
+        }
+    }
+
     const fetchCurrentPosition = async () => {
         try {
             const response = await fetch('/api/pipetting/status')
@@ -669,14 +712,18 @@ function App() {
         // Initial fetch
         fetchCurrentPosition()
         fetchConfig()
+        fetchAxisPositions()
 
         // Poll every 1 second to keep UI in sync with backend
         const interval = setInterval(() => {
             fetchCurrentPosition()
+            if (activeTab === 'manual') {
+                fetchAxisPositions()
+            }
         }, 1000) // Poll every second
 
         return () => clearInterval(interval)
-    }, [])
+    }, [activeTab])
 
     // Increase polling frequency during execution
     useEffect(() => {
@@ -742,6 +789,12 @@ function App() {
                     onClick={() => setActiveTab('program')}
                 >
                     <span className="nav-icon">◇</span> Program
+                </button>
+                <button
+                    className={`nav-tab ${activeTab === 'manual' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('manual')}
+                >
+                    <span className="nav-icon">↔</span> Manual
                 </button>
                 <button
                     className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -925,6 +978,173 @@ function App() {
                                     />
                                 </label>
                             </div>
+                        </div>
+                    </div>
+                ) : activeTab === 'manual' ? (
+                    /* Manual Tab Content */
+                    <div className="manual-section">
+                        <h2>Manual Axis Control</h2>
+                        <p className="manual-description">
+                            Manually move individual axes using step controls. Use with caution.
+                        </p>
+
+                        <div className="axis-controls-grid">
+                            {/* X-Axis Control */}
+                            <div className="axis-control-card">
+                                <div className="axis-header">
+                                    <h3>X-Axis</h3>
+                                    <span className="axis-position">{axisPositions.x} mm</span>
+                                </div>
+                                <div className="axis-buttons">
+                                    <button
+                                        className="axis-btn axis-btn-neg-large"
+                                        onClick={() => handleAxisMove('x', 100, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -100
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-neg"
+                                        onClick={() => handleAxisMove('x', 10, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos"
+                                        onClick={() => handleAxisMove('x', 10, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos-large"
+                                        onClick={() => handleAxisMove('x', 100, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +100
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Y-Axis Control */}
+                            <div className="axis-control-card">
+                                <div className="axis-header">
+                                    <h3>Y-Axis</h3>
+                                    <span className="axis-position">{axisPositions.y} mm</span>
+                                </div>
+                                <div className="axis-buttons">
+                                    <button
+                                        className="axis-btn axis-btn-neg-large"
+                                        onClick={() => handleAxisMove('y', 100, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -100
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-neg"
+                                        onClick={() => handleAxisMove('y', 10, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos"
+                                        onClick={() => handleAxisMove('y', 10, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos-large"
+                                        onClick={() => handleAxisMove('y', 100, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +100
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Z-Axis Control */}
+                            <div className="axis-control-card">
+                                <div className="axis-header">
+                                    <h3>Z-Axis</h3>
+                                    <span className="axis-position">{axisPositions.z} mm</span>
+                                </div>
+                                <div className="axis-buttons">
+                                    <button
+                                        className="axis-btn axis-btn-neg-large"
+                                        onClick={() => handleAxisMove('z', 100, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -100
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-neg"
+                                        onClick={() => handleAxisMove('z', 10, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos"
+                                        onClick={() => handleAxisMove('z', 10, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos-large"
+                                        onClick={() => handleAxisMove('z', 100, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +100
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Pipette Control */}
+                            <div className="axis-control-card">
+                                <div className="axis-header">
+                                    <h3>Pipette</h3>
+                                    <span className="axis-position">Motor 4</span>
+                                </div>
+                                <div className="axis-buttons">
+                                    <button
+                                        className="axis-btn axis-btn-neg-large"
+                                        onClick={() => handleAxisMove('pipette', 100, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -100
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-neg"
+                                        onClick={() => handleAxisMove('pipette', 10, 'ccw')}
+                                        disabled={isExecuting}
+                                    >
+                                        -10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos"
+                                        onClick={() => handleAxisMove('pipette', 10, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +10
+                                    </button>
+                                    <button
+                                        className="axis-btn axis-btn-pos-large"
+                                        onClick={() => handleAxisMove('pipette', 100, 'cw')}
+                                        disabled={isExecuting}
+                                    >
+                                        +100
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="manual-info">
+                            <p>Current Well: {selectedWell || 'Unknown'}</p>
+                            <p>Status: {systemStatus}</p>
                         </div>
                     </div>
                 ) : activeTab === 'settings' ? (

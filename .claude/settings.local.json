@@ -4,7 +4,8 @@
       "Bash(npm create:*)",
       "Bash(npm install)",
       "Bash(npm run dev:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
