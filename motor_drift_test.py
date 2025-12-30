@@ -5,19 +5,19 @@ Tests X-axis stepper motor precision by running back and forth cycles
 Measures drift using limit switches
 """
 
-import RPi.GPIO as GPIO
-import time
 import json
+import time
 from datetime import datetime
-import sys
+
+import RPi.GPIO as GPIO
 
 # Motor Configuration (X-axis)
-PULSE_PIN = 4   # GPIO04
-DIR_PIN = 17    # GPIO17
+PULSE_PIN = 4  # GPIO04
+DIR_PIN = 17  # GPIO17
 
 # Limit Switch Configuration
-LIMIT_MIN_PIN = 6   # GPIO06 - X-axis minimum position
-LIMIT_MAX_PIN = 13  # GPIO13 - X-axis maximum position
+LIMIT_MIN_PIN = 20  # GPIO06 - X-axis minimum position
+LIMIT_MAX_PIN = 21  # GPIO13 - X-axis maximum position
 
 # Motor Parameters
 STEPS_PER_MM = 200  # Adjust based on your motor and lead screw specs
@@ -107,12 +107,12 @@ class MotorDriftTester:
 
     def run_drift_test(self, num_cycles):
         """Run the drift test for specified number of cycles"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Starting Motor Drift Test - X-axis")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Cycles to run: {num_cycles}")
         print(f"Logging to: {LOG_FILE}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Initial homing to min position
         print("Phase 1: Homing to minimum position...")
@@ -198,9 +198,9 @@ class MotorDriftTester:
 
     def print_summary(self):
         """Print test summary and statistics"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("TEST SUMMARY")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         if not self.test_data["cycles"]:
             print("No cycles completed")
@@ -225,7 +225,7 @@ class MotorDriftTester:
         print(f"  Maximum drift: {max_drift:.3f} mm")
         print(f"  Minimum drift: {min_drift:.3f} mm")
         print(f"\nData saved to: {LOG_FILE}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
     def cleanup(self):
         """Clean up GPIO"""
@@ -234,12 +234,12 @@ class MotorDriftTester:
 
 
 def main():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MOTOR DRIFT MEASUREMENT TEST")
-    print("="*60)
+    print("=" * 60)
     print("WARNING: Ensure limit switches are properly installed!")
     print("Press Ctrl+C at any time to stop the test")
-    print("="*60)
+    print("=" * 60)
 
     input("\nPress ENTER to start the test...")
 
