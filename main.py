@@ -540,12 +540,12 @@ class DriftTestRequest(BaseModel):
     steps_per_mm: int = Field(default=200, gt=0, le=10000, description="Steps per millimeter")
 
 
-def run_drift_test_simulation(cycles: int, motor_speed: float, steps_per_mm: int):
-    """Run a simulated drift test (for development without hardware)"""
-    global drift_test_running, drift_test_results
-    import random
+def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
+    """Run the actual motor drift test using the stepper controller"""
+    global drift_test_running, drift_test_results, pipetting_controller
     import time
     from datetime import datetime
+    from stepper_control import Direction, LimitSwitchState
 
     drift_test_results = {
         "status": "running",
@@ -558,36 +558,100 @@ def run_drift_test_simulation(cycles: int, motor_speed: float, steps_per_mm: int
     }
 
     try:
+        # Get the stepper controller from pipetting controller
+        if pipetting_controller is None:
+            raise Exception("Pipetting controller not initialized")
+
+        stepper = pipetting_controller.stepper_controller
+        motor_id = 1  # X-axis motor for drift test
+
+        # Check if limit switches are available
+        motor = stepper.get_motor(motor_id)
+        has_limits = motor.limit_min_pin is not None and motor.limit_max_pin is not None
+
+        if not has_limits:
+            print("Warning: No limit switches configured for X-axis, running step-based test")
+
+        # Initial homing to min position
+        drift_test_results["status"] = "homing"
+        print("Drift Test: Homing to minimum position...")
+
+        if has_limits:
+            steps, reached = motor.move_until_limit(Direction.COUNTERCLOCKWISE, motor_speed, 50000)
+            if not reached:
+                raise Exception("Failed to reach home position - check limit switches")
+            motor.reset_position()
+        else:
+            # No limit switches - just reset position
+            motor.reset_position()
+
+        drift_test_results["status"] = "running"
+        time.sleep(0.5)
+
+        # Run test cycles
         for cycle in range(1, cycles + 1):
             if not drift_test_running:
                 drift_test_results["status"] = "stopped"
                 break
 
             drift_test_results["current_cycle"] = cycle
+            cycle_start = time.time()
 
-            # Simulate motor movement with random variation
-            base_steps = random.randint(8000, 12000)
-            fwd_steps = base_steps + random.randint(-50, 50)
-            back_steps = base_steps + random.randint(-50, 50)
+            if has_limits:
+                # Move forward to MAX limit
+                fwd_start = time.time()
+                fwd_steps, fwd_reached = motor.move_until_limit(Direction.CLOCKWISE, motor_speed, 50000)
+                fwd_time = time.time() - fwd_start
+
+                if not fwd_reached and not motor.stop_requested:
+                    print(f"Warning: Cycle {cycle} - Failed to reach MAX limit")
+
+                time.sleep(0.3)  # Brief pause at max
+
+                # Move backward to MIN limit
+                back_start = time.time()
+                back_steps, back_reached = motor.move_until_limit(Direction.COUNTERCLOCKWISE, motor_speed, 50000)
+                back_time = time.time() - back_start
+
+                if not back_reached and not motor.stop_requested:
+                    print(f"Warning: Cycle {cycle} - Failed to reach MIN limit")
+            else:
+                # No limit switches - move fixed number of steps
+                test_steps = 5000  # Fixed test distance
+
+                fwd_start = time.time()
+                fwd_steps, _ = motor.step(Direction.CLOCKWISE, test_steps, motor_speed, check_limits=False)
+                fwd_time = time.time() - fwd_start
+
+                time.sleep(0.3)
+
+                back_start = time.time()
+                back_steps, _ = motor.step(Direction.COUNTERCLOCKWISE, test_steps, motor_speed, check_limits=False)
+                back_time = time.time() - back_start
+
+            cycle_elapsed = time.time() - cycle_start
+
+            # Calculate drift metrics
             step_difference = abs(fwd_steps - back_steps)
             drift_mm = step_difference / steps_per_mm
 
+            # Store cycle data
             cycle_data = {
                 "cycle_number": cycle,
                 "timestamp": datetime.now().isoformat(),
                 "forward_steps": fwd_steps,
-                "forward_time": random.uniform(5.0, 8.0),
+                "forward_time": round(fwd_time, 2),
                 "backward_steps": back_steps,
-                "backward_time": random.uniform(5.0, 8.0),
-                "total_cycle_time": random.uniform(12.0, 18.0),
+                "backward_time": round(back_time, 2),
+                "total_cycle_time": round(cycle_elapsed, 2),
                 "step_difference": step_difference,
                 "drift_mm": round(drift_mm, 3)
             }
 
             drift_test_results["cycles"].append(cycle_data)
+            print(f"Drift Test: Cycle {cycle}/{cycles} - Forward: {fwd_steps}, Backward: {back_steps}, Drift: {drift_mm:.3f}mm")
 
-            # Simulate time for each cycle
-            time.sleep(0.5)
+            time.sleep(0.3)  # Brief pause between cycles
 
         # Calculate summary
         if drift_test_results["cycles"]:
@@ -610,10 +674,12 @@ def run_drift_test_simulation(cycles: int, motor_speed: float, steps_per_mm: int
     except Exception as e:
         drift_test_results["status"] = "error"
         drift_test_results["error"] = str(e)
+        print(f"Drift Test Error: {e}")
 
     finally:
         drift_test_running = False
         drift_test_results["end_time"] = datetime.now().isoformat()
+        print("Drift Test: Complete")
 
 
 @app.post("/api/drift-test/start")
@@ -627,11 +693,17 @@ async def start_drift_test(request: DriftTestRequest):
             detail="Drift test is already running"
         )
 
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
     drift_test_running = True
 
     # Start the test in a background thread
     drift_test_thread = threading.Thread(
-        target=run_drift_test_simulation,
+        target=run_drift_test,
         args=(request.cycles, request.motor_speed, request.steps_per_mm)
     )
     drift_test_thread.start()
