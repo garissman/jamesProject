@@ -250,6 +250,7 @@ class StepperMotor:
                               max_steps: int = 50000) -> Tuple[int, str]:
         """
         Move motor until ANY limit switch is triggered (min or max)
+        Note: Ignores the limit we start at, only stops at the OTHER limit
 
         Args:
             direction: Direction to move
@@ -261,6 +262,10 @@ class StepperMotor:
         """
         self.stop_requested = False
 
+        # Remember which limit we're starting at (so we can ignore it)
+        starting_at_min = self.check_min_limit()
+        starting_at_max = self.check_max_limit()
+
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
@@ -269,17 +274,6 @@ class StepperMotor:
         steps_taken = 0
 
         while True:
-            # Check both limits
-            if self.check_min_limit():
-                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                self.current_position += position_delta
-                return steps_taken, 'min'
-
-            if self.check_max_limit():
-                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                self.current_position += position_delta
-                return steps_taken, 'max'
-
             if self.stop_requested:
                 break
 
@@ -287,6 +281,7 @@ class StepperMotor:
                 print(f"Warning: {self.name} reached safety limit ({max_steps} steps)")
                 break
 
+            # Take a step first
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
                 time.sleep(delay)
@@ -301,6 +296,32 @@ class StepperMotor:
                     self.simulated_position -= 1
 
             steps_taken += 1
+
+            # Check limits every step
+            at_min = self.check_min_limit()
+            at_max = self.check_max_limit()
+
+            # If we detect a limit we weren't at before, verify with multiple reads
+            if (at_min and not starting_at_min) or (at_max and not starting_at_max):
+                # Debounce: check 3 times with small delays
+                time.sleep(0.001)
+                confirm1 = self.check_min_limit() if at_min else self.check_max_limit()
+                time.sleep(0.001)
+                confirm2 = self.check_min_limit() if at_min else self.check_max_limit()
+
+                if confirm1 and confirm2:  # Confirmed triggered
+                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                    self.current_position += position_delta
+                    if at_min and not starting_at_min:
+                        return steps_taken, 'min'
+                    if at_max and not starting_at_max:
+                        return steps_taken, 'max'
+
+            # If we've moved away from starting limit, clear the flag
+            if starting_at_min and not at_min:
+                starting_at_min = False
+            if starting_at_max and not at_max:
+                starting_at_max = False
 
         # Update position
         position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
