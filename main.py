@@ -532,6 +532,41 @@ async def get_axis_positions():
         )
 
 
+@app.get("/api/limit-switches")
+async def get_limit_switches():
+    """Get current status of all limit switches - for diagnostics"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        stepper = pipetting_controller.stepper_controller
+        limit_states = stepper.check_all_limit_switches()
+
+        # Also include pin configuration for reference
+        pin_config = {
+            motor_id: {
+                'min_pin': stepper.LIMIT_SWITCH_PINS.get(motor_id, (None, None))[0],
+                'max_pin': stepper.LIMIT_SWITCH_PINS.get(motor_id, (None, None))[1]
+            }
+            for motor_id in stepper.motors
+        }
+
+        return {
+            "status": "success",
+            "limit_states": limit_states,
+            "pin_configuration": pin_config,
+            "note": "Switches should read 'true' when triggered (pressed). If always false, check wiring."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading limit switches: {str(e)}"
+        )
+
+
 # Motor Drift Test endpoints
 class DriftTestRequest(BaseModel):
     """Request to start a drift test"""
