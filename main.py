@@ -651,24 +651,29 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
 
             # Move in first direction and see which limit we hit
             test_steps, hit_limit = motor.move_until_any_limit(first_dir, motor_speed, 50000)
+            used_dir = first_dir
 
             if hit_limit == 'none':
                 # Try the other direction
                 print("Drift Test: First direction failed, trying opposite...")
                 test_steps, hit_limit = motor.move_until_any_limit(second_dir, motor_speed, 50000)
+                used_dir = second_dir
 
             if hit_limit == 'none':
                 raise Exception("Failed to find opposite limit - check wiring")
 
-            # Now we know: CLOCKWISE leads to 'hit_limit', COUNTERCLOCKWISE leads to the other
-            if hit_limit == 'max':
-                dir_to_max = Direction.CLOCKWISE
-                dir_to_min = Direction.COUNTERCLOCKWISE
-            else:  # hit_limit == 'min'
-                dir_to_max = Direction.COUNTERCLOCKWISE
-                dir_to_min = Direction.CLOCKWISE
+            # The direction we used leads to the limit we hit
+            # The opposite direction leads to the opposite limit
+            opposite_dir = Direction.COUNTERCLOCKWISE if used_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
 
-            print(f"Drift Test: CLOCKWISE → {hit_limit.upper()}, COUNTERCLOCKWISE → {'MIN' if hit_limit == 'max' else 'MAX'}")
+            if hit_limit == 'max':
+                dir_to_max = used_dir
+                dir_to_min = opposite_dir
+            else:  # hit_limit == 'min'
+                dir_to_min = used_dir
+                dir_to_max = opposite_dir
+
+            print(f"Drift Test: {dir_to_max.name} → MAX, {dir_to_min.name} → MIN")
 
             motor.reset_position()
         else:

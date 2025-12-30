@@ -310,14 +310,26 @@ class StepperMotor:
 
         steps_taken = 0
 
-        # PHASE 1: If starting at a limit, step away until we're clear
+        # PHASE 1: If starting at a limit, step AWAY from it until we're clear
         if starting_at_min or starting_at_max:
-            print(f"{self.name}: Starting at limit, stepping away...")
+            # Determine escape direction - OPPOSITE of the limit we're at
+            if starting_at_min:
+                escape_dir = Direction.CLOCKWISE  # Move away from MIN
+            else:
+                escape_dir = Direction.COUNTERCLOCKWISE  # Move away from MAX
+
+            print(f"{self.name}: Starting at {'MIN' if starting_at_min else 'MAX'} limit, escaping {escape_dir.name}...")
+
+            # Set escape direction
+            if GPIO_AVAILABLE:
+                GPIO.output(self.dir_pin, escape_dir.value)
+                time.sleep(0.005)
+
             escape_steps = 0
             max_escape_steps = 500  # Max steps to escape a limit
 
             while escape_steps < max_escape_steps:
-                # Take a step
+                # Take a step in escape direction
                 if GPIO_AVAILABLE:
                     GPIO.output(self.pulse_pin, GPIO.HIGH)
                     time.sleep(actual_delay)
@@ -325,13 +337,12 @@ class StepperMotor:
                     time.sleep(actual_delay)
                 else:
                     time.sleep(actual_delay * 0.01)
-                    if direction == Direction.CLOCKWISE:
+                    if escape_dir == Direction.CLOCKWISE:
                         self.simulated_position += 1
                     else:
                         self.simulated_position -= 1
 
                 escape_steps += 1
-                steps_taken += 1
 
                 # Check if we've cleared the starting limit
                 if starting_at_min and not self.check_min_limit():
@@ -343,6 +354,11 @@ class StepperMotor:
 
             if escape_steps >= max_escape_steps:
                 print(f"Warning: {self.name} could not escape starting limit after {max_escape_steps} steps")
+
+            # Now set the ACTUAL requested direction for PHASE 2
+            if GPIO_AVAILABLE:
+                GPIO.output(self.dir_pin, direction.value)
+                time.sleep(0.005)
 
             # Small delay after escaping limit
             time.sleep(0.05)
