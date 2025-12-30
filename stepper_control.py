@@ -319,7 +319,7 @@ class StepperMotor:
 
             # Direction is already set from above, just step until we clear the limit
             escape_steps = 0
-            max_escape_steps = 500
+            max_escape_steps = 5000  # Increased from 500 to allow more travel to escape
 
             while escape_steps < max_escape_steps:
                 # Take a step in requested direction
@@ -345,6 +345,18 @@ class StepperMotor:
                 if starting_at_max and not self.check_max_limit():
                     print(f"{self.name}: Cleared MAX limit after {escape_steps} steps")
                     break
+
+                # Also check if we hit the OPPOSITE limit during escape - that means we're done!
+                if starting_at_min and self.check_max_limit():
+                    print(f"{self.name}: Hit MAX limit during escape at step {escape_steps}")
+                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                    self.current_position += position_delta
+                    return steps_taken, 'max'
+                if starting_at_max and self.check_min_limit():
+                    print(f"{self.name}: Hit MIN limit during escape at step {escape_steps}")
+                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                    self.current_position += position_delta
+                    return steps_taken, 'min'
 
             if escape_steps >= max_escape_steps:
                 print(f"Warning: {self.name} could not escape {which_limit} limit after {max_escape_steps} steps")
