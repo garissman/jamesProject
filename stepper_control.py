@@ -13,6 +13,7 @@ except (ImportError, RuntimeError):
     print("Warning: RPi.GPIO not available. Running in simulation mode.")
     GPIO_AVAILABLE = False
 
+import random
 import time
 from enum import Enum
 from typing import List, Tuple, Optional
@@ -54,6 +55,10 @@ class StepperMotor:
         self.limit_max_pin = limit_max_pin
         self.stop_requested = False
 
+        # Simulation mode: track simulated position and limit triggers
+        self.simulated_position = 0
+        self.simulated_travel_range = random.randint(8000, 12000)  # Simulated range in steps
+
         if GPIO_AVAILABLE:
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.pulse_pin, GPIO.OUT)
@@ -82,6 +87,12 @@ class StepperMotor:
             return False
         if GPIO_AVAILABLE:
             return GPIO.input(pin) == GPIO.LOW
+
+        # Simulation mode: simulate limit switch based on position
+        if pin == self.limit_min_pin:
+            return self.simulated_position <= 0
+        elif pin == self.limit_max_pin:
+            return self.simulated_position >= self.simulated_travel_range
         return False
 
     def check_min_limit(self) -> bool:
@@ -158,7 +169,12 @@ class StepperMotor:
                 GPIO.output(self.pulse_pin, GPIO.LOW)
                 time.sleep(delay)
             else:
-                time.sleep(delay * 2)  # Simulate step time in non-GPIO mode
+                # Simulation mode: faster delay for testing, update simulated position
+                time.sleep(delay * 0.01)  # Much faster in simulation mode
+                if direction == Direction.CLOCKWISE:
+                    self.simulated_position += 1
+                else:
+                    self.simulated_position -= 1
 
             steps_completed += 1
 
@@ -214,7 +230,12 @@ class StepperMotor:
                 GPIO.output(self.pulse_pin, GPIO.LOW)
                 time.sleep(delay)
             else:
-                time.sleep(delay * 2)
+                # Simulation mode: faster delay for testing, update simulated position
+                time.sleep(delay * 0.01)  # Much faster in simulation mode
+                if direction == Direction.CLOCKWISE:
+                    self.simulated_position += 1
+                else:
+                    self.simulated_position -= 1
 
             steps_taken += 1
 
@@ -281,6 +302,7 @@ class StepperMotor:
     def reset_position(self):
         """Reset position counter to zero"""
         self.current_position = 0
+        self.simulated_position = 0  # Also reset simulated position
 
 
 class StepperController:
