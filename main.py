@@ -636,11 +636,26 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
             print(f"Drift Test: At {current_limit.upper()} limit")
 
             # Determine which direction moves AWAY from current limit
-            # We need to discover this by moving and checking which limit we hit
+            # Try moving away from the current limit first
             print("Drift Test: Discovering correct travel direction...")
 
-            # Move in one direction and see which limit we hit
-            test_steps, hit_limit = motor.move_until_any_limit(Direction.CLOCKWISE, motor_speed, 50000)
+            # Choose initial direction based on which limit we're at
+            # If at MIN, try CLOCKWISE first (typically away from MIN)
+            # If at MAX, try COUNTERCLOCKWISE first (typically away from MAX)
+            if current_limit == 'min':
+                first_dir = Direction.CLOCKWISE
+                second_dir = Direction.COUNTERCLOCKWISE
+            else:  # at MAX
+                first_dir = Direction.COUNTERCLOCKWISE
+                second_dir = Direction.CLOCKWISE
+
+            # Move in first direction and see which limit we hit
+            test_steps, hit_limit = motor.move_until_any_limit(first_dir, motor_speed, 50000)
+
+            if hit_limit == 'none':
+                # Try the other direction
+                print("Drift Test: First direction failed, trying opposite...")
+                test_steps, hit_limit = motor.move_until_any_limit(second_dir, motor_speed, 50000)
 
             if hit_limit == 'none':
                 raise Exception("Failed to find opposite limit - check wiring")

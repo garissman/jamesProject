@@ -265,11 +265,14 @@ class StepperMotor:
         # Remember which limit we're starting at (so we can ignore it)
         starting_at_min = self.check_min_limit()
         starting_at_max = self.check_max_limit()
+        moved_away_from_start = False
+
+        print(f"{self.name}: move_until_any_limit {direction.name}, starting at min={starting_at_min}, max={starting_at_max}")
 
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
-            time.sleep(0.001)  # Small delay for direction change
+            time.sleep(0.005)  # Longer delay for direction change
 
         steps_taken = 0
 
@@ -281,14 +284,41 @@ class StepperMotor:
                 print(f"Warning: {self.name} reached safety limit ({max_steps} steps)")
                 break
 
-            # Take a step first
+            # Check limits BEFORE stepping
+            at_min = self.check_min_limit()
+            at_max = self.check_max_limit()
+
+            # Track when we've moved away from starting position
+            if starting_at_min and not at_min:
+                moved_away_from_start = True
+                starting_at_min = False
+                print(f"{self.name}: Moved away from MIN at step {steps_taken}")
+            if starting_at_max and not at_max:
+                moved_away_from_start = True
+                starting_at_max = False
+                print(f"{self.name}: Moved away from MAX at step {steps_taken}")
+
+            # If we've moved away and now hit a limit, we're done
+            if moved_away_from_start:
+                if at_min:
+                    print(f"{self.name}: Hit MIN limit at step {steps_taken}")
+                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                    self.current_position += position_delta
+                    return steps_taken, 'min'
+                if at_max:
+                    print(f"{self.name}: Hit MAX limit at step {steps_taken}")
+                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                    self.current_position += position_delta
+                    return steps_taken, 'max'
+
+            # Take a step
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
                 time.sleep(delay)
                 GPIO.output(self.pulse_pin, GPIO.LOW)
                 time.sleep(delay)
             else:
-                # Simulation mode: faster delay for testing, update simulated position
+                # Simulation mode
                 time.sleep(delay * 0.01)
                 if direction == Direction.CLOCKWISE:
                     self.simulated_position += 1
@@ -297,36 +327,11 @@ class StepperMotor:
 
             steps_taken += 1
 
-            # Check limits every step
-            at_min = self.check_min_limit()
-            at_max = self.check_max_limit()
-
-            # If we detect a limit we weren't at before, verify with multiple reads
-            if (at_min and not starting_at_min) or (at_max and not starting_at_max):
-                # Debounce: check 3 times with small delays
-                time.sleep(0.001)
-                confirm1 = self.check_min_limit() if at_min else self.check_max_limit()
-                time.sleep(0.001)
-                confirm2 = self.check_min_limit() if at_min else self.check_max_limit()
-
-                if confirm1 and confirm2:  # Confirmed triggered
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    if at_min and not starting_at_min:
-                        return steps_taken, 'min'
-                    if at_max and not starting_at_max:
-                        return steps_taken, 'max'
-
-            # If we've moved away from starting limit, clear the flag
-            if starting_at_min and not at_min:
-                starting_at_min = False
-            if starting_at_max and not at_max:
-                starting_at_max = False
-
         # Update position
         position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
         self.current_position += position_delta
 
+        print(f"{self.name}: Finished with {steps_taken} steps, no limit found")
         return steps_taken, 'none'
 
     def home(self, delay: float = 0.001, max_steps: int = 50000) -> bool:
