@@ -246,6 +246,68 @@ class StepperMotor:
 
         return steps_taken, self.check_limit_switch(limit_pin)
 
+    def move_until_any_limit(self, direction: Direction, delay: float = 0.001,
+                              max_steps: int = 50000) -> Tuple[int, str]:
+        """
+        Move motor until ANY limit switch is triggered (min or max)
+
+        Args:
+            direction: Direction to move
+            delay: Step delay in seconds
+            max_steps: Maximum steps before giving up (safety limit)
+
+        Returns:
+            Tuple of (steps_taken, which_limit: 'min'|'max'|'none')
+        """
+        self.stop_requested = False
+
+        # Set direction
+        if GPIO_AVAILABLE:
+            GPIO.output(self.dir_pin, direction.value)
+            time.sleep(0.001)  # Small delay for direction change
+
+        steps_taken = 0
+
+        while True:
+            # Check both limits
+            if self.check_min_limit():
+                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                self.current_position += position_delta
+                return steps_taken, 'min'
+
+            if self.check_max_limit():
+                position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                self.current_position += position_delta
+                return steps_taken, 'max'
+
+            if self.stop_requested:
+                break
+
+            if steps_taken >= max_steps:
+                print(f"Warning: {self.name} reached safety limit ({max_steps} steps)")
+                break
+
+            if GPIO_AVAILABLE:
+                GPIO.output(self.pulse_pin, GPIO.HIGH)
+                time.sleep(delay)
+                GPIO.output(self.pulse_pin, GPIO.LOW)
+                time.sleep(delay)
+            else:
+                # Simulation mode: faster delay for testing, update simulated position
+                time.sleep(delay * 0.01)
+                if direction == Direction.CLOCKWISE:
+                    self.simulated_position += 1
+                else:
+                    self.simulated_position -= 1
+
+            steps_taken += 1
+
+        # Update position
+        position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+        self.current_position += position_delta
+
+        return steps_taken, 'none'
+
     def home(self, delay: float = 0.001, max_steps: int = 50000) -> bool:
         """
         Home the motor by moving to minimum limit switch
