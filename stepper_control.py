@@ -56,8 +56,9 @@ class StepperMotor:
         self.stop_requested = False
 
         # Simulation mode: track simulated position and limit triggers
-        self.simulated_position = 0
         self.simulated_travel_range = random.randint(8000, 12000)  # Simulated range in steps
+        # Start at random middle position so homing actually moves the motor
+        self.simulated_position = random.randint(2000, self.simulated_travel_range - 2000)
 
         if GPIO_AVAILABLE:
             GPIO.setmode(GPIO.BCM)
