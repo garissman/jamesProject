@@ -71,7 +71,7 @@ function App() {
     const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
 
     // Drift test state
-    const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.001, steps_per_mm: 200})
+    const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.00000000001, steps_per_mm: 200})
     const [driftTestRunning, setDriftTestRunning] = useState(false)
     const [driftTestResults, setDriftTestResults] = useState(null)
 
@@ -1086,7 +1086,10 @@ function App() {
                                         min="1"
                                         max="10000"
                                         value={axisStepInputs.x}
-                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, x: parseInt(e.target.value) || 1}))}
+                                        onChange={(e) => setAxisStepInputs(prev => ({
+                                            ...prev,
+                                            x: parseInt(e.target.value) || 1
+                                        }))}
                                         className="step-input"
                                         disabled={isExecuting}
                                     />
@@ -1122,7 +1125,10 @@ function App() {
                                         min="1"
                                         max="10000"
                                         value={axisStepInputs.y}
-                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, y: parseInt(e.target.value) || 1}))}
+                                        onChange={(e) => setAxisStepInputs(prev => ({
+                                            ...prev,
+                                            y: parseInt(e.target.value) || 1
+                                        }))}
                                         className="step-input"
                                         disabled={isExecuting}
                                     />
@@ -1158,7 +1164,10 @@ function App() {
                                         min="1"
                                         max="10000"
                                         value={axisStepInputs.z}
-                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, z: parseInt(e.target.value) || 1}))}
+                                        onChange={(e) => setAxisStepInputs(prev => ({
+                                            ...prev,
+                                            z: parseInt(e.target.value) || 1
+                                        }))}
                                         className="step-input"
                                         disabled={isExecuting}
                                     />
@@ -1194,7 +1203,10 @@ function App() {
                                         min="1"
                                         max="10000"
                                         value={axisStepInputs.pipette}
-                                        onChange={(e) => setAxisStepInputs(prev => ({...prev, pipette: parseInt(e.target.value) || 1}))}
+                                        onChange={(e) => setAxisStepInputs(prev => ({
+                                            ...prev,
+                                            pipette: parseInt(e.target.value) || 1
+                                        }))}
                                         className="step-input"
                                         disabled={isExecuting}
                                     />
@@ -1352,23 +1364,28 @@ function App() {
                                     </div>
                                     <div className="summary-item">
                                         <span className="summary-label">Avg Forward Steps:</span>
-                                        <span className="summary-value">{driftTestResults.summary.avg_forward_steps}</span>
+                                        <span
+                                            className="summary-value">{driftTestResults.summary.avg_forward_steps}</span>
                                     </div>
                                     <div className="summary-item">
                                         <span className="summary-label">Avg Backward Steps:</span>
-                                        <span className="summary-value">{driftTestResults.summary.avg_backward_steps}</span>
+                                        <span
+                                            className="summary-value">{driftTestResults.summary.avg_backward_steps}</span>
                                     </div>
                                     <div className="summary-item highlight">
                                         <span className="summary-label">Avg Drift:</span>
-                                        <span className="summary-value">{driftTestResults.summary.avg_drift_mm} mm</span>
+                                        <span
+                                            className="summary-value">{driftTestResults.summary.avg_drift_mm} mm</span>
                                     </div>
                                     <div className="summary-item">
                                         <span className="summary-label">Max Drift:</span>
-                                        <span className="summary-value">{driftTestResults.summary.max_drift_mm} mm</span>
+                                        <span
+                                            className="summary-value">{driftTestResults.summary.max_drift_mm} mm</span>
                                     </div>
                                     <div className="summary-item">
                                         <span className="summary-label">Min Drift:</span>
-                                        <span className="summary-value">{driftTestResults.summary.min_drift_mm} mm</span>
+                                        <span
+                                            className="summary-value">{driftTestResults.summary.min_drift_mm} mm</span>
                                     </div>
                                 </div>
                             </div>
@@ -1381,29 +1398,30 @@ function App() {
                                 <div className="data-table-container">
                                     <table className="data-table">
                                         <thead>
-                                            <tr>
-                                                <th>Cycle</th>
-                                                <th>Forward Steps</th>
-                                                <th>Backward Steps</th>
-                                                <th>Difference</th>
-                                                <th>Drift (mm)</th>
-                                            </tr>
+                                        <tr>
+                                            <th>Cycle</th>
+                                            <th>Forward Steps</th>
+                                            <th>Backward Steps</th>
+                                            <th>Difference</th>
+                                            <th>Drift (mm)</th>
+                                        </tr>
                                         </thead>
                                         <tbody>
-                                            {driftTestResults.cycles.slice(-20).map((cycle, index) => (
-                                                <tr key={index}>
-                                                    <td>{cycle.cycle_number}</td>
-                                                    <td>{cycle.forward_steps}</td>
-                                                    <td>{cycle.backward_steps}</td>
-                                                    <td>{cycle.step_difference}</td>
-                                                    <td>{cycle.drift_mm}</td>
-                                                </tr>
-                                            ))}
+                                        {driftTestResults.cycles.slice(-20).map((cycle, index) => (
+                                            <tr key={index}>
+                                                <td>{cycle.cycle_number}</td>
+                                                <td>{cycle.forward_steps}</td>
+                                                <td>{cycle.backward_steps}</td>
+                                                <td>{cycle.step_difference}</td>
+                                                <td>{cycle.drift_mm}</td>
+                                            </tr>
+                                        ))}
                                         </tbody>
                                     </table>
                                 </div>
                                 {driftTestResults.cycles.length > 20 && (
-                                    <p className="table-note">Showing last 20 cycles of {driftTestResults.cycles.length}</p>
+                                    <p className="table-note">Showing last 20 cycles
+                                        of {driftTestResults.cycles.length}</p>
                                 )}
                             </div>
                         )}

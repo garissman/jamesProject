@@ -60,6 +60,9 @@ class StepperMotor:
         # Start at random middle position so homing actually moves the motor
         self.simulated_position = random.randint(2000, self.simulated_travel_range - 2000)
 
+        # Interrupt-based limit detection
+        self.limit_triggered = None  # Will be set by interrupt callback
+
         if GPIO_AVAILABLE:
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.pulse_pin, GPIO.OUT)
@@ -67,12 +70,37 @@ class StepperMotor:
             GPIO.output(self.pulse_pin, GPIO.LOW)
             GPIO.output(self.dir_pin, GPIO.LOW)
 
-            # Setup limit switch pins with pull-up resistors
+            # Setup limit switch pins with pull-up resistors and edge detection
             # Assumes normally-open switches that connect to ground when triggered
             if self.limit_min_pin is not None:
                 GPIO.setup(self.limit_min_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+                try:
+                    GPIO.add_event_detect(self.limit_min_pin, GPIO.FALLING,
+                                         callback=self._limit_min_callback, bouncetime=50)
+                except RuntimeError:
+                    pass  # Event detect already added
             if self.limit_max_pin is not None:
                 GPIO.setup(self.limit_max_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+                try:
+                    GPIO.add_event_detect(self.limit_max_pin, GPIO.FALLING,
+                                         callback=self._limit_max_callback, bouncetime=50)
+                except RuntimeError:
+                    pass  # Event detect already added
+
+    def _limit_min_callback(self, channel):
+        """Interrupt callback when MIN limit switch is triggered"""
+        self.limit_triggered = 'min'
+        self.stop_requested = True
+
+    def _limit_max_callback(self, channel):
+        """Interrupt callback when MAX limit switch is triggered"""
+        self.limit_triggered = 'max'
+        self.stop_requested = True
+
+    def clear_limit_trigger(self):
+        """Clear the limit trigger flag"""
+        self.limit_triggered = None
+        self.stop_requested = False
 
     def check_limit_switch(self, pin: Optional[int]) -> bool:
         """
@@ -250,7 +278,7 @@ class StepperMotor:
                               max_steps: int = 50000) -> Tuple[int, str]:
         """
         Move motor until ANY limit switch is triggered (min or max)
-        Note: Ignores the limit we start at, only stops at the OTHER limit
+        Uses interrupt-based detection for reliable high-speed operation.
 
         Args:
             direction: Direction to move
@@ -260,56 +288,62 @@ class StepperMotor:
         Returns:
             Tuple of (steps_taken, which_limit: 'min'|'max'|'none')
         """
-        self.stop_requested = False
+        # Clear any previous trigger and reset stop flag
+        self.clear_limit_trigger()
 
         # Remember which limit we're starting at (so we can ignore it)
         starting_at_min = self.check_min_limit()
         starting_at_max = self.check_max_limit()
-        moved_away_from_start = False
 
         print(f"{self.name}: move_until_any_limit {direction.name}, starting at min={starting_at_min}, max={starting_at_max}")
+
+        # If already at a limit, need to move away first
+        if starting_at_min or starting_at_max:
+            # Clear the trigger that might fire immediately
+            time.sleep(0.1)
+            self.clear_limit_trigger()
 
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
-            time.sleep(0.005)  # Longer delay for direction change
+            time.sleep(0.005)  # Delay for direction change
 
         steps_taken = 0
+        moved_away = False
 
         while True:
+            # Check if interrupt triggered a stop
             if self.stop_requested:
-                break
+                # Interrupt detected a limit
+                if self.limit_triggered:
+                    # Make sure we actually moved away from starting position
+                    if (self.limit_triggered == 'min' and not starting_at_min) or \
+                       (self.limit_triggered == 'max' and not starting_at_max) or \
+                       moved_away:
+                        print(f"{self.name}: Hit {self.limit_triggered.upper()} limit at step {steps_taken} (interrupt)")
+                        position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
+                        self.current_position += position_delta
+                        result = self.limit_triggered
+                        self.clear_limit_trigger()
+                        return steps_taken, result
+                    else:
+                        # Still at starting limit, clear and continue
+                        self.clear_limit_trigger()
 
             if steps_taken >= max_steps:
                 print(f"Warning: {self.name} reached safety limit ({max_steps} steps)")
                 break
 
-            # Check limits BEFORE stepping
-            at_min = self.check_min_limit()
-            at_max = self.check_max_limit()
-
-            # Track when we've moved away from starting position
-            if starting_at_min and not at_min:
-                moved_away_from_start = True
-                starting_at_min = False
-                print(f"{self.name}: Moved away from MIN at step {steps_taken}")
-            if starting_at_max and not at_max:
-                moved_away_from_start = True
-                starting_at_max = False
-                print(f"{self.name}: Moved away from MAX at step {steps_taken}")
-
-            # If we've moved away and now hit a limit, we're done
-            if moved_away_from_start:
-                if at_min:
-                    print(f"{self.name}: Hit MIN limit at step {steps_taken}")
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    return steps_taken, 'min'
-                if at_max:
-                    print(f"{self.name}: Hit MAX limit at step {steps_taken}")
-                    position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-                    self.current_position += position_delta
-                    return steps_taken, 'max'
+            # Check if we've moved away from starting limit
+            if not moved_away:
+                if starting_at_min and not self.check_min_limit():
+                    moved_away = True
+                    print(f"{self.name}: Moved away from MIN at step {steps_taken}")
+                elif starting_at_max and not self.check_max_limit():
+                    moved_away = True
+                    print(f"{self.name}: Moved away from MAX at step {steps_taken}")
+                elif not starting_at_min and not starting_at_max:
+                    moved_away = True  # Started in middle
 
             # Take a step
             if GPIO_AVAILABLE:
@@ -331,7 +365,15 @@ class StepperMotor:
         position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
         self.current_position += position_delta
 
+        # Check if limit was triggered at the very end
+        if self.limit_triggered and moved_away:
+            result = self.limit_triggered
+            self.clear_limit_trigger()
+            print(f"{self.name}: Finished at {result.upper()} limit with {steps_taken} steps")
+            return steps_taken, result
+
         print(f"{self.name}: Finished with {steps_taken} steps, no limit found")
+        self.clear_limit_trigger()
         return steps_taken, 'none'
 
     def home(self, delay: float = 0.001, max_steps: int = 50000) -> bool:
