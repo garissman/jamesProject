@@ -76,14 +76,14 @@ class StepperMotor:
                 GPIO.setup(self.limit_min_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                 try:
                     GPIO.add_event_detect(self.limit_min_pin, GPIO.FALLING,
-                                         callback=self._limit_min_callback, bouncetime=50)
+                                          callback=self._limit_min_callback, bouncetime=50)
                 except RuntimeError:
                     pass  # Event detect already added
             if self.limit_max_pin is not None:
                 GPIO.setup(self.limit_max_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                 try:
                     GPIO.add_event_detect(self.limit_max_pin, GPIO.FALLING,
-                                         callback=self._limit_max_callback, bouncetime=50)
+                                          callback=self._limit_max_callback, bouncetime=50)
                 except RuntimeError:
                     pass  # Event detect already added
 
@@ -235,7 +235,8 @@ class StepperMotor:
             limit_pin = self.limit_min_pin
 
         if limit_pin is None:
-            print(f"Warning: No limit switch configured for {self.name} in {'max' if direction == Direction.CLOCKWISE else 'min'} direction")
+            print(
+                f"Warning: No limit switch configured for {self.name} in {'max' if direction == Direction.CLOCKWISE else 'min'} direction")
             return 0, False
 
         # Set direction
@@ -275,7 +276,7 @@ class StepperMotor:
         return steps_taken, self.check_limit_switch(limit_pin)
 
     def move_until_limit(self, direction: Direction, delay: float = 0.001,
-                          max_steps: int = 100000) -> Tuple[int, str]:
+                         max_steps: int = 100000) -> Tuple[int, str]:
         """
         Simple: Move in direction until ANY limit switch is hit.
         Checks limit AFTER each step so we can move away from current limit.
@@ -348,7 +349,7 @@ class StepperMotor:
         return steps_taken, 'none'
 
     def move_until_any_limit(self, direction: Direction, delay: float = 0.001,
-                              max_steps: int = 100000) -> Tuple[int, str]:
+                             max_steps: int = 100000) -> Tuple[int, str]:
         """Alias for move_until_limit for backwards compatibility"""
         return self.move_until_limit(direction, delay, max_steps)
 
@@ -417,20 +418,18 @@ class StepperController:
 
     # GPIO pin configuration (Pulse Pin, Direction Pin)
     MOTOR_PINS = {
-        1: (4, 17),  # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
-        2: (27, 22),  # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
-        # 3: (23, 24),    # Motor 3 Z-axis: Pulse=GPIO23, Dir=GPIO24
-        3: (5, 6),  # Motor 3 Z-axis: Pulse=GPIO05, Dir=GPIO06, use this pins For Better PCB Design
-        # 4: (25, 5)  # Motor 4 Pipette: Pulse=GPIO25, Dir=GPIO05
-        4: (13, 19)  # Motor 4 Pipette: Pulse=GPIO13, Dir=GPIO19, use this pins For Better PCB Design
+        1: (21, 13),  # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
+        2: (4, 27),  # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
+        3: (26, 23),  # Motor 3 Z-axis: Pulse=GPIO05, Dir=GPIO06, use this pins For Better PCB Design
+        4: (22, 12)  # Motor 4 Pipette: Pulse=GPIO13, Dir=GPIO19, use this pins For Better PCB Design
     }
 
     # Limit switch configuration (Min Pin, Max Pin) - None if not connected
     LIMIT_SWITCH_PINS = {
-        1: (20, 21),  # Motor 1 X-axis: Min=GPIO20, Max=GPIO21
-        2: (16, 12),  # Motor 2 Y-axis: Min=GPIO16, Max=GPIO12
-        3: (7, 8),    # Motor 3 Z-axis: Min=GPIO07, Max=GPIO08
-        4: (None, None)  # Motor 4 Pipette: No limit switches
+        1: (20, 19),  # Motor 1 X-axis: Min=GPIO20, Max=GPIO21
+        2: (24, 25),  # Motor 2 Y-axis: Min=GPIO16, Max=GPIO12
+        3: (5, 6),  # Motor 3 Z-axis: Min=GPIO07, Max=GPIO08
+        4: (16, 17)  # Motor 4 Pipette: No limit switches
     }
 
     def __init__(self, use_limit_switches: bool = True):
@@ -491,7 +490,7 @@ class StepperController:
         return motor.step(direction, steps, delay, check_limits)
 
     def move_motor_until_limit(self, motor_id: int, direction: Direction,
-                                delay: float = 0.001, max_steps: int = 50000) -> Tuple[int, bool]:
+                               delay: float = 0.001, max_steps: int = 50000) -> Tuple[int, bool]:
         """
         Move a motor until its limit switch is triggered
 
