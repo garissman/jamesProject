@@ -418,18 +418,18 @@ class StepperController:
 
     # GPIO pin configuration (Pulse Pin, Direction Pin)
     MOTOR_PINS = {
-        1: (21, 13),  # Motor 1 X-axis: Pulse=GPIO04, Dir=GPIO17
-        2: (4, 27),  # Motor 2 Y-axis: Pulse=GPIO27, Dir=GPIO22
-        3: (26, 23),  # Motor 3 Z-axis: Pulse=GPIO05, Dir=GPIO06, use this pins For Better PCB Design
-        4: (22, 12)  # Motor 4 Pipette: Pulse=GPIO13, Dir=GPIO19, use this pins For Better PCB Design
+        1: (4, 17),  # Motor 2 X-axis: Pulse=GPIO04, Dir=GPIO17
+        2: (27, 22),  # Motor 1 Y-axis: Pulse=GPIO27, Dir=GPIO22
+        3: (5, 6),  # Motor 3 Z-axis: Pulse=GPIO05, Dir=GPIO06, use this pins For Better PCB Design
+        4: (13, 19)  # Motor 4 Pipette: Pulse=GPIO13, Dir=GPIO19, use this pins For Better PCB Design
     }
 
     # Limit switch configuration (Min Pin, Max Pin) - None if not connected
     LIMIT_SWITCH_PINS = {
-        1: (20, 19),  # Motor 1 X-axis: Min=GPIO20, Max=GPIO21
-        2: (24, 25),  # Motor 2 Y-axis: Min=GPIO16, Max=GPIO12
-        3: (5, 6),  # Motor 3 Z-axis: Min=GPIO07, Max=GPIO08
-        4: (16, 17)  # Motor 4 Pipette: No limit switches
+        1: (26, 21),  # Motor 1 X-axis: Min=GPIO26, Max=GPIO21
+        2: (20, 16),  # Motor 2 Y-axis: Min=GPIO20, Max=GPIO16
+        3: (12, 25),  # Motor 3 Z-axis: Min=GPIO12, Max=GPIO25
+        4: (24, 23)  # Motor 4 Pipette: Min=GPIO24, Max=GPIO23
     }
 
     def __init__(self, use_limit_switches: bool = True):
