@@ -623,14 +623,18 @@ async def get_limit_switches():
 
 
 # Motor Drift Test endpoints
+DRIFT_TEST_MOTOR_NAMES = {1: "X-Axis", 2: "Y-Axis", 3: "Z-Axis", 4: "Pipette"}
+
+
 class DriftTestRequest(BaseModel):
     """Request to start a drift test"""
     cycles: int = Field(default=10, gt=0, le=1000, description="Number of test cycles")
     motor_speed: float = Field(default=0.001, gt=0, le=0.1, description="Motor speed (delay between steps)")
     steps_per_mm: int = Field(default=200, gt=0, le=10000, description="Steps per millimeter")
+    motor: int = Field(default=1, ge=1, le=4, description="Motor to test: 1=X, 2=Y, 3=Z, 4=Pipette")
 
 
-def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
+def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num: int = 1):
     """
     Simple drift test: move back and forth between limits, count steps.
     """
@@ -639,8 +643,12 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
     from datetime import datetime
     from stepper_control import Direction
 
+    motor_name = DRIFT_TEST_MOTOR_NAMES.get(motor_num, f"Motor {motor_num}")
+
     drift_test_results = {
         "status": "running",
+        "motor": motor_num,
+        "motor_name": motor_name,
         "current_cycle": 0,
         "total_cycles": cycles,
         "cycles": [],
@@ -654,11 +662,11 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int):
             raise Exception("Pipetting controller not initialized")
 
         stepper = pipetting_controller.stepper_controller
-        motor = stepper.get_motor(1)  # X-axis
+        motor = stepper.get_motor(motor_num)
 
         has_limits = motor.limit_min_pin is not None and motor.limit_max_pin is not None
         if not has_limits:
-            raise Exception("No limit switches configured for X-axis")
+            raise Exception(f"No limit switches configured for {motor_name}")
 
         # Start by moving CLOCKWISE until we hit something
         drift_test_results["status"] = "homing"
@@ -785,14 +793,17 @@ async def start_drift_test(request: DriftTestRequest):
     # Start the test in a background thread
     drift_test_thread = threading.Thread(
         target=run_drift_test,
-        args=(request.cycles, request.motor_speed, request.steps_per_mm)
+        args=(request.cycles, request.motor_speed, request.steps_per_mm, request.motor)
     )
     drift_test_thread.start()
 
+    motor_name = DRIFT_TEST_MOTOR_NAMES.get(request.motor, f"Motor {request.motor}")
     return {
         "status": "started",
-        "message": f"Drift test started with {request.cycles} cycles",
-        "cycles": request.cycles
+        "message": f"Drift test started for {motor_name} with {request.cycles} cycles",
+        "cycles": request.cycles,
+        "motor": request.motor,
+        "motor_name": motor_name
     }
 
 

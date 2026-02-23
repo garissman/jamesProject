@@ -185,43 +185,46 @@
 
 .pipette-config-control {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
-    padding: 10px;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
     background: var(--bg-secondary);
     border-radius: 8px;
 }
 
 .pipette-config-control label {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-secondary);
     margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .pipette-config-control select {
-    flex: 0 0 auto;
-    min-width: 150px;
+    flex: 1 1 120px;
+    min-width: 110px;
+    max-width: 160px;
 }
 
-/* Z-axis Control */
+/* Z-axis Control — collapse wrapper, button is direct flex child */
 .z-axis-control {
-    display: flex;
-    justify-content: center;
-    margin-top: 15px;
-    margin-bottom: 15px;
+    display: contents;
 }
 
 .btn-z-toggle {
-    padding: 12px 24px;
-    font-size: 1rem;
+    padding: 8px 16px;
+    font-size: 0.9rem;
     font-weight: 600;
     border: 2px solid var(--border-color);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 180px;
+    flex: 1 1 140px;
+    min-width: 120px;
+    white-space: nowrap;
 }
 
 .btn-z-toggle.z-up {
@@ -258,28 +261,13 @@
     box-shadow: none;
 }
 
-/* Pipette Controls (Dispense/Collect) */
+/* Pipette Controls (Dispense/Collect) — collapse wrapper into parent flex */
 .pipette-controls {
-    margin: 15px 0;
-    padding: 15px;
-    background: var(--bg-secondary);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.pipette-controls:hover {
-    border-color: var(--border-hover);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
+    display: contents;
 }
 
 .pipette-control-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    display: contents;
 }
 
 .pipette-control-row label {
@@ -289,17 +277,19 @@
     white-space: nowrap;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .pipette-control-row label::before {
     content: '💧';
-    margin-right: 6px;
-    font-size: 16px;
+    margin-right: 5px;
+    font-size: 15px;
 }
 
 .pipette-control-row input {
-    width: 90px;
-    padding: 8px 12px;
+    width: 80px;
+    flex: 0 0 80px;
+    padding: 8px 10px;
     font-size: 14px;
     font-weight: 600;
     text-align: center;
@@ -1081,64 +1071,28 @@
 
     /* Pipette Config Control */
     .pipette-config-control {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .pipette-config-control label {
-        margin-bottom: 5px;
+        gap: 6px;
     }
 
     .pipette-config-control select {
-        min-width: 100%;
-    }
-
-    /* Z-axis Control */
-    .z-axis-control {
-        margin-top: 10px;
-        margin-bottom: 10px;
+        flex: 1 1 100px;
     }
 
     .btn-z-toggle {
-        width: 100%;
-        min-width: 100%;
-    }
-
-    /* Pipette Controls */
-    .pipette-controls {
-        margin: 15px 0;
-        padding: 12px;
-    }
-
-    .pipette-control-row {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .pipette-control-row label {
-        width: 100%;
-        font-size: 13px;
-        margin-bottom: 5px;
-    }
-
-    .pipette-control-row label::before {
-        font-size: 14px;
-        margin-right: 5px;
+        flex: 1 1 110px;
+        padding: 8px 10px;
+        font-size: 0.85rem;
     }
 
     .pipette-control-row input {
-        width: 100%;
-        max-width: 100%;
-        padding: 10px 12px;
-        font-size: 16px;
-        margin-bottom: 5px;
+        flex: 1 1 70px;
+        width: auto;
     }
 
     .btn-collect,
     .btn-dispense {
-        flex: 1 1 calc(50% - 4px);
-        min-width: calc(50% - 4px);
-        padding: 12px 10px;
+        flex: 1 1 90px;
+        padding: 8px 10px;
         font-size: 13px;
     }
 
@@ -1292,41 +1246,20 @@
 
     /* Pipette Config Control */
     .pipette-config-control {
-        padding: 12px;
+        padding: 8px 10px;
     }
 
-    /* Z-axis Control */
     .btn-z-toggle {
-        padding: 12px 20px;
-        font-size: 0.9rem;
-    }
-
-    /* Pipette Controls */
-    .pipette-controls {
-        margin: 10px 0;
-        padding: 10px;
-        border-radius: 10px;
-    }
-
-    .pipette-control-row {
-        gap: 6px;
-    }
-
-    .pipette-control-row label {
-        font-size: 12px;
-    }
-
-    .pipette-control-row input {
-        padding: 10px;
-        font-size: 16px;
+        flex: 1 1 100px;
+        padding: 8px 10px;
+        font-size: 0.85rem;
     }
 
     .btn-collect,
     .btn-dispense {
-        padding: 11px 8px;
+        flex: 1 1 80px;
+        padding: 8px 6px;
         font-size: 12px;
-        flex: 1 1 calc(50% - 3px);
-        min-width: calc(50% - 3px);
     }
 
     /* Plate grid - make it scrollable */
@@ -1500,11 +1433,7 @@
         font-size: 14px;
     }
 
-    /* Disable hover animations on touch devices */
-    .pipette-controls:hover {
-        transform: none;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
+
 
     .btn-collect:hover::before,
     .btn-dispense:hover::before {
@@ -2206,6 +2135,138 @@
     color: var(--text-primary);
 }
 
+/* Limit Switch Validation Panel */
+.limit-switch-validation {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.limit-switch-validation-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.limit-switch-validation-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.btn-refresh-limits {
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-refresh-limits:hover:not(:disabled) {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.btn-refresh-limits:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.limit-switch-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.limit-switch-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+}
+
+.limit-switch-row.ls-configured {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.limit-switch-row.ls-missing {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ls-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ls-configured .ls-dot { background: #10b981; }
+.ls-missing   .ls-dot { background: #ef4444; }
+
+.ls-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 90px;
+}
+
+.ls-pin {
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+.ls-state {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+}
+
+.ls-state.ls-triggered {
+    background: #f59e0b;
+    color: #fff;
+}
+
+.ls-state.ls-open {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.ls-ok-msg {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+    color: #10b981;
+}
+
+.ls-warn-msg {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+    color: #f59e0b;
+}
+
+.limit-switch-hint,
+.limit-switch-error {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+}
+
+.limit-switch-error { color: #ef4444; }
+
 .drift-test-actions {
     display: flex;
     gap: 15px;
@@ -2218,8 +2279,14 @@
     flex: 1;
 }
 
-.btn-start-test:hover {
+.btn-start-test:hover:not(:disabled) {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.btn-start-test:disabled {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .btn-stop-test {

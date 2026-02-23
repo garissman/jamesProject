@@ -11,8 +11,9 @@
 - `frontend/src/App.css` — Styles (blue gradient + glassmorphism theme)
 - `pipetting_controller.py` — Hardware control logic, `PipettingController` + `PipettingStep`
 - `stepper_control.py` — Low-level GPIO stepper motor control
+- `settings.py` — JSON-backed runtime config module (replaces .env/dotenv)
+- `config.json` — Runtime config file (created on first save from Settings tab)
 - `requirements.txt` — Python deps
-- `.env` — Runtime config (created on first save from Settings tab)
 
 ## Architecture
 - Single React component (`App`) with tab-based navigation: Plate Layout, Program, Settings
@@ -30,7 +31,8 @@
 - `POST /api/pipetting/toggle-z` — Z-axis up/down
 - `POST /api/pipetting/aspirate` / `dispense` — Manual liquid ops
 - `POST /api/pipetting/set-pipette-count` — Set 1 or 3 pipettes
-- `GET/POST /api/config` — Read/write hardware config to `.env`
+- `GET/POST /api/config` — Read/write hardware config to `config.json`
+- `POST /api/pipetting/set-layout` — Switch between 'microchip' and 'wellplate' layout modes
 - `GET /api/pipetting/logs` — Fetch log messages
 
 ## State Polling

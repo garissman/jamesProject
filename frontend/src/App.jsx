@@ -79,9 +79,11 @@ function App() {
     const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
 
     // Drift test state
-    const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.00000000001, steps_per_mm: 200})
+    const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.001, steps_per_mm: 200, motor: 1})
     const [driftTestRunning, setDriftTestRunning] = useState(false)
     const [driftTestResults, setDriftTestResults] = useState(null)
+    const [limitSwitchStatus, setLimitSwitchStatus] = useState(null)
+    const [limitSwitchLoading, setLimitSwitchLoading] = useState(false)
 
     // Dispense/Collect state
     const [pipetteVolume, setPipetteVolume] = useState('1.0') // Volume for manual dispense/collect
@@ -767,6 +769,23 @@ function App() {
         }
     }
 
+    const fetchLimitSwitches = async () => {
+        setLimitSwitchLoading(true)
+        try {
+            const response = await fetch('/api/limit-switches')
+            const data = await response.json()
+            if (response.ok) {
+                setLimitSwitchStatus(data)
+            } else {
+                setLimitSwitchStatus({error: data.detail})
+            }
+        } catch (error) {
+            setLimitSwitchStatus({error: 'Could not reach backend'})
+        } finally {
+            setLimitSwitchLoading(false)
+        }
+    }
+
     const fetchCurrentPosition = async () => {
         try {
             const response = await fetch('/api/pipetting/status')
@@ -885,6 +904,7 @@ function App() {
             }
             if (activeTab === 'drift-test') {
                 fetchDriftTestStatus()
+                fetchLimitSwitches()
             }
         }, 1000) // Poll every second
 
@@ -1339,7 +1359,7 @@ function App() {
                     <div className="drift-test-section">
                         <h2>Motor Drift Test</h2>
                         <p className="drift-test-description">
-                            Test X-axis stepper motor precision by running back-and-forth cycles.
+                            Test stepper motor precision by running back-and-forth cycles.
                             Measures drift using limit switches.
                         </p>
 
@@ -1347,6 +1367,23 @@ function App() {
                         <div className="drift-test-config">
                             <h3>Test Configuration</h3>
                             <div className="config-grid">
+                                <div className="form-group">
+                                    <label>Motor:</label>
+                                    <select
+                                        value={driftTestConfig.motor}
+                                        onChange={(e) => {
+                                            setDriftTestConfig(prev => ({...prev, motor: parseInt(e.target.value)}))
+                                            fetchLimitSwitches()
+                                        }}
+                                        className="form-input"
+                                        disabled={driftTestRunning}
+                                    >
+                                        <option value={1}>Motor 1 — X-Axis</option>
+                                        <option value={2}>Motor 2 — Y-Axis</option>
+                                        <option value={3}>Motor 3 — Z-Axis</option>
+                                        <option value={4}>Motor 4 — Pipette</option>
+                                    </select>
+                                </div>
                                 <div className="form-group">
                                     <label>Number of Cycles:</label>
                                     <input
@@ -1395,14 +1432,79 @@ function App() {
                                 </div>
                             </div>
 
+                            {/* Limit Switch Validation */}
+                            {(() => {
+                                const motorData = limitSwitchStatus?.limit_states?.[driftTestConfig.motor]
+                                const pinData   = limitSwitchStatus?.pin_configuration?.[driftTestConfig.motor]
+                                const minOk  = pinData?.min_pin != null
+                                const maxOk  = pinData?.max_pin != null
+                                const bothOk = minOk && maxOk
+                                return (
+                                    <div className="limit-switch-validation">
+                                        <div className="limit-switch-validation-header">
+                                            <span className="limit-switch-validation-title">Limit Switch Check</span>
+                                            <button
+                                                className="btn-refresh-limits"
+                                                onClick={fetchLimitSwitches}
+                                                disabled={limitSwitchLoading || driftTestRunning}
+                                                title="Refresh limit switch status"
+                                            >
+                                                {limitSwitchLoading ? '...' : '↻ Refresh'}
+                                            </button>
+                                        </div>
+                                        {limitSwitchStatus?.error ? (
+                                            <p className="limit-switch-error">{limitSwitchStatus.error}</p>
+                                        ) : !limitSwitchStatus ? (
+                                            <p className="limit-switch-hint">Click Refresh to check limit switches.</p>
+                                        ) : (
+                                            <div className="limit-switch-rows">
+                                                <div className={`limit-switch-row ${minOk ? 'ls-configured' : 'ls-missing'}`}>
+                                                    <span className="ls-dot" />
+                                                    <span className="ls-label">MIN switch</span>
+                                                    <span className="ls-pin">{minOk ? `GPIO ${pinData.min_pin}` : 'Not configured'}</span>
+                                                    {minOk && (
+                                                        <span className={`ls-state ${motorData?.min ? 'ls-triggered' : 'ls-open'}`}>
+                                                            {motorData?.min ? 'TRIGGERED' : 'Open'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className={`limit-switch-row ${maxOk ? 'ls-configured' : 'ls-missing'}`}>
+                                                    <span className="ls-dot" />
+                                                    <span className="ls-label">MAX switch</span>
+                                                    <span className="ls-pin">{maxOk ? `GPIO ${pinData.max_pin}` : 'Not configured'}</span>
+                                                    {maxOk && (
+                                                        <span className={`ls-state ${motorData?.max ? 'ls-triggered' : 'ls-open'}`}>
+                                                            {motorData?.max ? 'TRIGGERED' : 'Open'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {bothOk ? (
+                                                    <p className="ls-ok-msg">Both limit switches configured. Press each switch by hand to verify it shows TRIGGERED.</p>
+                                                ) : (
+                                                    <p className="ls-warn-msg">⚠ One or both limit switches are not configured for this motor. Fix wiring before running the test.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })()}
+
                             <div className="drift-test-actions">
                                 {!driftTestRunning ? (
-                                    <button
-                                        className="btn btn-start-test"
-                                        onClick={startDriftTest}
-                                    >
-                                        Start Drift Test
-                                    </button>
+                                    (() => {
+                                        const pinData = limitSwitchStatus?.pin_configuration?.[driftTestConfig.motor]
+                                        const bothOk  = pinData?.min_pin != null && pinData?.max_pin != null
+                                        return (
+                                            <button
+                                                className="btn btn-start-test"
+                                                onClick={startDriftTest}
+                                                disabled={!bothOk}
+                                                title={!bothOk ? 'Both limit switches must be configured before running the test' : ''}
+                                            >
+                                                Start Drift Test
+                                            </button>
+                                        )
+                                    })()
                                 ) : (
                                     <button
                                         className="btn btn-stop-test"
@@ -1426,6 +1528,12 @@ function App() {
                             <div className="drift-test-status">
                                 <h3>Test Status</h3>
                                 <div className="status-grid">
+                                    {driftTestResults.motor_name && (
+                                        <div className="status-item">
+                                            <span className="status-label">Motor:</span>
+                                            <span className="status-value">{driftTestResults.motor_name}</span>
+                                        </div>
+                                    )}
                                     <div className="status-item">
                                         <span className="status-label">Status:</span>
                                         <span className={`status-value status-${driftTestResults.status}`}>
