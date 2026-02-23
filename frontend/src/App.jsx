@@ -3,7 +3,7 @@ import './App.css'
 
 function App() {
     const [activeTab, setActiveTab] = useState('protocol')
-    const [selectedWell, setSelectedWell] = useState('A1') // Current motor position
+    const [selectedWell, setSelectedWell] = useState('WS1') // Current motor position (home = WS1)
     const [targetWell, setTargetWell] = useState(null) // User-clicked target well
     const [currentPipetteCount, setCurrentPipetteCount] = useState(3) // Current pipette configuration (from backend)
     const [currentOperation, setCurrentOperation] = useState('idle') // Current operation: idle, moving, aspirating, dispensing
@@ -85,9 +85,34 @@ function App() {
     const validateWellId = (wellId) => {
         if (!wellId || wellId.trim() === '') return true // Empty is OK for optional fields
 
-        // Well ID format: Row (A-H) + Column (1-12)
-        const wellPattern = /^[A-H]([1-9]|1[0-2])$/
-        return wellPattern.test(wellId.trim().toUpperCase())
+        const wellIdUpper = wellId.trim().toUpperCase()
+
+        // Special wells
+        // Washing stations (both layouts)
+        if (['WS1', 'WS2'].includes(wellIdUpper)) {
+            return true
+        }
+
+        // MicroChips (microchip layout)
+        if (['MC1', 'MC2', 'MC3', 'MC4', 'MC5'].includes(wellIdUpper)) {
+            return true
+        }
+
+        // Vials (vial layout - VA1-VE3)
+        const vialPattern = /^V[A-E][1-3]$/
+        if (vialPattern.test(wellIdUpper)) {
+            return true
+        }
+
+        // Small wells (SA1-SL6)
+        const smallWellPattern = /^S[A-L][1-6]$/
+        if (smallWellPattern.test(wellIdUpper)) {
+            return true
+        }
+
+        // Standard well ID format: Row (A-H) + Column (1-15 for MicroChip, 1-12 for legacy)
+        const wellPattern = /^[A-H]([1-9]|1[0-5])$/
+        return wellPattern.test(wellIdUpper)
     }
 
     const handleAddStep = () => {
@@ -149,12 +174,60 @@ function App() {
         setPipetteCount(3) // Reset to default (3 pipettes)
     }
 
-    // Initialize 96-well plate data (8 rows x 12 columns)
+    // Layout type state
+    const [layoutType, setLayoutType] = useState('microchip') // 'microchip' or 'wellplate'
+
+    // Initialize 96-well plate data (8 rows x 12 columns) - for microchip layout
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     const columns = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
     // Well data - all wells start empty by default
     const [wellData, setWellData] = useState({})
+
+    // Layout definitions
+    const layouts = {
+        microchip: {
+            name: 'MicroChip Layout',
+            // Washing stations (top-left)
+            reservoirs: [
+                {id: 'WS1', label: 'Washing Station 1', type: 'reservoir'},
+                {id: 'WS2', label: 'Washing Station 2', type: 'reservoir'}
+            ],
+            // Main well grid (8 rows x 15 columns)
+            wellGrid: {
+                rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+            },
+            // MicroChips (bottom)
+            vials: [
+                {id: 'MC1', label: 'MicroChip 1', type: 'vial'},
+                {id: 'MC2', label: 'MicroChip 2', type: 'vial'},
+                {id: 'MC3', label: 'MicroChip 3', type: 'vial'},
+                {id: 'MC4', label: 'MicroChip 4', type: 'vial'},
+                {id: 'MC5', label: 'MicroChip 5', type: 'vial'}
+            ]
+        },
+        wellplate: {
+            name: 'Vial Layout',
+            // Washing stations (top-left)
+            reservoirs: [
+                {id: 'WS1', label: 'Washing Station 1', type: 'reservoir'},
+                {id: 'WS2', label: 'Washing Station 2', type: 'reservoir'}
+            ],
+            // Vials grid (left side: 5 rows x 3 columns)
+            vialGrid: {
+                rows: ['A', 'B', 'C', 'D', 'E'],
+                columns: [1, 2, 3],
+                prefix: 'V' // V for Vials (VA1, VA2, etc.)
+            },
+            // Small wells grid (right side: 12 rows x 6 columns)
+            smallWellGrid: {
+                rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
+                columns: [1, 2, 3, 4, 5, 6],
+                prefix: 'S' // S for Small wells (SA1, SA2, etc.)
+            }
+        }
+    }
 
     const getWellType = (row, col) => {
         const wellId = `${row}${col}`
@@ -297,10 +370,6 @@ function App() {
     }
 
     const handleStop = async () => {
-        if (!isExecuting) {
-            return
-        }
-
         try {
             const response = await fetch('/api/pipetting/stop', {
                 method: 'POST',
@@ -366,6 +435,29 @@ function App() {
                 fetchCurrentPosition()
             } else {
                 console.error(`Error: ${data.detail || 'Failed to set pipette count'}`)
+            }
+        } catch (error) {
+            console.error(`Error: Unable to connect to backend. ${error.message}`)
+        }
+    }
+
+    const handleSetLayoutType = async (newLayoutType) => {
+        try {
+            const response = await fetch('/api/pipetting/set-layout-type', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({layoutType: newLayoutType})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setLayoutType(newLayoutType)
+                console.log(`${data.message}`)
+            } else {
+                console.error(`Error: ${data.detail || 'Failed to set layout type'}`)
             }
         } catch (error) {
             console.error(`Error: Unable to connect to backend. ${error.message}`)
@@ -686,6 +778,11 @@ function App() {
                 // Update pipette count from backend
                 if (data.pipette_count !== undefined) {
                     setCurrentPipetteCount(data.pipette_count)
+                }
+
+                // Update layout type from backend
+                if (data.layout_type !== undefined) {
+                    setLayoutType(data.layout_type)
                 }
 
                 // Update isExecuting state from backend
@@ -1640,6 +1737,20 @@ function App() {
                             </div>
                         </div>
 
+                        {/* Layout Switcher */}
+                        <div className="layout-switcher">
+                            <label>Layout Type:</label>
+                            <select
+                                value={layoutType}
+                                onChange={(e) => handleSetLayoutType(e.target.value)}
+                                className="form-input form-select"
+                                disabled={isExecuting}
+                            >
+                                <option value="microchip">MicroChip Layout (8x15)</option>
+                                <option value="wellplate">Vial Layout (12x6)</option>
+                            </select>
+                        </div>
+
                         <div className="pipette-config-control">
                             <label>Pipette Configuration:</label>
                             <select
@@ -1755,55 +1866,31 @@ function App() {
                             )}
                         </div>
 
-                        <div className="plate-grid-wrapper">
-                            {/* Column headers */}
-                            <div className="column-headers">
-                                <div className="row-label-space"></div>
-                                {columns.map(col => (
-                                    <div key={col} className="column-header">{col}</div>
-                                ))}
-                            </div>
-
-                            {/* Grid with row labels */}
-                            {rows.map(row => {
-                                // Calculate which wells should be highlighted for pipette positions
-                                const pipetteWells = getPipetteWells(selectedWell, currentPipetteCount)
-
-                                return (
-                                    <div key={row} className="plate-row">
-                                        <div className="row-label">{row}</div>
-                                        {columns.map(col => {
-                                            const well = getWellType(row, col)
-                                            const wellId = `${row}${col}`
-                                            const isPipettePosition = pipetteWells.includes(wellId)
-                                            const isCenterPipette = wellId === selectedWell
-                                            const isSidePipette = isPipettePosition && !isCenterPipette
-
-                                            // Check if this well is part of an operation (for multi-pipette animation)
-                                            const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                            const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
-                                            const operationClass = isOperating ? `operation-${currentOperation}` : ''
-
-                                            // Check if this well is selected in quick op mode
-                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
-                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
-                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
+                        {/* Render layout based on selected type */}
+                        {layoutType === 'microchip' ? (
+                            /* MicroChip Layout */
+                            <div className="layout-microchip">
+                                <div className="microchip-top-section">
+                                    {/* Washing Stations */}
+                                    <div className="reservoirs-section">
+                                        {layouts.microchip.reservoirs.map(reservoir => {
+                                            const isPipettePosition = selectedWell === reservoir.id
+                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === reservoir.id
+                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === reservoir.id
+                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === reservoir.id
 
                                             return (
                                                 <div
-                                                    key={wellId}
-                                                    className={`well well-${well.type}
-                                                        ${isCenterPipette ? 'selected' : ''}
-                                                        ${isSidePipette ? 'pipette-side' : ''}
-                                                        ${targetWell === wellId ? 'target' : ''}
-                                                        ${operationClass}
+                                                    key={reservoir.id}
+                                                    className={`reservoir ${isPipettePosition ? 'selected' : ''}
+                                                        ${targetWell === reservoir.id ? 'target' : ''}
                                                         ${isQuickOpPickup ? 'quick-op-pickup' : ''}
                                                         ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
                                                         ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                    onClick={() => handleWellClick(wellId)}
-                                                    style={{cursor: 'pointer'}}
+                                                    onClick={() => handleWellClick(reservoir.id)}
+                                                    title={reservoir.label}
                                                 >
-                                                    {wellId}
+                                                    {reservoir.id}
                                                     {isQuickOpPickup && <span className="quick-op-badge">P</span>}
                                                     {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
                                                     {isQuickOpRinse && <span className="quick-op-badge">R</span>}
@@ -1811,9 +1898,197 @@ function App() {
                                             )
                                         })}
                                     </div>
-                                )
-                            })}
-                        </div>
+
+                                    {/* Main Well Grid (8x15) and MicroChips Container */}
+                                    <div className="microchip-grid-container">
+                                        <div className="microchip-well-grid">
+                                        {layouts.microchip.wellGrid.rows.map(row => {
+                                            const pipetteWells = getPipetteWells(selectedWell, currentPipetteCount)
+
+                                            return (
+                                                <div key={row} className="microchip-row">
+                                                    {layouts.microchip.wellGrid.columns.map(col => {
+                                                        const wellId = `${row}${col}`
+                                                        const isPipettePosition = pipetteWells.includes(wellId)
+                                                        const isCenterPipette = wellId === selectedWell
+                                                        const isSidePipette = isPipettePosition && !isCenterPipette
+
+                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
+                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
+
+                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
+                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
+
+                                                        return (
+                                                            <div
+                                                                key={wellId}
+                                                                className={`microchip-well
+                                                                    ${isCenterPipette ? 'selected' : ''}
+                                                                    ${isSidePipette ? 'pipette-side' : ''}
+                                                                    ${targetWell === wellId ? 'target' : ''}
+                                                                    ${operationClass}
+                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
+                                                                onClick={() => handleWellClick(wellId)}
+                                                            >
+                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })}
+                                        </div>
+
+                                        {/* MicroChips (below grid) */}
+                                        <div className="vials-section">
+                                    {layouts.microchip.vials.map(vial => {
+                                        const isPipettePosition = selectedWell === vial.id
+                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === vial.id
+                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === vial.id
+                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === vial.id
+
+                                        return (
+                                            <div
+                                                key={vial.id}
+                                                className={`vial ${isPipettePosition ? 'selected' : ''}
+                                                    ${targetWell === vial.id ? 'target' : ''}
+                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
+                                                onClick={() => handleWellClick(vial.id)}
+                                                title={vial.label}
+                                            >
+                                                {vial.id}
+                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                            </div>
+                                        )
+                                    })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Vial Layout */
+                            <div className="layout-wellplate">
+                                {/* Left Column: WS + Vials */}
+                                <div className="wellplate-left-column">
+                                    {/* Washing Stations */}
+                                    <div className="reservoirs-section-wellplate">
+                                        {layouts.wellplate.reservoirs.map(reservoir => {
+                                            const isPipettePosition = selectedWell === reservoir.id
+                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === reservoir.id
+                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === reservoir.id
+                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === reservoir.id
+
+                                            return (
+                                                <div
+                                                    key={reservoir.id}
+                                                    className={`reservoir-wellplate ${isPipettePosition ? 'selected' : ''}
+                                                        ${targetWell === reservoir.id ? 'target' : ''}
+                                                        ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                        ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                        ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
+                                                    onClick={() => handleWellClick(reservoir.id)}
+                                                    title={reservoir.label}
+                                                >
+                                                    {reservoir.id}
+                                                    {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                    {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                    {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* Vials Grid (5x3) */}
+                                    <div className="large-wells-grid">
+                                        {layouts.wellplate.vialGrid.rows.map(row => {
+                                            return (
+                                                <div key={row} className="large-wells-row">
+                                                    {layouts.wellplate.vialGrid.columns.map(col => {
+                                                        const wellId = `V${row}${col}` // VA1, VA2, etc.
+                                                        const isPipettePosition = selectedWell === wellId
+                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
+                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
+
+                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
+                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
+
+                                                        return (
+                                                            <div
+                                                                key={wellId}
+                                                                className={`large-well
+                                                                    ${isPipettePosition ? 'selected' : ''}
+                                                                    ${targetWell === wellId ? 'target' : ''}
+                                                                    ${operationClass}
+                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
+                                                                onClick={() => handleWellClick(wellId)}
+                                                            >
+                                                                {wellId}
+                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Small Wells Grid (12x6) */}
+                                <div className="small-wells-grid">
+                                        {layouts.wellplate.smallWellGrid.rows.map(row => {
+                                            return (
+                                                <div key={row} className="small-wells-row">
+                                                    {layouts.wellplate.smallWellGrid.columns.map(col => {
+                                                        const wellId = `S${row}${col}` // SA1, SA2, etc.
+                                                        const isPipettePosition = selectedWell === wellId
+                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
+                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
+
+                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
+                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
+
+                                                        return (
+                                                            <div
+                                                                key={wellId}
+                                                                className={`small-well
+                                                                    ${isPipettePosition ? 'selected' : ''}
+                                                                    ${targetWell === wellId ? 'target' : ''}
+                                                                    ${operationClass}
+                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
+                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
+                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
+                                                                onClick={() => handleWellClick(wellId)}
+                                                            >
+                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
+                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
+                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1923,7 +2198,6 @@ function App() {
                         <button
                             className="btn btn-stop"
                             onClick={handleStop}
-                            disabled={!isExecuting}
                         >
                             Stop
                         </button>

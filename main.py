@@ -295,6 +295,7 @@ async def get_pipetting_status():
         position = pipetting_controller.current_position
         current_well = pipetting_controller.get_current_well()
         pipette_count = pipetting_controller.current_pipette_count
+        layout_type = pipetting_controller.layout_type
         current_operation = pipetting_controller.current_operation
         operation_well = pipetting_controller.operation_well
         return {
@@ -306,6 +307,7 @@ async def get_pipetting_status():
             },
             "current_well": current_well,
             "pipette_count": pipette_count,
+            "layout_type": layout_type,
             "is_executing": is_executing,
             "current_operation": current_operation,
             "operation_well": operation_well,
@@ -375,6 +377,41 @@ async def set_pipette_count(request: SetPipetteCountRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error setting pipette count: {str(e)}"
+        )
+
+
+class SetLayoutTypeRequest(BaseModel):
+    """Request to set layout type"""
+    layoutType: str = Field(..., description="Layout type: 'microchip' or 'wellplate'")
+
+
+@app.post("/api/pipetting/set-layout-type")
+async def set_layout_type(request: SetLayoutTypeRequest):
+    """Set the layout type (microchip or wellplate)"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    if request.layoutType not in ['microchip', 'wellplate']:
+        raise HTTPException(
+            status_code=400,
+            detail="Layout type must be 'microchip' or 'wellplate'"
+        )
+
+    try:
+        pipetting_controller.layout_type = request.layoutType
+        pipetting_controller.save_position()
+        return {
+            "status": "success",
+            "message": f"Layout type set to {request.layoutType}",
+            "layout_type": request.layoutType
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error setting layout type: {str(e)}"
         )
 
 

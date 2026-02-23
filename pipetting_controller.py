@@ -38,9 +38,9 @@ class PipettingStep:
 
 
 class CoordinateMapper:
-    """Maps well positions to physical coordinates"""
+    """Maps well positions to physical coordinates - supports multiple layout types"""
 
-    # Well plate configuration from CLAUDE.md
+    # Well plate configuration from CLAUDE.md (default/legacy layout)
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     COLUMNS = list(range(1, 13))  # 1-12
 
@@ -58,6 +58,26 @@ class CoordinateMapper:
     # Origin offset (position of well A1)
     ORIGIN_X = 0.0  # mm
     ORIGIN_Y = 0.0  # mm
+
+    # Layout-specific coordinate mappings
+    # MicroChip Layout coordinates
+    MICROCHIP_COORDS = {
+        # Washing Stations (top-left)
+        'WS1': (0, 0, 0),
+        'WS2': (0, 15, 0),
+        # MicroChips (bottom)
+        'MC1': (80, 300, 0),
+        'MC2': (140, 300, 0),
+        'MC3': (200, 300, 0),
+        'MC4': (260, 300, 0),
+        'MC5': (320, 300, 0),
+    }
+
+    # Vial Layout coordinates
+    WELLPLATE_COORDS = {
+        # Note: Vial layout uses WS1 and WS2 (same as MicroChip)
+        # No additional special coordinates needed - vials are grid-based (VA1-VE3)
+    }
 
     @staticmethod
     def coordinates_to_well(coords: WellCoordinates) -> Optional[str]:
@@ -94,7 +114,7 @@ class CoordinateMapper:
         Parse well identifier into row and column
 
         Args:
-            well_id: Well identifier (e.g., 'A12', 'H1')
+            well_id: Well identifier (e.g., 'A12', 'H1', 'A15')
 
         Returns:
             Tuple of (row, column)
@@ -110,42 +130,91 @@ class CoordinateMapper:
 
         if row not in CoordinateMapper.ROWS:
             raise ValueError(f"Invalid row '{row}'. Must be A-H")
-        if column not in CoordinateMapper.COLUMNS:
-            raise ValueError(f"Invalid column {column}. Must be 1-12")
+        # Extended range for MicroChip layout (up to 15 columns)
+        if column < 1 or column > 15:
+            raise ValueError(f"Invalid column {column}. Must be 1-15")
 
         return row, column
 
     @staticmethod
     def well_to_coordinates(well_id: str) -> WellCoordinates:
         """
-        Convert well ID to physical coordinates
+        Convert well ID to physical coordinates - supports multiple layout types
 
         Args:
-            well_id: Well identifier (e.g., 'A12')
+            well_id: Well identifier (e.g., 'A12', 'R1', 'V3', 'LA1', 'SA2')
 
         Returns:
             WellCoordinates with x, y, z positions
         """
-        row, column = CoordinateMapper.parse_well(well_id)
+        # Check for MicroChip layout special wells
+        if well_id in CoordinateMapper.MICROCHIP_COORDS:
+            coords = CoordinateMapper.MICROCHIP_COORDS[well_id]
+            return WellCoordinates(x=coords[0], y=coords[1], z=coords[2])
 
-        # Calculate row index (A=0, B=1, etc.)
-        row_index = CoordinateMapper.ROWS.index(row)
+        # Check for WellPlate layout special wells
+        if well_id in CoordinateMapper.WELLPLATE_COORDS:
+            coords = CoordinateMapper.WELLPLATE_COORDS[well_id]
+            return WellCoordinates(x=coords[0], y=coords[1], z=coords[2])
 
-        # Calculate column index (1=0, 2=1, etc.)
-        column_index = column - 1
+        # Handle Vial Layout vials (VA1, VA2, etc.)
+        if well_id.startswith('V') and len(well_id) >= 3:
+            row_char = well_id[1]
+            col_num = int(well_id[2:])
+            # Vials: 5 rows (A-E) x 3 columns
+            vial_rows = ['A', 'B', 'C', 'D', 'E']
+            if row_char in vial_rows and 1 <= col_num <= 3:
+                row_index = vial_rows.index(row_char)
+                col_index = col_num - 1
+                # Vials positioned on left side, starting at offset
+                x = CoordinateMapper.ORIGIN_X + 20 + (col_index * 70)  # 70mm spacing for vials
+                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * 70)  # 70mm spacing
+                return WellCoordinates(x=x, y=y, z=0.0)
 
-        # Calculate physical coordinates
-        # X increases with column number
-        x = CoordinateMapper.ORIGIN_X + (
-                column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+        # Handle WellPlate small wells (SA1, SA2, etc.)
+        if well_id.startswith('S') and len(well_id) >= 3:
+            row_char = well_id[1]
+            col_num = int(well_id[2:])
+            # Small wells: 12 rows (A-L) x 6 columns
+            small_well_rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
+            if row_char in small_well_rows and 1 <= col_num <= 6:
+                row_index = small_well_rows.index(row_char)
+                col_index = col_num - 1
+                # Small wells positioned on right side
+                x = CoordinateMapper.ORIGIN_X + 280 + (col_index * 45)  # 45mm spacing for small wells
+                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * 45)  # 45mm spacing
+                return WellCoordinates(x=x, y=y, z=0.0)
 
-        # Y increases with row letter (A to H)
-        y = CoordinateMapper.ORIGIN_Y + (row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+        # Standard well format (A1-H15 for MicroChip, A1-H12 for legacy)
+        try:
+            row, column = CoordinateMapper.parse_well(well_id)
 
-        # Z is at top of well (0), adjust during pipetting
-        z = 0.0
+            # Calculate row index (A=0, B=1, etc.)
+            row_index = CoordinateMapper.ROWS.index(row)
 
-        return WellCoordinates(x=x, y=y, z=z)
+            # Calculate column index (1=0, 2=1, etc.)
+            column_index = column - 1
+
+            # For MicroChip layout (8x15), wells start at offset
+            # For legacy layout (8x12), use standard spacing
+            well_offset_x = 180  # Offset for microchip wells (to the right of left section)
+            well_offset_y = 20   # Offset from top
+
+            # Calculate physical coordinates
+            # X increases with column number
+            x = CoordinateMapper.ORIGIN_X + well_offset_x + (
+                    column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+
+            # Y increases with row letter (A to H)
+            y = CoordinateMapper.ORIGIN_Y + well_offset_y + (
+                row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+
+            # Z is at top of well (0), adjust during pipetting
+            z = 0.0
+
+            return WellCoordinates(x=x, y=y, z=z)
+        except (ValueError, IndexError):
+            raise ValueError(f"Invalid well ID: {well_id}")
 
     @staticmethod
     def coordinates_to_steps(coords: WellCoordinates) -> Tuple[int, int, int]:
@@ -193,9 +262,10 @@ class PipettingController:
         self.current_pipette_count = 1  # Current pipette configuration (default: 1)
         self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
         self.operation_well = None  # Well where current operation is happening
+        self.layout_type = "microchip"  # Current layout type: microchip or wellplate
 
-        # Load last known position or default to home (A1)
-        self.current_position, self.current_pipette_count = self.load_position()
+        # Load last known position or default to home (WS1 - Washing Station 1)
+        self.current_position, self.current_pipette_count, self.layout_type = self.load_position()
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
         self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
 
@@ -224,22 +294,23 @@ class PipettingController:
         self.log_buffer.clear()
 
     def save_position(self):
-        """Save current position and pipette count to file for recovery after interruption"""
+        """Save current position, pipette count, and layout type to file for recovery after interruption"""
         try:
             position_data = {
                 "x": self.current_position.x,
                 "y": self.current_position.y,
                 "z": self.current_position.z,
                 "well": self.get_current_well(),
-                "pipette_count": self.current_pipette_count
+                "pipette_count": self.current_pipette_count,
+                "layout_type": self.layout_type
             }
             with open(self.POSITION_FILE, 'w') as f:
                 json.dump(position_data, f, indent=2)
         except Exception as e:
             print(f"Warning: Could not save position to file: {e}")
 
-    def load_position(self) -> tuple[WellCoordinates, int]:
-        """Load last known position and pipette count from file"""
+    def load_position(self) -> tuple[WellCoordinates, int, str]:
+        """Load last known position, pipette count, and layout type from file"""
         try:
             if self.POSITION_FILE.exists():
                 with open(self.POSITION_FILE, 'r') as f:
@@ -247,21 +318,25 @@ class PipettingController:
                 # Note: can't use self.log here as it's called before __init__ completes
                 print(f"Loaded last position from file: {position_data.get('well', 'Unknown')}")
                 pipette_count = position_data.get('pipette_count', 1)  # Default to 1 if not found
+                layout_type = position_data.get('layout_type', 'microchip')  # Default to microchip
                 print(f"Loaded pipette configuration: {pipette_count} pipette(s)")
+                print(f"Loaded layout type: {layout_type}")
                 return (
                     WellCoordinates(
                         x=position_data.get('x', 0.0),
                         y=position_data.get('y', 0.0),
                         z=position_data.get('z', 0.0)
                     ),
-                    pipette_count
+                    pipette_count,
+                    layout_type
                 )
         except Exception as e:
             print(f"Warning: Could not load position from file: {e}")
 
-        # Default to home position (A1) with 1 pipette
-        print("Using default home position (A1) and 1 pipette")
-        return WellCoordinates(x=0.0, y=0.0, z=0.0), 1
+        # Default to home position (WS1 - Washing Station 1) with 1 pipette and microchip layout
+        print("Using default home position (WS1 - Washing Station 1), 1 pipette, and microchip layout")
+        # WS1 coordinates from MICROCHIP_COORDS: (0, 0, 0)
+        return WellCoordinates(x=0.0, y=0.0, z=0.0), 1, "microchip"
 
     def move_to_well(self, well_id: str, z_offset: float = 0.0):
         """
@@ -554,21 +629,22 @@ class PipettingController:
         self.stepper_controller.stop_all()
 
     def home(self):
-        """Return to home position (well A1)"""
-        self.log("Returning to home position (well A1)...")
+        """Return to home position (WS1 - Washing Station 1)"""
+        self.log("Returning to home position (WS1 - Washing Station 1)...")
 
         # First, raise Z to safe height if needed
         if self.current_position.z < 0:
             safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
             self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
 
-        # Move to well A1 (home position)
-        self.move_to_well("A1", 0)
+        # Move to well WS1 (home position - Washing Station 1)
+        self.move_to_well("WS1", 0)
 
-        # Reset position tracking
-        self.current_position = WellCoordinates(x=0, y=0, z=0)
+        # Reset position tracking to WS1 coordinates
+        home_coords = self.mapper.well_to_coordinates("WS1")
+        self.current_position = home_coords
         self.save_position()
-        self.log("Home position reached (A1)")
+        self.log("Home position reached (WS1 - Washing Station 1)")
 
     def get_current_well(self) -> Optional[str]:
         """

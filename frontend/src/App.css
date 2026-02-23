@@ -2342,3 +2342,475 @@
         font-size: 1.1rem;
     }
 }
+/* ===== Layout Switcher ===== */
+.layout-switcher {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.layout-switcher label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.layout-switcher select {
+    min-width: 250px;
+}
+
+/* ===== MicroChip Layout ===== */
+.layout-microchip {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 15px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    min-height: 600px;
+}
+
+.microchip-top-section {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-direction: row;
+}
+
+/* Washing Stations Section */
+.reservoirs-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reservoir {
+    width: 120px;
+    height: 40px;
+    background: var(--well-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: var(--text-primary);
+    position: relative;
+}
+
+.reservoir:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-overlay);
+}
+
+.reservoir.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: #45a049;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+}
+
+/* Sample Holder Section */
+.sample-holder-section {
+    display: flex;
+    align-items: center;
+}
+
+.sample-holder {
+    width: 150px;
+    height: 200px;
+    background: var(--well-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sample-holder:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-overlay);
+}
+
+.sample-holder.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: #45a049;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+}
+
+/* MicroChip Grid Container (Grid + MicroChips) */
+.microchip-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+/* MicroChip Well Grid (8x15) */
+.microchip-well-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.microchip-row {
+    display: flex;
+    gap: 4px;
+}
+
+.microchip-well {
+    width: 24px;
+    height: 24px;
+    background: var(--well-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.6rem;
+    color: transparent;
+    position: relative;
+}
+
+.microchip-well:hover {
+    background: var(--bg-overlay);
+    border-color: var(--border-hover);
+}
+
+.microchip-well.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-color: #45a049;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+.microchip-well.pipette-side {
+    background: linear-gradient(135deg, #81C784 0%, #66BB6A 100%);
+    border-color: #66BB6A;
+    box-shadow: 0 0 6px rgba(129, 199, 132, 0.4);
+}
+
+.microchip-well.target {
+    border-color: #FF9800;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.6);
+}
+
+/* Vials Section */
+.vials-section {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.vial {
+    width: 80px;
+    height: 120px;
+    background: var(--well-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 0 0 8px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: var(--text-primary);
+    position: relative;
+}
+
+.vial:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-overlay);
+}
+
+.vial.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: #45a049;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+}
+
+/* ===== Vial Layout ===== */
+.layout-wellplate {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    min-height: 600px;
+    align-items: flex-start;
+}
+
+.wellplate-left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Wellplate Reservoirs */
+.reservoirs-section-wellplate {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reservoir-wellplate {
+    width: 200px;
+    height: 35px;
+    background: var(--well-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: var(--text-primary);
+    position: relative;
+}
+
+.reservoir-wellplate:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-overlay);
+}
+
+.reservoir-wellplate.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: #45a049;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+}
+
+/* Large Wells Grid (5x3) */
+.large-wells-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.large-wells-row {
+    display: flex;
+    gap: 8px;
+}
+
+.large-well {
+    width: 60px;
+    height: 60px;
+    background: var(--well-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    position: relative;
+}
+
+.large-well:hover {
+    background: var(--bg-overlay);
+    border-color: var(--border-hover);
+}
+
+.large-well.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: #45a049;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+}
+
+.large-well.target {
+    border-color: #FF9800;
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.6);
+}
+
+/* Small Wells Grid (6x6) */
+.small-wells-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.small-wells-row {
+    display: flex;
+    gap: 6px;
+}
+
+.small-well {
+    width: 36px;
+    height: 36px;
+    background: var(--well-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.7rem;
+    color: transparent;
+    position: relative;
+}
+
+.small-well:hover {
+    background: var(--bg-overlay);
+    border-color: var(--border-hover);
+    color: var(--text-tertiary);
+}
+
+.small-well.selected {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-color: #45a049;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+    color: white;
+}
+
+.small-well.target {
+    border-color: #FF9800;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.6);
+}
+
+/* Quick Operation Badges for all layout types */
+.quick-op-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #2196F3;
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 50%;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Quick Operation Highlighting for all layouts */
+.quick-op-pickup {
+    border-color: #2196F3 !important;
+    box-shadow: 0 0 12px rgba(33, 150, 243, 0.7) !important;
+}
+
+.quick-op-dropoff {
+    border-color: #FF9800 !important;
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.7) !important;
+}
+
+.quick-op-rinse {
+    border-color: #9C27B0 !important;
+    box-shadow: 0 0 12px rgba(156, 39, 176, 0.7) !important;
+}
+
+/* Operation animations for new layouts */
+.microchip-well.operation-moving,
+.large-well.operation-moving,
+.small-well.operation-moving {
+    animation: pulse-yellow 1s infinite;
+}
+
+.microchip-well.operation-aspirating,
+.large-well.operation-aspirating,
+.small-well.operation-aspirating {
+    animation: pulse-blue 1s infinite;
+}
+
+.microchip-well.operation-dispensing,
+.large-well.operation-dispensing,
+.small-well.operation-dispensing {
+    animation: pulse-green 1s infinite;
+}
+
+/* Responsive styles for new layouts */
+@media (max-width: 1200px) {
+    .layout-microchip {
+        grid-template-rows: auto;
+        gap: 10px;
+    }
+
+    .microchip-top-section {
+        flex-direction: column;
+    }
+
+    .microchip-well {
+        width: 20px;
+        height: 20px;
+    }
+
+    .layout-wellplate {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .large-well {
+        width: 50px;
+        height: 50px;
+        font-size: 0.8rem;
+    }
+
+    .small-well {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+@media (max-width: 768px) {
+    .layout-switcher {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .layout-switcher select {
+        width: 100%;
+    }
+
+    .microchip-well {
+        width: 18px;
+        height: 18px;
+    }
+
+    .large-well {
+        width: 45px;
+        height: 45px;
+    }
+
+    .small-well {
+        width: 28px;
+        height: 28px;
+    }
+
+    .reservoir,
+    .reservoir-wellplate {
+        width: 100%;
+    }
+
+    .vials-section {
+        flex-wrap: wrap;
+    }
+
+    .vial {
+        width: 60px;
+        height: 100px;
+    }
+}
