@@ -22,3 +22,4 @@ dist/
 
 # Pipetting system state
 pipette_position.json
+/.playwright-mcp

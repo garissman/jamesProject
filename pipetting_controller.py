@@ -4,12 +4,12 @@ Handles coordinate mapping and pipetting workflows
 """
 
 import json
-import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple, Optional
 
+import settings
 from stepper_control import StepperController, Direction
 
 
@@ -44,23 +44,24 @@ class CoordinateMapper:
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     COLUMNS = list(range(1, 13))  # 1-12
 
-    # Physical dimensions - read from environment variables with fallback to default values
-    WELL_SPACING = float(os.getenv('WELL_SPACING', '4.0'))  # mm between wells
-    WELL_DIAMETER = float(os.getenv('WELL_DIAMETER', '8.0'))  # mm
-    WELL_HEIGHT = float(os.getenv('WELL_HEIGHT', '14.0'))  # mm
+    # Physical dimensions - read from config.json at import time
+    WELL_SPACING = settings.get('WELL_SPACING')   # mm between wells
+    WELL_DIAMETER = settings.get('WELL_DIAMETER')  # mm
+    WELL_HEIGHT = settings.get('WELL_HEIGHT')      # mm
 
     # Motor configuration (steps per mm - adjust based on your stepper setup)
-    # Read from environment variables with fallback to default values
-    STEPS_PER_MM_X = int(os.getenv('STEPS_PER_MM_X', '100'))  # Adjust based on calibration
-    STEPS_PER_MM_Y = int(os.getenv('STEPS_PER_MM_Y', '100'))  # Adjust based on calibration
-    STEPS_PER_MM_Z = int(os.getenv('STEPS_PER_MM_Z', '100'))  # Adjust based on calibration
+    STEPS_PER_MM_X = settings.get('STEPS_PER_MM_X')  # Adjust based on calibration
+    STEPS_PER_MM_Y = settings.get('STEPS_PER_MM_Y')  # Adjust based on calibration
+    STEPS_PER_MM_Z = settings.get('STEPS_PER_MM_Z')  # Adjust based on calibration
 
     # Origin offset (position of well A1)
     ORIGIN_X = 0.0  # mm
     ORIGIN_Y = 0.0  # mm
 
-    # Small well spacing (for Vial Layout alignment)
-    SMALL_WELL_SPACING = 45.0  # mm between small wells
+    # Vial Layout physical dimensions - read from config.json at import time
+    SMALL_WELL_SPACING = settings.get('VIAL_WELL_SPACING')   # mm between small wells
+    VIAL_WELL_DIAMETER = settings.get('VIAL_WELL_DIAMETER')  # mm
+    VIAL_WELL_HEIGHT   = settings.get('VIAL_WELL_HEIGHT')    # mm
 
     # Layout-specific coordinate mappings
     # MicroChip Layout coordinates
@@ -246,17 +247,22 @@ class CoordinateMapper:
 class PipettingController:
     """High-level controller for pipetting operations"""
 
-    # Pipette parameters - read from environment variables with fallback to default values
-    PIPETTE_STEPS_PER_ML = int(
-        os.getenv('PIPETTE_STEPS_PER_ML', '1000'))  # Steps to aspirate/dispense 1mL (adjust based on syringe)
-    PICKUP_DEPTH = float(os.getenv('PICKUP_DEPTH', '10.0'))  # mm to descend into well for pickup
-    DROPOFF_DEPTH = float(os.getenv('DROPOFF_DEPTH', '5.0'))  # mm to descend into well for dropoff
-    SAFE_HEIGHT = float(os.getenv('SAFE_HEIGHT', '20.0'))  # mm above well for travel
-    RINSE_CYCLES = int(os.getenv('RINSE_CYCLES', '3'))  # Number of rinse cycles
+    # Pipette parameters - read from config.json at import time
+    PIPETTE_STEPS_PER_ML = settings.get('PIPETTE_STEPS_PER_ML')  # Steps to aspirate/dispense 1mL
+    PICKUP_DEPTH  = settings.get('PICKUP_DEPTH')   # mm to descend into well for pickup
+    DROPOFF_DEPTH = settings.get('DROPOFF_DEPTH')  # mm to descend into well for dropoff
+    SAFE_HEIGHT   = settings.get('SAFE_HEIGHT')    # mm above well for travel
+    RINSE_CYCLES  = settings.get('RINSE_CYCLES')   # Number of rinse cycles
 
-    # Movement speeds - read from environment variables with fallback to default values
-    TRAVEL_SPEED = float(os.getenv('TRAVEL_SPEED', '0.001'))  # Fast movement delay (seconds between steps)
-    PIPETTE_SPEED = float(os.getenv('PIPETTE_SPEED', '0.002'))  # Slower for pipetting operations
+    # Movement speeds - read from config.json at import time
+    TRAVEL_SPEED  = settings.get('TRAVEL_SPEED')   # Fast movement delay (seconds between steps)
+    PIPETTE_SPEED = settings.get('PIPETTE_SPEED')  # Slower for pipetting operations
+
+    # Motor inversion flags - flip physical direction for reversed-mounted motors
+    INVERT_X       = settings.get('INVERT_X')
+    INVERT_Y       = settings.get('INVERT_Y')
+    INVERT_Z       = settings.get('INVERT_Z')
+    INVERT_PIPETTE = settings.get('INVERT_PIPETTE')
 
     # Position persistence
     POSITION_FILE = Path(__file__).parent / "pipette_position.json"
@@ -277,6 +283,13 @@ class PipettingController:
         self.current_position, self.current_pipette_count, self.layout_type = self.load_position()
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
         self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
+
+    @staticmethod
+    def _inv(direction: Direction, invert: bool) -> Direction:
+        """Flip direction if the invert flag is set (for reversed-mounted motors)."""
+        if invert:
+            return Direction.COUNTERCLOCKWISE if direction == Direction.CLOCKWISE else Direction.CLOCKWISE
+        return direction
 
     def log(self, message: str):
         """Log a message to both console and buffer for UI display"""
@@ -375,15 +388,15 @@ class PipettingController:
         # Move Z up to safe height first (if moving down)
         if z_delta < 0:
             safe_z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Move X and Y
         if x_delta != 0:
-            direction = Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE
+            direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
             self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
 
         if y_delta != 0:
-            direction = Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE
+            direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
             self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED)
 
         # Move Z to target position
@@ -391,9 +404,9 @@ class PipettingController:
             # Account for safe height movement
             if z_delta < 0:
                 total_z = abs(z_delta) + int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-                self.stepper_controller.move_motor(3, total_z, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+                self.stepper_controller.move_motor(3, total_z, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             else:
-                self.stepper_controller.move_motor(3, abs(z_delta), Direction.CLOCKWISE, self.TRAVEL_SPEED)
+                self.stepper_controller.move_motor(3, abs(z_delta), self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Update current position
         self.current_position = target_coords
@@ -416,7 +429,7 @@ class PipettingController:
         self.operation_well = self.get_current_well()
         self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
-        self.stepper_controller.move_motor(4, steps, Direction.CLOCKWISE, self.PIPETTE_SPEED)
+        self.stepper_controller.move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -432,7 +445,7 @@ class PipettingController:
         self.operation_well = self.get_current_well()
         self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
-        self.stepper_controller.move_motor(4, steps, Direction.COUNTERCLOCKWISE, self.PIPETTE_SPEED)
+        self.stepper_controller.move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -653,14 +666,14 @@ class PipettingController:
         self.log("Raising Z to safe height...")
         if self.current_position.z < 0:
             safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = 0.0
 
         # Home X axis - move to minimum limit switch
         self.log("Homing X axis to minimum limit...")
         x_steps, x_limit = self.stepper_controller.move_motor_until_limit(
             motor_id=1,  # X axis
-            direction=Direction.CLOCKWISE,  # Towards minimum
+            direction=self._inv(Direction.CLOCKWISE, self.INVERT_X),  # Towards minimum
             delay=self.TRAVEL_SPEED,
             max_steps=100000  # Safety limit
         )
@@ -669,14 +682,14 @@ class PipettingController:
         # Back off slightly from X limit (optional, for safety)
         if x_limit:
             backoff_steps = 50  # Back off 50 steps
-            self.stepper_controller.move_motor(1, backoff_steps, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(1, backoff_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_X), self.TRAVEL_SPEED)
             self.log(f"Backed off {backoff_steps} steps from X minimum limit")
 
         # Home Y axis - move to minimum limit switch
         self.log("Homing Y axis to minimum limit...")
         y_steps, y_limit = self.stepper_controller.move_motor_until_limit(
             motor_id=2,  # Y axis
-            direction=Direction.COUNTERCLOCKWISE,  # Towards minimum
+            direction=self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Y),  # Towards minimum
             delay=self.TRAVEL_SPEED,
             max_steps=100000  # Safety limit
         )
@@ -685,7 +698,7 @@ class PipettingController:
         # Back off slightly from Y limit (optional, for safety)
         if y_limit:
             backoff_steps = 50  # Back off 50 steps
-            self.stepper_controller.move_motor(2, backoff_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(2, backoff_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Y), self.TRAVEL_SPEED)
             self.log(f"Backed off {backoff_steps} steps from Y minimum limit")
 
         # Set position to WS1 coordinates (this is now our known home position)
@@ -727,13 +740,13 @@ class PipettingController:
         if direction == 'up':
             # Move Z up by SAFE_HEIGHT
             z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z += self.SAFE_HEIGHT
             self.log(f"Z-axis moved UP ({self.SAFE_HEIGHT}mm)")
         elif direction == 'down':
             # Move Z down by SAFE_HEIGHT
             z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(3, z_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z -= self.SAFE_HEIGHT
             self.log(f"Z-axis moved DOWN ({self.SAFE_HEIGHT}mm)")
         else:
@@ -768,7 +781,9 @@ class PipettingController:
             raise ValueError(f"Invalid axis: {axis}. Must be 'x', 'y', 'z', or 'pipette'")
 
         motor_id = axis_motor_map[axis]
-        motor_direction = Direction.CLOCKWISE if direction == 'cw' else Direction.COUNTERCLOCKWISE
+        invert_map = {'x': self.INVERT_X, 'y': self.INVERT_Y, 'z': self.INVERT_Z, 'pipette': self.INVERT_PIPETTE}
+        raw_direction = Direction.CLOCKWISE if direction == 'cw' else Direction.COUNTERCLOCKWISE
+        motor_direction = self._inv(raw_direction, invert_map[axis])
 
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
         self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED)

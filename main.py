@@ -1,19 +1,15 @@
-import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List, Dict
 
-from dotenv import load_dotenv, set_key
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-# Load environment variables from .env file
-load_dotenv()
-
+import settings
 from pipetting_controller import PipettingController, PipettingStep
 
 # Global pipetting controller instance
@@ -413,6 +409,28 @@ async def set_layout_type(request: SetLayoutTypeRequest):
             status_code=500,
             detail=f"Error setting layout type: {str(e)}"
         )
+
+
+class SetLayoutRequest(BaseModel):
+    """Request to set layout type (short-form endpoint)"""
+    layoutType: str = Field(..., description="'microchip' or 'wellplate'")
+
+
+@app.post("/api/pipetting/set-layout")
+async def set_layout(request: SetLayoutRequest):
+    """Set the layout type — canonical endpoint used by the frontend"""
+    if pipetting_controller is None:
+        raise HTTPException(status_code=503, detail="Pipetting controller not initialized")
+
+    if request.layoutType not in ['microchip', 'wellplate']:
+        raise HTTPException(status_code=400, detail="layoutType must be 'microchip' or 'wellplate'")
+
+    try:
+        pipetting_controller.layout_type = request.layoutType
+        pipetting_controller.save_position()
+        return {"status": "success", "layout_type": request.layoutType}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting layout: {str(e)}")
 
 
 class ToggleZRequest(BaseModel):
@@ -834,7 +852,6 @@ async def clear_drift_test_results():
 
 
 # Configuration management endpoints
-ENV_FILE = Path(__file__).parent / ".env"
 
 class ConfigurationModel(BaseModel):
     """Configuration settings model"""
@@ -842,6 +859,11 @@ class ConfigurationModel(BaseModel):
     WELL_SPACING: float = Field(..., gt=0, description="Spacing between well centers in mm")
     WELL_DIAMETER: float = Field(..., gt=0, description="Diameter of each well in mm")
     WELL_HEIGHT: float = Field(..., gt=0, description="Height of each well in mm")
+
+    # Vial Layout Physical Dimensions
+    VIAL_WELL_SPACING:  float = Field(..., gt=0, description="Vial/small well spacing in mm")
+    VIAL_WELL_DIAMETER: float = Field(..., gt=0, description="Vial/small well diameter in mm")
+    VIAL_WELL_HEIGHT:   float = Field(..., gt=0, description="Vial/small well height in mm")
 
     # Motor Configuration
     STEPS_PER_MM_X: int = Field(..., gt=0, description="X-axis steps per mm")
@@ -861,33 +883,21 @@ class ConfigurationModel(BaseModel):
     TRAVEL_SPEED: float = Field(..., gt=0, description="Fast movement speed (seconds/step)")
     PIPETTE_SPEED: float = Field(..., gt=0, description="Pipetting operation speed (seconds/step)")
 
+    # Motor Inversion Flags
+    INVERT_X:       bool = Field(..., description="Invert X-axis motor direction")
+    INVERT_Y:       bool = Field(..., description="Invert Y-axis motor direction")
+    INVERT_Z:       bool = Field(..., description="Invert Z-axis motor direction")
+    INVERT_PIPETTE: bool = Field(..., description="Invert pipette motor direction")
+
 
 @app.get("/api/config")
 async def get_configuration():
     """
     Get current configuration settings
-    Returns current values from environment variables or defaults
+    Returns current values from config.json or defaults
     """
     try:
-        config = {
-            "WELL_SPACING": float(os.getenv('WELL_SPACING', '4.0')),
-            "WELL_DIAMETER": float(os.getenv('WELL_DIAMETER', '8.0')),
-            "WELL_HEIGHT": float(os.getenv('WELL_HEIGHT', '14.0')),
-            "STEPS_PER_MM_X": int(os.getenv('STEPS_PER_MM_X', '100')),
-            "STEPS_PER_MM_Y": int(os.getenv('STEPS_PER_MM_Y', '100')),
-            "STEPS_PER_MM_Z": int(os.getenv('STEPS_PER_MM_Z', '100')),
-            "PIPETTE_STEPS_PER_ML": int(os.getenv('PIPETTE_STEPS_PER_ML', '1000')),
-            "PICKUP_DEPTH": float(os.getenv('PICKUP_DEPTH', '10.0')),
-            "DROPOFF_DEPTH": float(os.getenv('DROPOFF_DEPTH', '5.0')),
-            "SAFE_HEIGHT": float(os.getenv('SAFE_HEIGHT', '20.0')),
-            "RINSE_CYCLES": int(os.getenv('RINSE_CYCLES', '3')),
-            "TRAVEL_SPEED": float(os.getenv('TRAVEL_SPEED', '0.001')),
-            "PIPETTE_SPEED": float(os.getenv('PIPETTE_SPEED', '0.002')),
-        }
-        return {
-            "status": "success",
-            "config": config
-        }
+        return {"status": "success", "config": settings.load()}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -898,23 +908,35 @@ async def get_configuration():
 @app.post("/api/config")
 async def update_configuration(config: ConfigurationModel):
     """
-    Update configuration settings and save to .env file
+    Update configuration settings and save to config.json
     Configuration is reloaded immediately without requiring restart
     """
     global pipetting_controller
 
     try:
-        # Create .env file if it doesn't exist
-        if not ENV_FILE.exists():
-            ENV_FILE.touch()
+        # Persist new values to config.json
+        cfg = config.model_dump()
+        settings.save(cfg)
 
-        # Update each configuration value in the .env file
-        config_dict = config.model_dump()
-        for key, value in config_dict.items():
-            set_key(str(ENV_FILE), key, str(value))
+        # Patch CoordinateMapper class-level attributes so they reflect new values
+        # without requiring a full process restart (class attrs are set at import time)
+        from pipetting_controller import CoordinateMapper
+        CoordinateMapper.WELL_SPACING       = cfg['WELL_SPACING']
+        CoordinateMapper.WELL_DIAMETER      = cfg['WELL_DIAMETER']
+        CoordinateMapper.WELL_HEIGHT        = cfg['WELL_HEIGHT']
+        CoordinateMapper.SMALL_WELL_SPACING = cfg['VIAL_WELL_SPACING']
+        CoordinateMapper.VIAL_WELL_DIAMETER = cfg['VIAL_WELL_DIAMETER']
+        CoordinateMapper.VIAL_WELL_HEIGHT   = cfg['VIAL_WELL_HEIGHT']
+        CoordinateMapper.STEPS_PER_MM_X     = cfg['STEPS_PER_MM_X']
+        CoordinateMapper.STEPS_PER_MM_Y     = cfg['STEPS_PER_MM_Y']
+        CoordinateMapper.STEPS_PER_MM_Z     = cfg['STEPS_PER_MM_Z']
 
-        # Reload environment variables from .env file
-        load_dotenv(override=True)
+        # Patch PipettingController inversion flags
+        from pipetting_controller import PipettingController as PC
+        PC.INVERT_X       = cfg['INVERT_X']
+        PC.INVERT_Y       = cfg['INVERT_Y']
+        PC.INVERT_Z       = cfg['INVERT_Z']
+        PC.INVERT_PIPETTE = cfg['INVERT_PIPETTE']
 
         # Reinitialize the pipetting controller with new configuration
         if pipetting_controller:
@@ -933,7 +955,7 @@ async def update_configuration(config: ConfigurationModel):
         return {
             "status": "success",
             "message": "Configuration saved and applied successfully!",
-            "config": config_dict
+            "config": cfg
         }
     except Exception as e:
         raise HTTPException(

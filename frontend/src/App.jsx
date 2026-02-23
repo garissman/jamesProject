@@ -27,10 +27,18 @@ function App() {
         SAFE_HEIGHT: 20.0,
         RINSE_CYCLES: 3,
         TRAVEL_SPEED: 0.001,
-        PIPETTE_SPEED: 0.002
+        PIPETTE_SPEED: 0.002,
+        VIAL_WELL_SPACING:  45.0,
+        VIAL_WELL_DIAMETER:  8.0,
+        VIAL_WELL_HEIGHT:   14.0,
+        INVERT_X:       false,
+        INVERT_Y:       false,
+        INVERT_Z:       false,
+        INVERT_PIPETTE: false
     })
     const [configLoading, setConfigLoading] = useState(false)
     const [configMessage, setConfigMessage] = useState('')
+    const [settingsSubTab, setSettingsSubTab] = useState('layout') // 'layout' | 'motor'
 
     // Program tab state
     const [cycles, setCycles] = useState(1)
@@ -441,26 +449,20 @@ function App() {
         }
     }
 
-    const handleSetLayoutType = async (newLayoutType) => {
+    const handleSetLayout = async (mode) => {
         try {
-            const response = await fetch('/api/pipetting/set-layout-type', {
+            const res = await fetch('/api/pipetting/set-layout', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({layoutType: newLayoutType})
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({layoutType: mode})
             })
-
-            const data = await response.json()
-
-            if (response.ok) {
-                setLayoutType(newLayoutType)
-                console.log(`${data.message}`)
-            } else {
-                console.error(`Error: ${data.detail || 'Failed to set layout type'}`)
+            if (res.ok) setLayoutType(mode)
+            else {
+                const data = await res.json()
+                console.error(`Error: ${data.detail || 'Failed to set layout'}`)
             }
-        } catch (error) {
-            console.error(`Error: Unable to connect to backend. ${error.message}`)
+        } catch (e) {
+            console.error('Failed to set layout:', e.message)
         }
     }
 
@@ -1028,7 +1030,7 @@ function App() {
                                 <label>Pickup Well:</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g., A1"
+                                    placeholder={layoutType === 'microchip' ? 'e.g., A1, WS1, MC3' : 'e.g., SA1, VA1, WS2'}
                                     value={pickupWell}
                                     onChange={(e) => setPickupWell(e.target.value)}
                                     className="form-input"
@@ -1039,7 +1041,7 @@ function App() {
                                 <label>Dropoff Well:</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g., B2"
+                                    placeholder={layoutType === 'microchip' ? 'e.g., A1, WS1, MC3' : 'e.g., SA1, VA1, WS2'}
                                     value={dropoffWell}
                                     onChange={(e) => setDropoffWell(e.target.value)}
                                     className="form-input"
@@ -1050,7 +1052,7 @@ function App() {
                                 <label>Rinse Well:</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g., C3"
+                                    placeholder={layoutType === 'microchip' ? 'e.g., A1, WS1, MC3' : 'e.g., SA1, VA1, WS2'}
                                     value={rinseWell}
                                     onChange={(e) => setRinseWell(e.target.value)}
                                     className="form-input"
@@ -1528,178 +1530,225 @@ function App() {
                     <div className="settings-section">
                         <h2>System Configuration</h2>
                         <p className="settings-description">
-                            Configure hardware parameters for the pipetting system. Changes will be saved to the .env
-                            file and applied immediately.
+                            Configure hardware parameters for the pipetting system. Changes are saved to config.json
+                            and applied immediately without a server restart.
                         </p>
 
+                        {/* Settings sub-tabs */}
+                        <div className="settings-subtabs">
+                            <button
+                                className={`settings-subtab ${settingsSubTab === 'layout' ? 'active' : ''}`}
+                                onClick={() => setSettingsSubTab('layout')}
+                            >
+                                Layout Settings
+                            </button>
+                            <button
+                                className={`settings-subtab ${settingsSubTab === 'motor' ? 'active' : ''}`}
+                                onClick={() => setSettingsSubTab('motor')}
+                            >
+                                Motor Settings
+                            </button>
+                        </div>
+
                         <div className="config-form">
-                            <div className="config-section">
-                                <h3>Well Plate Physical Dimensions</h3>
-                                <div className="config-grid">
-                                    <div className="form-group">
-                                        <label>Well Spacing (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.WELL_SPACING}
-                                            onChange={(e) => handleConfigChange('WELL_SPACING', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
+                            {settingsSubTab === 'layout' ? (
+                                <>
+                                    <div className="config-section">
+                                        <h3>MicroChip Layout Well Dimensions</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Well Spacing (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.WELL_SPACING}
+                                                    onChange={(e) => handleConfigChange('WELL_SPACING', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Well Diameter (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.WELL_DIAMETER}
+                                                    onChange={(e) => handleConfigChange('WELL_DIAMETER', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Well Height (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.WELL_HEIGHT}
+                                                    onChange={(e) => handleConfigChange('WELL_HEIGHT', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Well Diameter (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.WELL_DIAMETER}
-                                            onChange={(e) => handleConfigChange('WELL_DIAMETER', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Well Height (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.WELL_HEIGHT}
-                                            onChange={(e) => handleConfigChange('WELL_HEIGHT', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="config-section">
-                                <h3>Motor Configuration</h3>
-                                <div className="config-grid">
-                                    <div className="form-group">
-                                        <label>X-Axis Steps/mm:</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={config.STEPS_PER_MM_X}
-                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_X', parseInt(e.target.value))}
-                                            className="form-input"
-                                        />
+                                    <div className="config-section">
+                                        <h3>Vial Layout Well Dimensions</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Vial Well Spacing (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.VIAL_WELL_SPACING}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_SPACING', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Vial Well Diameter (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.VIAL_WELL_DIAMETER}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_DIAMETER', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Vial Well Height (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.VIAL_WELL_HEIGHT}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_HEIGHT', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Y-Axis Steps/mm:</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={config.STEPS_PER_MM_Y}
-                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_Y', parseInt(e.target.value))}
-                                            className="form-input"
-                                        />
+                                </>
+                            ) : (
+                                <>
+                                    <div className="config-section">
+                                        <h3>Motor Configuration</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>X-Axis Steps/mm:</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={config.STEPS_PER_MM_X}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_X', parseInt(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Y-Axis Steps/mm:</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={config.STEPS_PER_MM_Y}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Y', parseInt(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Z-Axis Steps/mm:</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={config.STEPS_PER_MM_Z}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Z', parseInt(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="invert-row">
+                                            <span className="invert-label">Invert Direction:</span>
+                                            {[
+                                                {key: 'INVERT_X',       label: 'X-Axis'},
+                                                {key: 'INVERT_Y',       label: 'Y-Axis'},
+                                                {key: 'INVERT_Z',       label: 'Z-Axis'},
+                                                {key: 'INVERT_PIPETTE', label: 'Pipette'},
+                                            ].map(({key, label}) => (
+                                                <label key={key} className="invert-toggle">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!config[key]}
+                                                        onChange={(e) => handleConfigChange(key, e.target.checked)}
+                                                    />
+                                                    <span className="invert-toggle-track" />
+                                                    <span className="invert-toggle-text">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Z-Axis Steps/mm:</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={config.STEPS_PER_MM_Z}
-                                            onChange={(e) => handleConfigChange('STEPS_PER_MM_Z', parseInt(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="config-section">
-                                <h3>Pipette Configuration</h3>
-                                <div className="config-grid">
-                                    <div className="form-group">
-                                        <label>Pipette Steps/mL:</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={config.PIPETTE_STEPS_PER_ML}
-                                            onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value))}
-                                            className="form-input"
-                                        />
+                                    <div className="config-section">
+                                        <h3>Pipette Configuration</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Pipette Steps/mL:</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={config.PIPETTE_STEPS_PER_ML}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="config-section">
-                                <h3>Pipetting Operation Parameters</h3>
-                                <div className="config-grid">
-                                    <div className="form-group">
-                                        <label>Pickup Depth (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.PICKUP_DEPTH}
-                                            onChange={(e) => handleConfigChange('PICKUP_DEPTH', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
+                                    <div className="config-section">
+                                        <h3>Pipetting Operation Parameters</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Pickup Depth (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.PICKUP_DEPTH}
+                                                    onChange={(e) => handleConfigChange('PICKUP_DEPTH', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Dropoff Depth (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.DROPOFF_DEPTH}
+                                                    onChange={(e) => handleConfigChange('DROPOFF_DEPTH', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Safe Height (mm):</label>
+                                                <input
+                                                    type="number" step="0.1" min="0"
+                                                    value={config.SAFE_HEIGHT}
+                                                    onChange={(e) => handleConfigChange('SAFE_HEIGHT', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Rinse Cycles:</label>
+                                                <input
+                                                    type="number" min="0"
+                                                    value={config.RINSE_CYCLES}
+                                                    onChange={(e) => handleConfigChange('RINSE_CYCLES', parseInt(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Dropoff Depth (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.DROPOFF_DEPTH}
-                                            onChange={(e) => handleConfigChange('DROPOFF_DEPTH', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Safe Height (mm):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            value={config.SAFE_HEIGHT}
-                                            onChange={(e) => handleConfigChange('SAFE_HEIGHT', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Rinse Cycles:</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={config.RINSE_CYCLES}
-                                            onChange={(e) => handleConfigChange('RINSE_CYCLES', parseInt(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="config-section">
-                                <h3>Movement Speed Configuration</h3>
-                                <div className="config-grid">
-                                    <div className="form-group">
-                                        <label>Travel Speed (s/step):</label>
-                                        <input
-                                            type="number"
-                                            step="0.0001"
-                                            min="0"
-                                            value={config.TRAVEL_SPEED}
-                                            onChange={(e) => handleConfigChange('TRAVEL_SPEED', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
+                                    <div className="config-section">
+                                        <h3>Movement Speed Configuration</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Travel Speed (s/step):</label>
+                                                <input
+                                                    type="number" step="0.0001" min="0"
+                                                    value={config.TRAVEL_SPEED}
+                                                    onChange={(e) => handleConfigChange('TRAVEL_SPEED', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Pipette Speed (s/step):</label>
+                                                <input
+                                                    type="number" step="0.0001" min="0"
+                                                    value={config.PIPETTE_SPEED}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_SPEED', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Pipette Speed (s/step):</label>
-                                        <input
-                                            type="number"
-                                            step="0.0001"
-                                            min="0"
-                                            value={config.PIPETTE_SPEED}
-                                            onChange={(e) => handleConfigChange('PIPETTE_SPEED', parseFloat(e.target.value))}
-                                            className="form-input"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                                </>
+                            )}
 
                             <div className="config-actions">
                                 <button
@@ -1737,18 +1786,22 @@ function App() {
                             </div>
                         </div>
 
-                        {/* Layout Switcher */}
-                        <div className="layout-switcher">
-                            <label>Layout Type:</label>
-                            <select
-                                value={layoutType}
-                                onChange={(e) => handleSetLayoutType(e.target.value)}
-                                className="form-input form-select"
+                        {/* Layout Toggle */}
+                        <div className="layout-toggle">
+                            <button
+                                className={`btn ${layoutType === 'microchip' ? 'active' : ''}`}
+                                onClick={() => handleSetLayout('microchip')}
                                 disabled={isExecuting}
                             >
-                                <option value="microchip">MicroChip Layout (8x15)</option>
-                                <option value="wellplate">Vial Layout (12x6)</option>
-                            </select>
+                                MicroChip
+                            </button>
+                            <button
+                                className={`btn ${layoutType === 'wellplate' ? 'active' : ''}`}
+                                onClick={() => handleSetLayout('wellplate')}
+                                disabled={isExecuting}
+                            >
+                                Vial
+                            </button>
                         </div>
 
                         <div className="pipette-config-control">
@@ -1866,226 +1919,160 @@ function App() {
                             )}
                         </div>
 
-                        {/* Render layout based on selected type */}
+                        {/* Render layout based on selected type — strict 12×21 CSS grid */}
                         {layoutType === 'microchip' ? (
                             /* MicroChip Layout */
-                            <div className="layout-microchip">
-                                <div className="microchip-top-section">
-                                    {/* Washing Stations */}
-                                    <div className="reservoirs-section">
-                                        {layouts.microchip.reservoirs.map(reservoir => {
-                                            const isPipettePosition = selectedWell === reservoir.id
-                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === reservoir.id
-                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === reservoir.id
-                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === reservoir.id
+                            <div className="layout-grid">
+                                {/* WS1 — row 1, cols 1-6 */}
+                                <div
+                                    className={`grid-zone ${selectedWell === 'WS1' ? 'selected' : ''} ${targetWell === 'WS1' ? 'target' : ''} ${quickOpMode && quickOpWells.pickup === 'WS1' ? 'quick-op-pickup' : ''} ${quickOpMode && quickOpWells.dropoff === 'WS1' ? 'quick-op-dropoff' : ''} ${quickOpMode && quickOpWells.rinse === 'WS1' ? 'quick-op-rinse' : ''}`}
+                                    style={{gridColumn: '1/7', gridRow: '1/2'}}
+                                    onClick={() => handleWellClick('WS1')}
+                                >
+                                    WS1
+                                    {quickOpMode && quickOpWells.pickup === 'WS1' && <span className="quick-op-badge">P</span>}
+                                    {quickOpMode && quickOpWells.dropoff === 'WS1' && <span className="quick-op-badge">D</span>}
+                                    {quickOpMode && quickOpWells.rinse === 'WS1' && <span className="quick-op-badge">R</span>}
+                                </div>
+                                {/* WS2 — row 2, cols 1-6 */}
+                                <div
+                                    className={`grid-zone ${selectedWell === 'WS2' ? 'selected' : ''} ${targetWell === 'WS2' ? 'target' : ''} ${quickOpMode && quickOpWells.pickup === 'WS2' ? 'quick-op-pickup' : ''} ${quickOpMode && quickOpWells.dropoff === 'WS2' ? 'quick-op-dropoff' : ''} ${quickOpMode && quickOpWells.rinse === 'WS2' ? 'quick-op-rinse' : ''}`}
+                                    style={{gridColumn: '1/7', gridRow: '2/3'}}
+                                    onClick={() => handleWellClick('WS2')}
+                                >
+                                    WS2
+                                    {quickOpMode && quickOpWells.pickup === 'WS2' && <span className="quick-op-badge">P</span>}
+                                    {quickOpMode && quickOpWells.dropoff === 'WS2' && <span className="quick-op-badge">D</span>}
+                                    {quickOpMode && quickOpWells.rinse === 'WS2' && <span className="quick-op-badge">R</span>}
+                                </div>
+                                {/* Disabled area — rows 3-12, cols 1-6 */}
+                                <div className="grid-zone disabled-zone" style={{gridColumn: '1/7', gridRow: '3/13'}} />
 
+                                {/* Well grid 8×15 — rows 1-8, cols 7-21 */}
+                                <div className="mc-well-zone" style={{gridColumn: '7/22', gridRow: '1/9'}}>
+                                    {['A','B','C','D','E','F','G','H'].flatMap(row =>
+                                        [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(col => {
+                                            const wellId = `${row}${col}`
+                                            const pipetteWells = getPipetteWells(selectedWell, currentPipetteCount)
+                                            const isCenterPipette = wellId === selectedWell
+                                            const isSidePipette = pipetteWells.includes(wellId) && !isCenterPipette
+                                            const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                            const isOperating = opWells.includes(wellId) && currentOperation !== 'idle'
+                                            const isQPickup = quickOpMode && quickOpWells.pickup === wellId
+                                            const isQDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                            const isQRinse = quickOpMode && quickOpWells.rinse === wellId
                                             return (
                                                 <div
-                                                    key={reservoir.id}
-                                                    className={`reservoir ${isPipettePosition ? 'selected' : ''}
-                                                        ${targetWell === reservoir.id ? 'target' : ''}
-                                                        ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                        ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                        ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                    onClick={() => handleWellClick(reservoir.id)}
-                                                    title={reservoir.label}
+                                                    key={wellId}
+                                                    className={`microchip-well ${isCenterPipette ? 'selected' : ''} ${isSidePipette ? 'pipette-side' : ''} ${targetWell === wellId ? 'target' : ''} ${isOperating ? `operation-${currentOperation}` : ''} ${isQPickup ? 'quick-op-pickup' : ''} ${isQDropoff ? 'quick-op-dropoff' : ''} ${isQRinse ? 'quick-op-rinse' : ''}`}
+                                                    onClick={() => handleWellClick(wellId)}
                                                 >
-                                                    {reservoir.id}
-                                                    {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                    {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                    {isQuickOpRinse && <span className="quick-op-badge">R</span>}
+                                                    {isQPickup && <span className="quick-op-badge">P</span>}
+                                                    {isQDropoff && <span className="quick-op-badge">D</span>}
+                                                    {isQRinse && <span className="quick-op-badge">R</span>}
                                                 </div>
                                             )
-                                        })}
-                                    </div>
-
-                                    {/* Main Well Grid (8x15) and MicroChips Container */}
-                                    <div className="microchip-grid-container">
-                                        <div className="microchip-well-grid">
-                                        {layouts.microchip.wellGrid.rows.map(row => {
-                                            const pipetteWells = getPipetteWells(selectedWell, currentPipetteCount)
-
-                                            return (
-                                                <div key={row} className="microchip-row">
-                                                    {layouts.microchip.wellGrid.columns.map(col => {
-                                                        const wellId = `${row}${col}`
-                                                        const isPipettePosition = pipetteWells.includes(wellId)
-                                                        const isCenterPipette = wellId === selectedWell
-                                                        const isSidePipette = isPipettePosition && !isCenterPipette
-
-                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
-                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
-
-                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
-                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
-                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
-
-                                                        return (
-                                                            <div
-                                                                key={wellId}
-                                                                className={`microchip-well
-                                                                    ${isCenterPipette ? 'selected' : ''}
-                                                                    ${isSidePipette ? 'pipette-side' : ''}
-                                                                    ${targetWell === wellId ? 'target' : ''}
-                                                                    ${operationClass}
-                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                                onClick={() => handleWellClick(wellId)}
-                                                            >
-                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )
-                                        })}
-                                        </div>
-
-                                        {/* MicroChips (below grid) */}
-                                        <div className="vials-section">
-                                    {layouts.microchip.vials.map(vial => {
-                                        const isPipettePosition = selectedWell === vial.id
-                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === vial.id
-                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === vial.id
-                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === vial.id
-
-                                        return (
-                                            <div
-                                                key={vial.id}
-                                                className={`vial ${isPipettePosition ? 'selected' : ''}
-                                                    ${targetWell === vial.id ? 'target' : ''}
-                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                onClick={() => handleWellClick(vial.id)}
-                                                title={vial.label}
-                                            >
-                                                {vial.id}
-                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
-                                            </div>
-                                        )
-                                    })}
-                                        </div>
-                                    </div>
+                                        })
+                                    )}
                                 </div>
+
+                                {/* MicroChips — rows 9-12, each 3-col block */}
+                                {[1,2,3,4,5].map(n => {
+                                    const colStart = 7 + (n - 1) * 3
+                                    const mcId = `MC${n}`
+                                    const isQPickup = quickOpMode && quickOpWells.pickup === mcId
+                                    const isQDropoff = quickOpMode && quickOpWells.dropoff === mcId
+                                    const isQRinse = quickOpMode && quickOpWells.rinse === mcId
+                                    return (
+                                        <div
+                                            key={mcId}
+                                            className={`grid-zone mc-chip-zone ${selectedWell === mcId ? 'selected' : ''} ${targetWell === mcId ? 'target' : ''} ${isQPickup ? 'quick-op-pickup' : ''} ${isQDropoff ? 'quick-op-dropoff' : ''} ${isQRinse ? 'quick-op-rinse' : ''}`}
+                                            style={{gridColumn: `${colStart}/${colStart + 3}`, gridRow: '9/13'}}
+                                            onClick={() => handleWellClick(mcId)}
+                                        >
+                                            {mcId}
+                                            {isQPickup && <span className="quick-op-badge">P</span>}
+                                            {isQDropoff && <span className="quick-op-badge">D</span>}
+                                            {isQRinse && <span className="quick-op-badge">R</span>}
+                                        </div>
+                                    )
+                                })}
                             </div>
                         ) : (
                             /* Vial Layout */
-                            <div className="layout-wellplate">
-                                {/* Left Column: WS + Vials */}
-                                <div className="wellplate-left-column">
-                                    {/* Washing Stations */}
-                                    <div className="reservoirs-section-wellplate">
-                                        {layouts.wellplate.reservoirs.map(reservoir => {
-                                            const isPipettePosition = selectedWell === reservoir.id
-                                            const isQuickOpPickup = quickOpMode && quickOpWells.pickup === reservoir.id
-                                            const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === reservoir.id
-                                            const isQuickOpRinse = quickOpMode && quickOpWells.rinse === reservoir.id
-
-                                            return (
-                                                <div
-                                                    key={reservoir.id}
-                                                    className={`reservoir-wellplate ${isPipettePosition ? 'selected' : ''}
-                                                        ${targetWell === reservoir.id ? 'target' : ''}
-                                                        ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                        ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                        ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                    onClick={() => handleWellClick(reservoir.id)}
-                                                    title={reservoir.label}
-                                                >
-                                                    {reservoir.id}
-                                                    {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                    {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                    {isQuickOpRinse && <span className="quick-op-badge">R</span>}
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    {/* Vials Grid (5x3) */}
-                                    <div className="large-wells-grid">
-                                        {layouts.wellplate.vialGrid.rows.map(row => {
-                                            return (
-                                                <div key={row} className="large-wells-row">
-                                                    {layouts.wellplate.vialGrid.columns.map(col => {
-                                                        const wellId = `V${row}${col}` // VA1, VA2, etc.
-                                                        const isPipettePosition = selectedWell === wellId
-                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
-                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
-                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
-
-                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
-                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
-
-                                                        return (
-                                                            <div
-                                                                key={wellId}
-                                                                className={`large-well
-                                                                    ${isPipettePosition ? 'selected' : ''}
-                                                                    ${targetWell === wellId ? 'target' : ''}
-                                                                    ${operationClass}
-                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                                onClick={() => handleWellClick(wellId)}
-                                                            >
-                                                                {wellId}
-                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
+                            <div className="layout-grid">
+                                {/* WS1 — row 1, cols 1-6 */}
+                                <div
+                                    className={`grid-zone ${selectedWell === 'WS1' ? 'selected' : ''} ${targetWell === 'WS1' ? 'target' : ''} ${quickOpMode && quickOpWells.pickup === 'WS1' ? 'quick-op-pickup' : ''} ${quickOpMode && quickOpWells.dropoff === 'WS1' ? 'quick-op-dropoff' : ''} ${quickOpMode && quickOpWells.rinse === 'WS1' ? 'quick-op-rinse' : ''}`}
+                                    style={{gridColumn: '1/7', gridRow: '1/2'}}
+                                    onClick={() => handleWellClick('WS1')}
+                                >
+                                    WS1
+                                    {quickOpMode && quickOpWells.pickup === 'WS1' && <span className="quick-op-badge">P</span>}
+                                    {quickOpMode && quickOpWells.dropoff === 'WS1' && <span className="quick-op-badge">D</span>}
+                                    {quickOpMode && quickOpWells.rinse === 'WS1' && <span className="quick-op-badge">R</span>}
+                                </div>
+                                {/* WS2 — row 2, cols 1-6 */}
+                                <div
+                                    className={`grid-zone ${selectedWell === 'WS2' ? 'selected' : ''} ${targetWell === 'WS2' ? 'target' : ''} ${quickOpMode && quickOpWells.pickup === 'WS2' ? 'quick-op-pickup' : ''} ${quickOpMode && quickOpWells.dropoff === 'WS2' ? 'quick-op-dropoff' : ''} ${quickOpMode && quickOpWells.rinse === 'WS2' ? 'quick-op-rinse' : ''}`}
+                                    style={{gridColumn: '1/7', gridRow: '2/3'}}
+                                    onClick={() => handleWellClick('WS2')}
+                                >
+                                    WS2
+                                    {quickOpMode && quickOpWells.pickup === 'WS2' && <span className="quick-op-badge">P</span>}
+                                    {quickOpMode && quickOpWells.dropoff === 'WS2' && <span className="quick-op-badge">D</span>}
+                                    {quickOpMode && quickOpWells.rinse === 'WS2' && <span className="quick-op-badge">R</span>}
                                 </div>
 
-                                {/* Small Wells Grid (12x6) */}
-                                <div className="small-wells-grid">
-                                        {layouts.wellplate.smallWellGrid.rows.map(row => {
+                                {/* Vials sub-grid — rows 3-12, cols 1-6 (5 rows × 3 cols = 15 vials) */}
+                                <div className="vial-zone" style={{gridColumn: '1/7', gridRow: '3/13'}}>
+                                    {['A','B','C','D','E'].flatMap(row =>
+                                        [1,2,3].map(col => {
+                                            const vialId = `V${row}${col}`
+                                            const isQPickup = quickOpMode && quickOpWells.pickup === vialId
+                                            const isQDropoff = quickOpMode && quickOpWells.dropoff === vialId
+                                            const isQRinse = quickOpMode && quickOpWells.rinse === vialId
+                                            const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                            const isOperating = opWells.includes(vialId) && currentOperation !== 'idle'
                                             return (
-                                                <div key={row} className="small-wells-row">
-                                                    {layouts.wellplate.smallWellGrid.columns.map(col => {
-                                                        const wellId = `S${row}${col}` // SA1, SA2, etc.
-                                                        const isPipettePosition = selectedWell === wellId
-                                                        const isQuickOpPickup = quickOpMode && quickOpWells.pickup === wellId
-                                                        const isQuickOpDropoff = quickOpMode && quickOpWells.dropoff === wellId
-                                                        const isQuickOpRinse = quickOpMode && quickOpWells.rinse === wellId
-
-                                                        const operationWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                                        const isOperating = operationWells.includes(wellId) && currentOperation !== 'idle'
-                                                        const operationClass = isOperating ? `operation-${currentOperation}` : ''
-
-                                                        return (
-                                                            <div
-                                                                key={wellId}
-                                                                className={`small-well
-                                                                    ${isPipettePosition ? 'selected' : ''}
-                                                                    ${targetWell === wellId ? 'target' : ''}
-                                                                    ${operationClass}
-                                                                    ${isQuickOpPickup ? 'quick-op-pickup' : ''}
-                                                                    ${isQuickOpDropoff ? 'quick-op-dropoff' : ''}
-                                                                    ${isQuickOpRinse ? 'quick-op-rinse' : ''}`}
-                                                                onClick={() => handleWellClick(wellId)}
-                                                            >
-                                                                {isQuickOpPickup && <span className="quick-op-badge">P</span>}
-                                                                {isQuickOpDropoff && <span className="quick-op-badge">D</span>}
-                                                                {isQuickOpRinse && <span className="quick-op-badge">R</span>}
-                                                            </div>
-                                                        )
-                                                    })}
+                                                <div
+                                                    key={vialId}
+                                                    className={`large-well ${selectedWell === vialId ? 'selected' : ''} ${targetWell === vialId ? 'target' : ''} ${isOperating ? `operation-${currentOperation}` : ''} ${isQPickup ? 'quick-op-pickup' : ''} ${isQDropoff ? 'quick-op-dropoff' : ''} ${isQRinse ? 'quick-op-rinse' : ''}`}
+                                                    onClick={() => handleWellClick(vialId)}
+                                                >
+                                                    {vialId}
+                                                    {isQPickup && <span className="quick-op-badge">P</span>}
+                                                    {isQDropoff && <span className="quick-op-badge">D</span>}
+                                                    {isQRinse && <span className="quick-op-badge">R</span>}
                                                 </div>
                                             )
-                                        })}
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Small wells sub-grid — rows 1-12, cols 7-21 (12 rows × 6 cols = 72 wells) */}
+                                <div className="vial-well-zone" style={{gridColumn: '7/22', gridRow: '1/13'}}>
+                                    {['A','B','C','D','E','F','G','H','I','J','K','L'].flatMap(row =>
+                                        [1,2,3,4,5,6].map(col => {
+                                            const wellId = `S${row}${col}`
+                                            const isQPickup = quickOpMode && quickOpWells.pickup === wellId
+                                            const isQDropoff = quickOpMode && quickOpWells.dropoff === wellId
+                                            const isQRinse = quickOpMode && quickOpWells.rinse === wellId
+                                            const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                                            const isOperating = opWells.includes(wellId) && currentOperation !== 'idle'
+                                            return (
+                                                <div
+                                                    key={wellId}
+                                                    className={`small-well ${selectedWell === wellId ? 'selected' : ''} ${targetWell === wellId ? 'target' : ''} ${isOperating ? `operation-${currentOperation}` : ''} ${isQPickup ? 'quick-op-pickup' : ''} ${isQDropoff ? 'quick-op-dropoff' : ''} ${isQRinse ? 'quick-op-rinse' : ''}`}
+                                                    onClick={() => handleWellClick(wellId)}
+                                                >
+                                                    {isQPickup && <span className="quick-op-badge">P</span>}
+                                                    {isQDropoff && <span className="quick-op-badge">D</span>}
+                                                    {isQRinse && <span className="quick-op-badge">R</span>}
+                                                </div>
+                                            )
+                                        })
+                                    )}
                                 </div>
                             </div>
                         )}

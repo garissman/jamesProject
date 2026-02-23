@@ -12,7 +12,19 @@
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_close",
-      "mcp__playwright__browser_run_code"
+      "mcp__playwright__browser_run_code",
+      "Bash(grep:*)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(kill 78252:*)",
+      "Bash(kill 78272:*)",
+      "Bash(tail:*)",
+      "Bash(python:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "Bash(curl:*)",
+      "mcp__plugin_playwright_playwright__browser_snapshot"
     ],
     "deny": [],
     "ask": []
