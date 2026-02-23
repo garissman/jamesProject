@@ -59,6 +59,9 @@ class CoordinateMapper:
     ORIGIN_X = 0.0  # mm
     ORIGIN_Y = 0.0  # mm
 
+    # Small well spacing (for Vial Layout alignment)
+    SMALL_WELL_SPACING = 45.0  # mm between small wells
+
     # Layout-specific coordinate mappings
     # MicroChip Layout coordinates
     MICROCHIP_COORDS = {
@@ -74,9 +77,13 @@ class CoordinateMapper:
     }
 
     # Vial Layout coordinates
+    # Note: 1 WS = 6 small wells in height, 1 Vial = 2 small wells in height
+    # This ensures proper Y-axis alignment with the small well grid
     WELLPLATE_COORDS = {
-        # Note: Vial layout uses WS1 and WS2 (same as MicroChip)
-        # No additional special coordinates needed - vials are grid-based (VA1-VE3)
+        # Washing Stations aligned with small well grid
+        # WS1 at row 0, WS2 at row 6 (since 1 WS = 6 small well rows)
+        'WS1': (0, 60, 0),  # Aligned with SA1 (row 0 of small wells)
+        'WS2': (0, 60 + (6 * 45), 0),  # 60 + 270 = 330, aligned with SG1 (row 6)
     }
 
     @staticmethod
@@ -166,9 +173,11 @@ class CoordinateMapper:
             if row_char in vial_rows and 1 <= col_num <= 3:
                 row_index = vial_rows.index(row_char)
                 col_index = col_num - 1
-                # Vials positioned on left side, starting at offset
-                x = CoordinateMapper.ORIGIN_X + 20 + (col_index * 70)  # 70mm spacing for vials
-                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * 70)  # 70mm spacing
+                # Vials positioned on left side, aligned with small well grid
+                # 1 vial = 2 small wells in height
+                vial_spacing_y = 2 * CoordinateMapper.SMALL_WELL_SPACING  # 2 * 45 = 90mm
+                x = CoordinateMapper.ORIGIN_X + 20 + (col_index * vial_spacing_y)  # Same spacing in X
+                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * vial_spacing_y)  # 90mm spacing in Y
                 return WellCoordinates(x=x, y=y, z=0.0)
 
         # Handle WellPlate small wells (SA1, SA2, etc.)
@@ -181,8 +190,8 @@ class CoordinateMapper:
                 row_index = small_well_rows.index(row_char)
                 col_index = col_num - 1
                 # Small wells positioned on right side
-                x = CoordinateMapper.ORIGIN_X + 280 + (col_index * 45)  # 45mm spacing for small wells
-                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * 45)  # 45mm spacing
+                x = CoordinateMapper.ORIGIN_X + 280 + (col_index * CoordinateMapper.SMALL_WELL_SPACING)
+                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * CoordinateMapper.SMALL_WELL_SPACING)
                 return WellCoordinates(x=x, y=y, z=0.0)
 
         # Standard well format (A1-H15 for MicroChip, A1-H12 for legacy)
@@ -629,22 +638,61 @@ class PipettingController:
         self.stepper_controller.stop_all()
 
     def home(self):
-        """Return to home position (WS1 - Washing Station 1)"""
-        self.log("Returning to home position (WS1 - Washing Station 1)...")
+        """Return to home position (WS1 - Washing Station 1) using limit switches"""
+        self.log("Homing to WS1 using limit switches...")
 
-        # First, raise Z to safe height if needed
+        # First, reload current position from saved file to ensure we have the latest position
+        saved_position, saved_pipette_count, saved_layout_type = self.load_position()
+        self.current_position = saved_position
+        self.current_pipette_count = saved_pipette_count
+        self.layout_type = saved_layout_type
+        current_well = self.get_current_well()
+        self.log(f"Current position loaded: {current_well} at ({saved_position.x:.1f}, {saved_position.y:.1f}, {saved_position.z:.1f})")
+
+        # Raise Z to safe height first
+        self.log("Raising Z to safe height...")
         if self.current_position.z < 0:
             safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
             self.stepper_controller.move_motor(3, safe_z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.current_position.z = 0.0
 
-        # Move to well WS1 (home position - Washing Station 1)
-        self.move_to_well("WS1", 0)
+        # Home X axis - move to minimum limit switch
+        self.log("Homing X axis to minimum limit...")
+        x_steps, x_limit = self.stepper_controller.move_motor_until_limit(
+            motor_id=1,  # X axis
+            direction=Direction.CLOCKWISE,  # Towards minimum
+            delay=self.TRAVEL_SPEED,
+            max_steps=100000  # Safety limit
+        )
+        self.log(f"X axis homed: {x_steps} steps, limit reached: {x_limit}")
 
-        # Reset position tracking to WS1 coordinates
+        # Back off slightly from X limit (optional, for safety)
+        if x_limit:
+            backoff_steps = 50  # Back off 50 steps
+            self.stepper_controller.move_motor(1, backoff_steps, Direction.COUNTERCLOCKWISE, self.TRAVEL_SPEED)
+            self.log(f"Backed off {backoff_steps} steps from X minimum limit")
+
+        # Home Y axis - move to minimum limit switch
+        self.log("Homing Y axis to minimum limit...")
+        y_steps, y_limit = self.stepper_controller.move_motor_until_limit(
+            motor_id=2,  # Y axis
+            direction=Direction.COUNTERCLOCKWISE,  # Towards minimum
+            delay=self.TRAVEL_SPEED,
+            max_steps=100000  # Safety limit
+        )
+        self.log(f"Y axis homed: {y_steps} steps, limit reached: {y_limit}")
+
+        # Back off slightly from Y limit (optional, for safety)
+        if y_limit:
+            backoff_steps = 50  # Back off 50 steps
+            self.stepper_controller.move_motor(2, backoff_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.log(f"Backed off {backoff_steps} steps from Y minimum limit")
+
+        # Set position to WS1 coordinates (this is now our known home position)
         home_coords = self.mapper.well_to_coordinates("WS1")
         self.current_position = home_coords
         self.save_position()
-        self.log("Home position reached (WS1 - Washing Station 1)")
+        self.log(f"Home position set to WS1: ({home_coords.x:.1f}, {home_coords.y:.1f}, {home_coords.z:.1f})")
 
     def get_current_well(self) -> Optional[str]:
         """
