@@ -38,7 +38,14 @@ function App() {
     })
     const [configLoading, setConfigLoading] = useState(false)
     const [configMessage, setConfigMessage] = useState('')
-    const [settingsSubTab, setSettingsSubTab] = useState('layout') // 'layout' | 'motor'
+    const [settingsSubTab, setSettingsSubTab] = useState('layout') // 'layout' | 'motor' | 'calibration'
+
+    // Calibration state
+    const [calibration, setCalibration] = useState({
+        x: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
+        y: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
+        z: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
+    })
 
     // Program tab state
     const [cycles, setCycles] = useState(1)
@@ -1656,6 +1663,12 @@ function App() {
                             >
                                 Motor Settings
                             </button>
+                            <button
+                                className={`settings-subtab ${settingsSubTab === 'calibration' ? 'active' : ''}`}
+                                onClick={() => setSettingsSubTab('calibration')}
+                            >
+                                Calibration
+                            </button>
                         </div>
 
                         <div className="config-form">
@@ -1695,6 +1708,40 @@ function App() {
                                     </div>
 
                                     <div className="config-section">
+                                        <h3>Washing Station Dimensions</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Y Offset (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.WS_OFFSET_Y}
+                                                    onChange={(e) => handleConfigChange('WS_OFFSET_Y', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Height (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.WS_HEIGHT}
+                                                    onChange={(e) => handleConfigChange('WS_HEIGHT', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Width (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.WS_WIDTH}
+                                                    onChange={(e) => handleConfigChange('WS_WIDTH', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Gap Between WS1 & WS2 (mm):</label>
+                                                <input type="number" step="0.1" min="0"
+                                                    value={config.WS_GAP}
+                                                    onChange={(e) => handleConfigChange('WS_GAP', parseFloat(e.target.value))}
+                                                    className="form-input" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="config-section">
                                         <h3>Vial Layout Well Dimensions</h3>
                                         <div className="config-grid">
                                             <div className="form-group">
@@ -1721,7 +1768,7 @@ function App() {
                                         </div>
                                     </div>
                                 </>
-                            ) : (
+                            ) : settingsSubTab === 'motor' ? (
                                 <>
                                     <div className="config-section">
                                         <h3>Motor Configuration</h3>
@@ -1853,6 +1900,122 @@ function App() {
                                                     className="form-input"
                                                 />
                                             </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                /* Calibration sub-tab */
+                                <>
+                                    <div className="config-section">
+                                        <h3>Axis Calibration</h3>
+                                        <p className="calibration-help">
+                                            Send a known number of steps, measure the actual travel distance with a ruler,
+                                            then calculate the correct Steps/mm for each axis.
+                                        </p>
+                                        <div className="calibration-cards">
+                                            {['x', 'y', 'z'].map(axis => {
+                                                const cal = calibration[axis]
+                                                const configKey = `STEPS_PER_MM_${axis.toUpperCase()}`
+                                                return (
+                                                    <div key={axis} className="calibration-card">
+                                                        <h4>{axis.toUpperCase()}-Axis</h4>
+                                                        <span className="calibration-current">
+                                                            Current: {config[configKey]} steps/mm
+                                                        </span>
+
+                                                        <div className="calibration-row">
+                                                            <label>Test Steps:</label>
+                                                            <input
+                                                                type="number" min="1"
+                                                                value={cal.testSteps}
+                                                                onChange={(e) => setCalibration(prev => ({
+                                                                    ...prev,
+                                                                    [axis]: {...prev[axis], testSteps: parseInt(e.target.value) || 0}
+                                                                }))}
+                                                                className="form-input"
+                                                            />
+                                                        </div>
+
+                                                        <div className="calibration-move-buttons">
+                                                            <button
+                                                                className="calibration-btn move-btn"
+                                                                onClick={() => handleAxisMove(axis, cal.testSteps, 'cw')}
+                                                            >
+                                                                Move +
+                                                            </button>
+                                                            <button
+                                                                className="calibration-btn move-btn"
+                                                                onClick={() => handleAxisMove(axis, cal.testSteps, 'ccw')}
+                                                            >
+                                                                Move −
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="calibration-row">
+                                                            <label>Measured Distance (mm):</label>
+                                                            <input
+                                                                type="number" step="0.01" min="0"
+                                                                value={cal.measuredDistance}
+                                                                onChange={(e) => setCalibration(prev => ({
+                                                                    ...prev,
+                                                                    [axis]: {...prev[axis], measuredDistance: e.target.value}
+                                                                }))}
+                                                                className="form-input"
+                                                                placeholder="Enter measured mm"
+                                                            />
+                                                        </div>
+
+                                                        <button
+                                                            className="calibration-btn calculate-btn"
+                                                            disabled={!cal.measuredDistance || parseFloat(cal.measuredDistance) <= 0}
+                                                            onClick={() => {
+                                                                const dist = parseFloat(cal.measuredDistance)
+                                                                if (dist > 0) {
+                                                                    const spm = Math.round(cal.testSteps / dist)
+                                                                    setCalibration(prev => ({
+                                                                        ...prev,
+                                                                        [axis]: {...prev[axis], calculatedSPM: spm}
+                                                                    }))
+                                                                }
+                                                            }}
+                                                        >
+                                                            Calculate
+                                                        </button>
+
+                                                        {cal.calculatedSPM !== null && (
+                                                            <div className="calibration-result">
+                                                                <span className="calibration-value">
+                                                                    {cal.calculatedSPM} steps/mm
+                                                                </span>
+                                                                <button
+                                                                    className="calibration-btn apply-btn"
+                                                                    onClick={async () => {
+                                                                        const updatedConfig = {...config, [configKey]: cal.calculatedSPM}
+                                                                        setConfig(updatedConfig)
+                                                                        setConfigLoading(true)
+                                                                        setConfigMessage('')
+                                                                        try {
+                                                                            const res = await fetch('/api/config', {
+                                                                                method: 'POST',
+                                                                                headers: {'Content-Type': 'application/json'},
+                                                                                body: JSON.stringify(updatedConfig)
+                                                                            })
+                                                                            const data = await res.json()
+                                                                            setConfigMessage(data.status === 'success' ? '✓ ' + data.message : '✗ Failed to save')
+                                                                        } catch (err) {
+                                                                            setConfigMessage('✗ Error: ' + err.message)
+                                                                        } finally {
+                                                                            setConfigLoading(false)
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    Apply &amp; Save
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 </>

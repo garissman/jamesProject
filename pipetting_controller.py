@@ -64,11 +64,8 @@ class CoordinateMapper:
     VIAL_WELL_HEIGHT   = settings.get('VIAL_WELL_HEIGHT')    # mm
 
     # Layout-specific coordinate mappings
-    # MicroChip Layout coordinates
+    # MicroChip Layout coordinates (non-WS entries only; WS computed dynamically)
     MICROCHIP_COORDS = {
-        # Washing Stations (top-left)
-        'WS1': (0, 0, 0),
-        'WS2': (0, 15, 0),
         # MicroChips (bottom)
         'MC1': (80, 300, 0),
         'MC2': (140, 300, 0),
@@ -77,15 +74,24 @@ class CoordinateMapper:
         'MC5': (320, 300, 0),
     }
 
-    # Vial Layout coordinates
-    # Note: 1 WS = 6 small wells in height, 1 Vial = 2 small wells in height
-    # This ensures proper Y-axis alignment with the small well grid
-    WELLPLATE_COORDS = {
-        # Washing Stations aligned with small well grid
-        # WS1 at row 0, WS2 at row 6 (since 1 WS = 6 small well rows)
-        'WS1': (0, 60, 0),  # Aligned with SA1 (row 0 of small wells)
-        'WS2': (0, 60 + (6 * 45), 0),  # 60 + 270 = 330, aligned with SG1 (row 6)
-    }
+    # Vial Layout coordinates (non-WS entries only)
+    WELLPLATE_COORDS = {}
+
+    @staticmethod
+    def _ws_coordinates(station: str) -> WellCoordinates:
+        """Compute WS1/WS2 center coordinates from current config values."""
+        ws_offset_y = settings.get('WS_OFFSET_Y')
+        ws_height   = settings.get('WS_HEIGHT')
+        ws_width    = settings.get('WS_WIDTH')
+        ws_gap      = settings.get('WS_GAP')
+
+        center_x = ws_width / 2
+        if station == 'WS1':
+            center_y = ws_offset_y + ws_height / 2
+        else:  # WS2
+            center_y = ws_offset_y + ws_height + ws_gap + ws_height / 2
+
+        return WellCoordinates(x=center_x, y=center_y, z=0.0)
 
     @staticmethod
     def coordinates_to_well(coords: WellCoordinates) -> Optional[str]:
@@ -98,6 +104,12 @@ class CoordinateMapper:
         Returns:
             Well ID (e.g., 'A1') or None if not at a well position
         """
+        # Check if at a washing station position
+        for ws_id in ('WS1', 'WS2'):
+            ws_coords = CoordinateMapper._ws_coordinates(ws_id)
+            if abs(coords.x - ws_coords.x) < 1.0 and abs(coords.y - ws_coords.y) < 1.0:
+                return ws_id
+
         # Calculate which column based on X coordinate
         x_offset = coords.x - CoordinateMapper.ORIGIN_X
         well_pitch_x = CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING
@@ -155,6 +167,10 @@ class CoordinateMapper:
         Returns:
             WellCoordinates with x, y, z positions
         """
+        # Washing stations — computed dynamically from config
+        if well_id in ('WS1', 'WS2'):
+            return CoordinateMapper._ws_coordinates(well_id)
+
         # Check for MicroChip layout special wells
         if well_id in CoordinateMapper.MICROCHIP_COORDS:
             coords = CoordinateMapper.MICROCHIP_COORDS[well_id]

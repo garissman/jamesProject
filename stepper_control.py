@@ -148,14 +148,14 @@ class StepperMotor:
     def step(self, direction: Direction = Direction.CLOCKWISE, steps: int = 1,
              delay: float = 0.001, check_limits: bool = True) -> Tuple[int, LimitSwitchState]:
         """
-        Move the motor a specified number of steps.
+        Move the motor a specified number of steps with trapezoidal acceleration.
         Checks BOTH limit switches. Allows moving away from a limit that is
         already triggered at the start, but stops immediately on any NEW limit.
 
         Args:
             direction: Direction.CLOCKWISE or Direction.COUNTERCLOCKWISE
             steps: Number of steps to move
-            delay: Delay between steps in seconds (controls speed)
+            delay: Target delay between steps in seconds (max speed)
             check_limits: If True, stop when any limit switch is triggered
 
         Returns:
@@ -168,6 +168,10 @@ class StepperMotor:
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
 
+        # Acceleration ramp parameters
+        start_delay = max(delay * 4, 0.004)  # Start slow (4× target or 4ms minimum)
+        accel_steps = min(steps // 4, 200)    # Ramp over 25% of move, max 200 steps
+
         # Remember which limits are already pressed at the start
         # so we can move away from them but stop if we hit a NEW limit
         started_at_min = check_limits and self.check_min_limit()
@@ -178,7 +182,7 @@ class StepperMotor:
         limit_state = LimitSwitchState.NOT_TRIGGERED
 
         # Generate step pulses
-        for _ in range(steps):
+        for i in range(steps):
             # Only honour stop_requested once we've left the starting limit,
             # otherwise the limit-switch interrupt blocks us from moving away
             if self.stop_requested and left_starting_limits:
@@ -204,14 +208,25 @@ class StepperMotor:
                     started_at_max = False  # We left the max limit
                     left_starting_limits = True
 
+            # Compute per-step delay with trapezoidal ramp
+            remaining = steps - i
+            if accel_steps > 0:
+                # Ramp phase: pick the slower of accel-up and decel-down
+                accel_factor = min(i, accel_steps) / accel_steps           # 0→1 during ramp-up
+                decel_factor = min(remaining - 1, accel_steps) / accel_steps  # 1→0 during ramp-down
+                ramp = min(accel_factor, decel_factor)  # 0 at ends, 1 at cruise
+                current_delay = start_delay - (start_delay - delay) * ramp
+            else:
+                current_delay = delay
+
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
-                time.sleep(delay)
+                time.sleep(current_delay)
                 GPIO.output(self.pulse_pin, GPIO.LOW)
-                time.sleep(delay)
+                time.sleep(current_delay)
             else:
                 # Simulation mode: faster delay for testing, update simulated position
-                time.sleep(delay * 0.01)  # Much faster in simulation mode
+                time.sleep(current_delay * 0.01)  # Much faster in simulation mode
                 if direction == Direction.CLOCKWISE:
                     self.simulated_position += 1
                 else:

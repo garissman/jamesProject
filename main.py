@@ -894,6 +894,12 @@ class ConfigurationModel(BaseModel):
     TRAVEL_SPEED: float = Field(..., gt=0, description="Fast movement speed (seconds/step)")
     PIPETTE_SPEED: float = Field(..., gt=0, description="Pipetting operation speed (seconds/step)")
 
+    # Washing Station Dimensions
+    WS_OFFSET_Y: float = Field(..., ge=0, description="Y offset from origin to WS1 start in mm")
+    WS_HEIGHT:   float = Field(..., gt=0, description="Height of each washing station in mm")
+    WS_WIDTH:    float = Field(..., gt=0, description="Width of each washing station in mm")
+    WS_GAP:      float = Field(..., ge=0, description="Gap between WS1 and WS2 in mm")
+
     # Motor Inversion Flags
     INVERT_X:       bool = Field(..., description="Invert X-axis motor direction")
     INVERT_Y:       bool = Field(..., description="Invert Y-axis motor direction")
