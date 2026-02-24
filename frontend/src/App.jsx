@@ -1919,9 +1919,41 @@ function App() {
                                                 return (
                                                     <div key={axis} className="calibration-card">
                                                         <h4>{axis.toUpperCase()}-Axis</h4>
-                                                        <span className="calibration-current">
-                                                            Current: {config[configKey]} steps/mm
-                                                        </span>
+                                                        <div className="calibration-row">
+                                                            <label>Steps/mm:</label>
+                                                            <div className="calibration-spm-row">
+                                                                <input
+                                                                    type="number" min="1"
+                                                                    value={config[configKey]}
+                                                                    onChange={(e) => handleConfigChange(configKey, parseInt(e.target.value) || 0)}
+                                                                    className="form-input"
+                                                                />
+                                                                <button
+                                                                    className="calibration-btn apply-btn"
+                                                                    onClick={async () => {
+                                                                        setConfigLoading(true)
+                                                                        setConfigMessage('')
+                                                                        try {
+                                                                            const res = await fetch('/api/config', {
+                                                                                method: 'POST',
+                                                                                headers: {'Content-Type': 'application/json'},
+                                                                                body: JSON.stringify(config)
+                                                                            })
+                                                                            const data = await res.json()
+                                                                            setConfigMessage(data.status === 'success' ? '✓ ' + data.message : '✗ Failed to save')
+                                                                        } catch (err) {
+                                                                            setConfigMessage('✗ Error: ' + err.message)
+                                                                        } finally {
+                                                                            setConfigLoading(false)
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <hr className="calibration-divider" />
 
                                                         <div className="calibration-row">
                                                             <label>Test Steps:</label>

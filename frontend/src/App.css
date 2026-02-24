@@ -1537,6 +1537,22 @@
     color: var(--text-secondary);
 }
 
+.calibration-spm-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.calibration-spm-row .form-input {
+    flex: 1;
+}
+
+.calibration-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 4px 0;
+}
+
 .calibration-move-buttons {
     display: flex;
     gap: 8px;
