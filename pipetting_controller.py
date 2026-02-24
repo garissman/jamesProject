@@ -229,11 +229,11 @@ class CoordinateMapper:
             # Calculate physical coordinates
             # X increases with column number
             x = CoordinateMapper.ORIGIN_X + well_offset_x + (
-                    column_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+                    column_index * CoordinateMapper.WELL_SPACING)
 
             # Y increases with row letter (A to H)
             y = CoordinateMapper.ORIGIN_Y + well_offset_y + (
-                row_index * (CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING))
+                row_index * CoordinateMapper.WELL_SPACING)
 
             # Z is at top of well (0), adjust during pipetting
             z = 0.0
