@@ -24,7 +24,9 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "mcp__plugin_playwright_playwright__browser_run_code",
       "Bash(curl:*)",
-      "mcp__plugin_playwright_playwright__browser_snapshot"
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "Bash(cd:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

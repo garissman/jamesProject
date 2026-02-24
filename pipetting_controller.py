@@ -650,17 +650,45 @@ class PipettingController:
         self.stop_requested = True
         self.stepper_controller.stop_all()
 
-    def home(self):
-        """Return to home position (WS1 - Washing Station 1) using limit switches"""
-        self.log("Homing to WS1 using limit switches...")
+    def _home_axis_to_min(self, motor_id: int, axis_name: str, first_direction: Direction = Direction.CLOCKWISE):
+        """
+        Home a single axis to its MIN limit switch.
+        Tries first_direction, then reverses if it hits MAX instead.
+        """
+        motor = self.stepper_controller.get_motor(motor_id)
 
-        # First, reload current position from saved file to ensure we have the latest position
-        saved_position, saved_pipette_count, saved_layout_type = self.load_position()
-        self.current_position = saved_position
-        self.current_pipette_count = saved_pipette_count
-        self.layout_type = saved_layout_type
-        current_well = self.get_current_well()
-        self.log(f"Current position loaded: {current_well} at ({saved_position.x:.1f}, {saved_position.y:.1f}, {saved_position.z:.1f})")
+        if motor.check_min_limit():
+            self.log(f"{axis_name} axis already at MIN limit")
+            motor.reset_position()
+            return
+
+        self.log(f"Homing {axis_name} axis to MIN limit...")
+
+        second_direction = Direction.COUNTERCLOCKWISE if first_direction == Direction.CLOCKWISE else Direction.CLOCKWISE
+
+        for direction in [first_direction, second_direction]:
+            steps, hit = motor.move_until_limit(direction, self.TRAVEL_SPEED)
+            self.log(f"{axis_name} axis: moved {direction.name} {steps} steps, hit {hit}")
+
+            if hit == 'min':
+                self.log(f"{axis_name} axis: reached MIN limit")
+                motor.reset_position()
+                return
+
+            # Hit MAX or no limit — try the other direction
+            if hit == 'max':
+                self.log(f"{axis_name} axis: hit MAX, reversing...")
+                continue
+
+            # 'none' — max steps reached without hitting any limit
+            self.log(f"{axis_name} axis: WARNING - no limit found in {direction.name}")
+
+        self.log(f"{axis_name} axis: WARNING - could not reach MIN limit")
+        motor.reset_position()
+
+    def home(self):
+        """Return to home position by moving X and Y axes to their MIN limit switches"""
+        self.log("Homing all axes to MIN limit switches...")
 
         # Raise Z to safe height first
         self.log("Raising Z to safe height...")
@@ -669,43 +697,16 @@ class PipettingController:
             self.stepper_controller.move_motor(3, safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = 0.0
 
-        # Home X axis - move to minimum limit switch
-        self.log("Homing X axis to minimum limit...")
-        x_steps, x_limit = self.stepper_controller.move_motor_until_limit(
-            motor_id=1,  # X axis
-            direction=self._inv(Direction.CLOCKWISE, self.INVERT_X),  # Towards minimum
-            delay=self.TRAVEL_SPEED,
-            max_steps=100000  # Safety limit
-        )
-        self.log(f"X axis homed: {x_steps} steps, limit reached: {x_limit}")
+        # Home X axis to MIN limit switch (CW goes toward MIN on X)
+        self._home_axis_to_min(1, "X", Direction.CLOCKWISE)
 
-        # Back off slightly from X limit (optional, for safety)
-        if x_limit:
-            backoff_steps = 50  # Back off 50 steps
-            self.stepper_controller.move_motor(1, backoff_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_X), self.TRAVEL_SPEED)
-            self.log(f"Backed off {backoff_steps} steps from X minimum limit")
+        # Home Y axis to MIN limit switch (CCW goes toward MIN on Y)
+        self._home_axis_to_min(2, "Y", Direction.COUNTERCLOCKWISE)
 
-        # Home Y axis - move to minimum limit switch
-        self.log("Homing Y axis to minimum limit...")
-        y_steps, y_limit = self.stepper_controller.move_motor_until_limit(
-            motor_id=2,  # Y axis
-            direction=self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Y),  # Towards minimum
-            delay=self.TRAVEL_SPEED,
-            max_steps=100000  # Safety limit
-        )
-        self.log(f"Y axis homed: {y_steps} steps, limit reached: {y_limit}")
-
-        # Back off slightly from Y limit (optional, for safety)
-        if y_limit:
-            backoff_steps = 50  # Back off 50 steps
-            self.stepper_controller.move_motor(2, backoff_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Y), self.TRAVEL_SPEED)
-            self.log(f"Backed off {backoff_steps} steps from Y minimum limit")
-
-        # Set position to WS1 coordinates (this is now our known home position)
-        home_coords = self.mapper.well_to_coordinates("WS1")
-        self.current_position = home_coords
+        # Position is now at origin (both axes at MIN limits)
+        self.current_position = WellCoordinates(x=0.0, y=0.0, z=0.0)
         self.save_position()
-        self.log(f"Home position set to WS1: ({home_coords.x:.1f}, {home_coords.y:.1f}, {home_coords.z:.1f})")
+        self.log("Home complete - position reset to origin (0, 0, 0)")
 
     def get_current_well(self) -> Optional[str]:
         """

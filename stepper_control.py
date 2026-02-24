@@ -148,49 +148,61 @@ class StepperMotor:
     def step(self, direction: Direction = Direction.CLOCKWISE, steps: int = 1,
              delay: float = 0.001, check_limits: bool = True) -> Tuple[int, LimitSwitchState]:
         """
-        Move the motor a specified number of steps
+        Move the motor a specified number of steps.
+        Checks BOTH limit switches. Allows moving away from a limit that is
+        already triggered at the start, but stops immediately on any NEW limit.
 
         Args:
             direction: Direction.CLOCKWISE or Direction.COUNTERCLOCKWISE
             steps: Number of steps to move
             delay: Delay between steps in seconds (controls speed)
-            check_limits: If True, stop when limit switch is triggered
+            check_limits: If True, stop when any limit switch is triggered
 
         Returns:
             Tuple of (steps_completed, limit_state)
         """
-        self.stop_requested = False
+        # Clear any pending interrupt-based stop so we can move away from a limit
+        self.clear_limit_trigger()
 
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
 
-        # Determine which limit to check based on direction
-        if check_limits:
-            if direction == Direction.CLOCKWISE:
-                limit_pin = self.limit_max_pin
-            else:
-                limit_pin = self.limit_min_pin
-        else:
-            limit_pin = None
+        # Remember which limits are already pressed at the start
+        # so we can move away from them but stop if we hit a NEW limit
+        started_at_min = check_limits and self.check_min_limit()
+        started_at_max = check_limits and self.check_max_limit()
+        left_starting_limits = not (started_at_min or started_at_max)
 
         steps_completed = 0
         limit_state = LimitSwitchState.NOT_TRIGGERED
 
         # Generate step pulses
         for _ in range(steps):
-            # Check for stop request
-            if self.stop_requested:
+            # Only honour stop_requested once we've left the starting limit,
+            # otherwise the limit-switch interrupt blocks us from moving away
+            if self.stop_requested and left_starting_limits:
                 break
 
-            # Check limit switch before stepping
-            if check_limits and limit_pin is not None:
-                if self.check_limit_switch(limit_pin):
-                    if direction == Direction.CLOCKWISE:
-                        limit_state = LimitSwitchState.MAX_TRIGGERED
-                    else:
+            # Check BOTH limit switches before stepping
+            if check_limits:
+                if self.limit_min_pin is not None and self.check_min_limit():
+                    if not started_at_min:
                         limit_state = LimitSwitchState.MIN_TRIGGERED
-                    break
+                        print(f"{self.name}: MIN limit hit - stopping")
+                        break
+                else:
+                    started_at_min = False  # We left the min limit
+                    left_starting_limits = True
+
+                if self.limit_max_pin is not None and self.check_max_limit():
+                    if not started_at_max:
+                        limit_state = LimitSwitchState.MAX_TRIGGERED
+                        print(f"{self.name}: MAX limit hit - stopping")
+                        break
+                else:
+                    started_at_max = False  # We left the max limit
+                    left_starting_limits = True
 
             if GPIO_AVAILABLE:
                 GPIO.output(self.pulse_pin, GPIO.HIGH)
@@ -206,6 +218,10 @@ class StepperMotor:
                     self.simulated_position -= 1
 
             steps_completed += 1
+
+            # Clear any interrupt-based stop that fired while still on the starting limit
+            if not left_starting_limits:
+                self.stop_requested = False
 
         # Update position tracking
         position_delta = steps_completed if direction == Direction.CLOCKWISE else -steps_completed
@@ -292,8 +308,8 @@ class StepperMotor:
         MIN_DELAY = 0.0001
         actual_delay = max(delay, MIN_DELAY)
 
+        # Clear any pending interrupt-based stop so we can move away from a limit
         self.clear_limit_trigger()
-        self.stop_requested = False
 
         # Remember if we started at a limit (so we can ignore it until we leave)
         started_at_min = self.check_min_limit()
@@ -308,7 +324,9 @@ class StepperMotor:
         steps_taken = 0
 
         while steps_taken < max_steps:
-            if self.stop_requested:
+            # Only honour stop_requested once we've left the starting limit,
+            # otherwise the limit-switch interrupt blocks us from moving away
+            if self.stop_requested and left_starting_limit:
                 break
 
             # Take one step FIRST
@@ -334,6 +352,8 @@ class StepperMotor:
                 elif started_at_max and not self.check_max_limit():
                     left_starting_limit = True
                     print(f"{self.name}: Left MAX limit at step {steps_taken}")
+                # Clear interrupt-based stop while still on starting limit
+                self.stop_requested = False
 
             # Only check for hitting limits AFTER we've left the starting limit
             if left_starting_limit:
