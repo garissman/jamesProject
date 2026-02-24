@@ -223,8 +223,8 @@ class CoordinateMapper:
 
             # For MicroChip layout (8x15), wells start at offset
             # For legacy layout (8x12), use standard spacing
-            well_offset_x = 180  # Offset for microchip wells (to the right of left section)
-            well_offset_y = 20   # Offset from top
+            well_offset_x = 70   # A1 is 70mm to the right of home
+            well_offset_y = 15   # A1 is 15mm up from home
 
             # Calculate physical coordinates
             # X increases with column number
