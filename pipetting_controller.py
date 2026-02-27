@@ -488,10 +488,11 @@ class PipettingController:
             self.current_operation = "idle"
             self.operation_well = None
             return
-        self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
+        actual_ml = steps / self.PIPETTE_STEPS_PER_ML
+        self.log(f"  Aspirating {actual_ml:.3f} mL ({steps} steps)...")
         self.stepper_controller.move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
-        self.pipette_ml += volume_ml
+        self.pipette_ml += actual_ml
         self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
@@ -515,10 +516,11 @@ class PipettingController:
             self.current_operation = "idle"
             self.operation_well = None
             return
-        self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
+        actual_ml = steps / self.PIPETTE_STEPS_PER_ML
+        self.log(f"  Dispensing {actual_ml:.3f} mL ({steps} steps)...")
         self.stepper_controller.move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
-        self.pipette_ml = max(0.0, self.pipette_ml - volume_ml)
+        self.pipette_ml = max(0.0, self.pipette_ml - actual_ml)
         self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
