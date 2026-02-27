@@ -15,7 +15,6 @@
  * Motor 4 (Pipette): Pulse=D8, Dir=D9, Limit=D13
  */
 
-#include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
 #include <Arduino_RouterBridge.h>
 

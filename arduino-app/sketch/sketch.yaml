@@ -2,7 +2,4 @@ profiles:
   default:
     platforms:
       - platform: arduino:zephyr
-    libraries:
-      - Arduino_RouterBridge
-      - ArduinoGraphics
 default_profile: default
