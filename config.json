@@ -8,7 +8,8 @@
   "STEPS_PER_MM_X": 120,
   "STEPS_PER_MM_Y": 120,
   "STEPS_PER_MM_Z": 120,
-  "PIPETTE_STEPS_PER_ML": 1000,
+  "PIPETTE_STEPS_PER_ML": 63,
+  "PIPETTE_MAX_ML": 100.0,
   "PICKUP_DEPTH": 10.0,
   "DROPOFF_DEPTH": 5.0,
   "SAFE_HEIGHT": 20.0,
@@ -22,5 +23,5 @@
   "INVERT_X": true,
   "INVERT_Y": false,
   "INVERT_Z": false,
-  "INVERT_PIPETTE": false
+  "INVERT_PIPETTE": true
 }

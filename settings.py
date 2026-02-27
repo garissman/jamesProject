@@ -22,6 +22,7 @@ DEFAULTS: dict[str, Any] = {
     "STEPS_PER_MM_Y":       100,
     "STEPS_PER_MM_Z":       100,
     "PIPETTE_STEPS_PER_ML": 1000,
+    "PIPETTE_MAX_ML":         10.0,
     "PICKUP_DEPTH":          10.0,
     "DROPOFF_DEPTH":          5.0,
     "SAFE_HEIGHT":           20.0,

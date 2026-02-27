@@ -265,6 +265,7 @@ class PipettingController:
 
     # Pipette parameters - read from config.json at import time
     PIPETTE_STEPS_PER_ML = settings.get('PIPETTE_STEPS_PER_ML')  # Steps to aspirate/dispense 1mL
+    PIPETTE_MAX_ML       = settings.get('PIPETTE_MAX_ML')       # Maximum pipette volume in mL
     PICKUP_DEPTH  = settings.get('PICKUP_DEPTH')   # mm to descend into well for pickup
     DROPOFF_DEPTH = settings.get('DROPOFF_DEPTH')  # mm to descend into well for dropoff
     SAFE_HEIGHT   = settings.get('SAFE_HEIGHT')    # mm above well for travel
@@ -280,6 +281,9 @@ class PipettingController:
     INVERT_Z       = settings.get('INVERT_Z')
     INVERT_PIPETTE = settings.get('INVERT_PIPETTE')
 
+    # Z-axis software travel limit (steps from home/min to max)
+    Z_MAX_STEPS = 9990
+
     # Position persistence
     POSITION_FILE = Path(__file__).parent / "pipette_position.json"
 
@@ -294,9 +298,18 @@ class PipettingController:
         self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
         self.operation_well = None  # Well where current operation is happening
         self.layout_type = "microchip"  # Current layout type: microchip or wellplate
+        self.pipette_ml = 0.0  # Current pipette volume in mL
 
         # Load last known position or default to home (WS1 - Washing Station 1)
         self.current_position, self.current_pipette_count, self.layout_type = self.load_position()
+        # Load pipette_ml from saved position file
+        try:
+            if self.POSITION_FILE.exists():
+                with open(self.POSITION_FILE, 'r') as f:
+                    saved = json.load(f)
+                self.pipette_ml = saved.get('pipette_ml', 0.0)
+        except Exception:
+            pass
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
         self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
 
@@ -306,6 +319,27 @@ class PipettingController:
         if invert:
             return Direction.COUNTERCLOCKWISE if direction == Direction.CLOCKWISE else Direction.CLOCKWISE
         return direction
+
+    def _move_z_safe(self, steps: int, direction: Direction, speed: float) -> int:
+        """Move Z-axis motor with software step limit enforcement.
+
+        Clamps the requested steps so the motor position stays within
+        [0, Z_MAX_STEPS].  Returns the number of steps actually commanded.
+        """
+        motor = self.stepper_controller.get_motor(3)
+        pos = motor.current_position
+
+        if direction == Direction.CLOCKWISE:
+            max_allowed = max(0, self.Z_MAX_STEPS - pos)
+        else:
+            max_allowed = max(0, pos)
+
+        clamped = min(steps, max_allowed)
+        if clamped < steps:
+            self.log(f"Z-axis: clamped {steps} -> {clamped} steps (limit: {self.Z_MAX_STEPS})")
+        if clamped > 0:
+            self.stepper_controller.move_motor(3, clamped, direction, speed)
+        return clamped
 
     def log(self, message: str):
         """Log a message to both console and buffer for UI display"""
@@ -340,7 +374,8 @@ class PipettingController:
                 "z": self.current_position.z,
                 "well": self.get_current_well(),
                 "pipette_count": self.current_pipette_count,
-                "layout_type": self.layout_type
+                "layout_type": self.layout_type,
+                "pipette_ml": round(self.pipette_ml, 3)
             }
             with open(self.POSITION_FILE, 'w') as f:
                 json.dump(position_data, f, indent=2)
@@ -404,7 +439,7 @@ class PipettingController:
         # Move Z up to safe height first (if moving down)
         if z_delta < 0:
             safe_z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+            self._move_z_safe(safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Move X and Y
         if x_delta != 0:
@@ -420,9 +455,9 @@ class PipettingController:
             # Account for safe height movement
             if z_delta < 0:
                 total_z = abs(z_delta) + int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-                self.stepper_controller.move_motor(3, total_z, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+                self._move_z_safe(total_z, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             else:
-                self.stepper_controller.move_motor(3, abs(z_delta), self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+                self._move_z_safe(abs(z_delta), self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Update current position
         self.current_position = target_coords
@@ -443,9 +478,21 @@ class PipettingController:
         """
         self.current_operation = "aspirating"
         self.operation_well = self.get_current_well()
+        # Clamp to max pipette capacity
+        allowed = max(0.0, self.PIPETTE_MAX_ML - self.pipette_ml)
+        if volume_ml > allowed:
+            self.log(f"  Pipette limit: clamped {volume_ml} mL -> {allowed:.3f} mL (max {self.PIPETTE_MAX_ML} mL)")
+            volume_ml = allowed
+        if volume_ml <= 0:
+            self.log(f"  Pipette already at max capacity ({self.PIPETTE_MAX_ML} mL) — skipping aspirate")
+            self.current_operation = "idle"
+            self.operation_well = None
+            return
         self.log(f"  Aspirating {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
+        self.pipette_ml += volume_ml
+        self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -459,9 +506,20 @@ class PipettingController:
         """
         self.current_operation = "dispensing"
         self.operation_well = self.get_current_well()
+        # Clamp to what's actually in the pipette
+        if volume_ml > self.pipette_ml:
+            self.log(f"  Pipette limit: clamped {volume_ml} mL -> {self.pipette_ml:.3f} mL (current volume)")
+            volume_ml = self.pipette_ml
+        if volume_ml <= 0:
+            self.log(f"  Pipette is empty — skipping dispense")
+            self.current_operation = "idle"
+            self.operation_well = None
+            return
         self.log(f"  Dispensing {volume_ml} mL...")
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         self.stepper_controller.move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
+        self.pipette_ml = max(0.0, self.pipette_ml - volume_ml)
+        self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
         self.current_operation = "idle"
         self.operation_well = None
@@ -710,8 +768,20 @@ class PipettingController:
         self.log("Raising Z to safe height...")
         if self.current_position.z < 0:
             safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+            self._move_z_safe(safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = 0.0
+
+        # Move Z to 75mm CW (skip if already there)
+        z_motor = self.stepper_controller.get_motor(3)
+        z_target_mm = 70.0
+        if abs(self.current_position.z - z_target_mm) < 1.0:
+            self.log(f"Z-axis already at {self.current_position.z:.1f}mm — skipping")
+        else:
+            z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
+            self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
+            z_motor.reset_position()
+            self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+            self.log(f"Z-axis at {z_motor.current_position} steps")
 
         # Home X axis to MIN limit switch (CW goes toward MIN on X)
         self._home_axis_to_min(1, "X", Direction.CLOCKWISE)
@@ -719,10 +789,10 @@ class PipettingController:
         # Home Y axis to MIN limit switch (CCW goes toward MIN on Y)
         self._home_axis_to_min(2, "Y", Direction.COUNTERCLOCKWISE)
 
-        # Position is now at origin (both axes at MIN limits)
-        self.current_position = WellCoordinates(x=0.0, y=0.0, z=0.0)
+        # Position is now at origin (X/Y at MIN limits, Z at 75mm)
+        self.current_position = WellCoordinates(x=0.0, y=0.0, z=z_target_mm)
         self.save_position()
-        self.log("Home complete - position reset to origin (0, 0, 0)")
+        self.log(f"Home complete - position: X=0, Y=0, Z={z_target_mm:.1f}mm")
 
     def get_current_well(self) -> Optional[str]:
         """
@@ -754,18 +824,27 @@ class PipettingController:
         Args:
             direction: 'up' or 'down'
         """
+        Z_UP_POSITION = 70.0  # mm — top position
+        Z_DOWN_POSITION = 0.0  # mm — bottom position
+
         if direction == 'up':
-            # Move Z up by SAFE_HEIGHT
-            z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-            self.current_position.z += self.SAFE_HEIGHT
-            self.log(f"Z-axis moved UP ({self.SAFE_HEIGHT}mm)")
+            distance = Z_UP_POSITION - self.current_position.z
+            if distance <= 0:
+                self.log("Z-axis already at top")
+                return
+            z_steps = int(distance * self.mapper.STEPS_PER_MM_Z)
+            self._move_z_safe(z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+            self.current_position.z = Z_UP_POSITION
+            self.log(f"Z-axis moved UP to {Z_UP_POSITION}mm")
         elif direction == 'down':
-            # Move Z down by SAFE_HEIGHT
-            z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self.stepper_controller.move_motor(3, z_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-            self.current_position.z -= self.SAFE_HEIGHT
-            self.log(f"Z-axis moved DOWN ({self.SAFE_HEIGHT}mm)")
+            distance = self.current_position.z - Z_DOWN_POSITION
+            if distance <= 0:
+                self.log("Z-axis already at bottom")
+                return
+            z_steps = int(distance * self.mapper.STEPS_PER_MM_Z)
+            self._move_z_safe(z_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+            self.current_position.z = Z_DOWN_POSITION
+            self.log(f"Z-axis moved DOWN to {Z_DOWN_POSITION}mm")
         else:
             raise ValueError("Direction must be 'up' or 'down'")
 
@@ -802,8 +881,31 @@ class PipettingController:
         raw_direction = Direction.CLOCKWISE if direction == 'cw' else Direction.COUNTERCLOCKWISE
         motor_direction = self._inv(raw_direction, invert_map[axis])
 
+        # Clamp pipette manual jog to limits
+        if axis == 'pipette':
+            delta_ml = steps / self.PIPETTE_STEPS_PER_ML
+            if direction == 'cw':
+                allowed_ml = max(0.0, self.PIPETTE_MAX_ML - self.pipette_ml)
+                if delta_ml > allowed_ml:
+                    steps = int(allowed_ml * self.PIPETTE_STEPS_PER_ML)
+                    self.log(f"Pipette limit: clamped to {steps} steps (max {self.PIPETTE_MAX_ML} mL)")
+                if steps <= 0:
+                    self.log(f"Pipette at max capacity ({self.PIPETTE_MAX_ML} mL) — skipping")
+                    return self.get_axis_positions()
+            else:
+                allowed_ml = self.pipette_ml
+                if delta_ml > allowed_ml:
+                    steps = int(allowed_ml * self.PIPETTE_STEPS_PER_ML)
+                    self.log(f"Pipette limit: clamped to {steps} steps (pipette at {self.pipette_ml:.3f} mL)")
+                if steps <= 0:
+                    self.log(f"Pipette is empty — skipping")
+                    return self.get_axis_positions()
+
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
-        self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED)
+        if axis == 'z':
+            self._move_z_safe(steps, motor_direction, self.TRAVEL_SPEED)
+        else:
+            self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED)
 
         # Update position tracking for X, Y, Z axes
         if axis == 'x':
@@ -815,6 +917,12 @@ class PipettingController:
         elif axis == 'z':
             delta = steps / self.mapper.STEPS_PER_MM_Z
             self.current_position.z += delta if direction == 'cw' else -delta
+        elif axis == 'pipette':
+            delta = steps / self.PIPETTE_STEPS_PER_ML
+            if direction == 'cw':
+                self.pipette_ml = min(self.PIPETTE_MAX_ML, self.pipette_ml + delta)
+            else:
+                self.pipette_ml = max(0.0, self.pipette_ml - delta)
 
         self.save_position()
 
@@ -833,6 +941,7 @@ class PipettingController:
             'x': round(self.current_position.x, 2),
             'y': round(self.current_position.y, 2),
             'z': round(self.current_position.z, 2),
+            'pipette_ml': round(self.pipette_ml, 3),
             'motor_steps': motor_positions
         }
 

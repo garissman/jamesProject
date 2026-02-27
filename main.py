@@ -71,7 +71,7 @@ class PipettingStepRequest(BaseModel):
     pickupWell: str = Field(..., description="Source well (e.g., 'A12')")
     dropoffWell: str = Field(..., description="Destination well (e.g., 'A15')")
     rinseWell: Optional[str] = Field(None, description="Rinse well (optional)")
-    sampleVolume: float = Field(..., gt=0, le=10, description="Volume in mL")
+    sampleVolume: float = Field(..., gt=0, description="Volume in mL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
     repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
@@ -469,7 +469,7 @@ async def toggle_z_axis(request: ToggleZRequest):
 
 class VolumeRequest(BaseModel):
     """Request for aspirate/dispense operations"""
-    volume: float = Field(..., gt=0, le=10, description="Volume in mL (0-10)")
+    volume: float = Field(..., gt=0, description="Volume in mL")
 
 
 @app.post("/api/pipetting/aspirate")
@@ -584,6 +584,47 @@ async def get_axis_positions():
         raise HTTPException(
             status_code=500,
             detail=f"Error getting positions: {str(e)}"
+        )
+
+
+class SetPositionRequest(BaseModel):
+    """Request to override the current tracked position"""
+    x: float = Field(..., description="X position in mm")
+    y: float = Field(..., description="Y position in mm")
+    z: float = Field(..., description="Z position in mm")
+    pipette_ml: float = Field(0.0, description="Pipette position in mL")
+
+
+@app.post("/api/axis/set-position")
+async def set_axis_position(request: SetPositionRequest):
+    """Override the current tracked position (does NOT move motors)"""
+    if pipetting_controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipetting controller not initialized"
+        )
+
+    try:
+        from pipetting_controller import WellCoordinates
+        pipetting_controller.current_position = WellCoordinates(
+            x=request.x, y=request.y, z=request.z
+        )
+        # Also reset motor step counters to match
+        mapper = pipetting_controller.mapper
+        pipetting_controller.stepper_controller.get_motor(1).current_position = int(request.x * mapper.STEPS_PER_MM_X)
+        pipetting_controller.stepper_controller.get_motor(2).current_position = int(request.y * mapper.STEPS_PER_MM_Y)
+        pipetting_controller.stepper_controller.get_motor(3).current_position = int(request.z * mapper.STEPS_PER_MM_Z)
+        pipetting_controller.pipette_ml = request.pipette_ml
+        pipetting_controller.save_position()
+        return {
+            "status": "success",
+            "message": f"Position set to X={request.x}, Y={request.y}, Z={request.z}, Pipette={request.pipette_ml}mL",
+            "positions": pipetting_controller.get_axis_positions()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error setting position: {str(e)}"
         )
 
 
@@ -883,6 +924,7 @@ class ConfigurationModel(BaseModel):
 
     # Pipette Configuration
     PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per mL")
+    PIPETTE_MAX_ML: float = Field(..., gt=0, description="Maximum pipette volume in mL")
 
     # Pipetting Operation Parameters
     PICKUP_DEPTH: float = Field(..., gt=0, description="Depth to descend for pickup in mm")
@@ -948,12 +990,14 @@ async def update_configuration(config: ConfigurationModel):
         CoordinateMapper.STEPS_PER_MM_Y     = cfg['STEPS_PER_MM_Y']
         CoordinateMapper.STEPS_PER_MM_Z     = cfg['STEPS_PER_MM_Z']
 
-        # Patch PipettingController inversion flags
+        # Patch PipettingController inversion flags and pipette config
         from pipetting_controller import PipettingController as PC
         PC.INVERT_X       = cfg['INVERT_X']
         PC.INVERT_Y       = cfg['INVERT_Y']
         PC.INVERT_Z       = cfg['INVERT_Z']
         PC.INVERT_PIPETTE = cfg['INVERT_PIPETTE']
+        PC.PIPETTE_STEPS_PER_ML = cfg['PIPETTE_STEPS_PER_ML']
+        PC.PIPETTE_MAX_ML       = cfg['PIPETTE_MAX_ML']
 
         # Reinitialize the pipetting controller with new configuration
         if pipetting_controller:

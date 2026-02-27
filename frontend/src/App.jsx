@@ -22,6 +22,7 @@ function App() {
         STEPS_PER_MM_Y: 100,
         STEPS_PER_MM_Z: 100,
         PIPETTE_STEPS_PER_ML: 1000,
+        PIPETTE_MAX_ML: 10.0,
         PICKUP_DEPTH: 10.0,
         DROPOFF_DEPTH: 5.0,
         SAFE_HEIGHT: 20.0,
@@ -45,6 +46,7 @@ function App() {
         x: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
         y: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
         z: {testSteps: 1000, measuredDistance: '', calculatedSPM: null},
+        pipette: {testSteps: 1000, measuredVolume: '', calculatedSPML: null},
     })
 
     // Program tab state
@@ -82,8 +84,10 @@ function App() {
     const [zAxisUp, setZAxisUp] = useState(true) // true = up, false = down
 
     // Axis positions state (for Manual tab)
-    const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, motor_steps: {}})
+    const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {}})
     const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
+    const [positionEditMode, setPositionEditMode] = useState(false)
+    const [positionInputs, setPositionInputs] = useState({x: 0, y: 0, z: 0, pipette_ml: 0})
 
     // Drift test state
     const [driftTestConfig, setDriftTestConfig] = useState({cycles: 10, motor_speed: 0.001, steps_per_mm: 200, motor: 1})
@@ -518,8 +522,9 @@ function App() {
         }
 
         const volume = parseFloat(quickOpVolume)
-        if (isNaN(volume) || volume <= 0 || volume > 10) {
-            console.error('Volume must be between 0 and 10 mL')
+        const maxML = config.PIPETTE_MAX_ML || 100
+        if (isNaN(volume) || volume <= 0 || volume > maxML) {
+            console.error(`Volume must be between 0 and ${maxML} mL`)
             return
         }
 
@@ -606,7 +611,7 @@ function App() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({direction: zAxisUp ? 'down' : 'up'})
+                body: JSON.stringify({direction: zAxisUp ? 'up' : 'down'})
             })
 
             const data = await response.json()
@@ -624,8 +629,9 @@ function App() {
 
     const handleCollect = async () => {
         const volume = parseFloat(pipetteVolume)
-        if (isNaN(volume) || volume <= 0 || volume > 10) {
-            console.error('Volume must be between 0 and 10 mL')
+        const maxML = config.PIPETTE_MAX_ML || 100
+        if (isNaN(volume) || volume <= 0 || volume > maxML) {
+            console.error(`Volume must be between 0 and ${maxML} mL`)
             return
         }
 
@@ -642,6 +648,7 @@ function App() {
 
             if (response.ok) {
                 console.log(`${data.message}`)
+                fetchAxisPositions()
             } else {
                 console.error(`Error: ${data.detail || 'Failed to aspirate'}`)
             }
@@ -652,8 +659,9 @@ function App() {
 
     const handleDispense = async () => {
         const volume = parseFloat(pipetteVolume)
-        if (isNaN(volume) || volume <= 0 || volume > 10) {
-            console.error('Volume must be between 0 and 10 mL')
+        const maxML = config.PIPETTE_MAX_ML || 100
+        if (isNaN(volume) || volume <= 0 || volume > maxML) {
+            console.error(`Volume must be between 0 and ${maxML} mL`)
             return
         }
 
@@ -670,6 +678,7 @@ function App() {
 
             if (response.ok) {
                 console.log(`${data.message}`)
+                fetchAxisPositions()
             } else {
                 console.error(`Error: ${data.detail || 'Failed to dispense'}`)
             }
@@ -716,6 +725,37 @@ function App() {
         } catch (error) {
             console.error('Failed to fetch axis positions:', error)
         }
+    }
+
+    const handleSetPosition = async () => {
+        try {
+            const response = await fetch('/api/axis/set-position', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    x: parseFloat(positionInputs.x) || 0,
+                    y: parseFloat(positionInputs.y) || 0,
+                    z: parseFloat(positionInputs.z) || 0,
+                    pipette_ml: parseFloat(positionInputs.pipette_ml) || 0
+                })
+            })
+            const data = await response.json()
+            if (response.ok) {
+                console.log(data.message)
+                if (data.positions) setAxisPositions(data.positions)
+                fetchCurrentPosition()
+                setPositionEditMode(false)
+            } else {
+                console.error(`Error: ${data.detail || 'Failed to set position'}`)
+            }
+        } catch (error) {
+            console.error('Failed to set position:', error.message)
+        }
+    }
+
+    const handleEnterPositionEdit = () => {
+        setPositionInputs({x: axisPositions.x, y: axisPositions.y, z: axisPositions.z, pipette_ml: axisPositions.pipette_ml || 0})
+        setPositionEditMode(true)
     }
 
     // Drift test functions
@@ -824,6 +864,12 @@ function App() {
                 }
                 if (data.operation_well !== undefined) {
                     setOperationWell(data.operation_well)
+                }
+
+                // Sync Z-axis toggle with actual position
+                // Button shows the action: UP when Z is low, DOWN when Z is high
+                if (data.position) {
+                    setZAxisUp(data.position.z <= 5)
                 }
             } else {
                 console.log('No position data available:', data)
@@ -1320,7 +1366,7 @@ function App() {
                             <div className="axis-control-card">
                                 <div className="axis-header">
                                     <h3>Pipette</h3>
-                                    <span className="axis-position">Motor 4</span>
+                                    <span className="axis-position">{axisPositions.pipette_ml} mL</span>
                                 </div>
                                 <div className="axis-step-input">
                                     <label>Steps:</label>
@@ -1354,6 +1400,69 @@ function App() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="set-position-section">
+                            {!positionEditMode ? (
+                                <button
+                                    className="btn btn-set-position"
+                                    onClick={handleEnterPositionEdit}
+                                    disabled={isExecuting}
+                                >
+                                    Set Current Position
+                                </button>
+                            ) : (
+                                <div className="position-edit-card">
+                                    <h3>Set Current Position (mm)</h3>
+                                    <p className="position-edit-hint">Override the tracked position without moving motors.</p>
+                                    <div className="position-edit-inputs">
+                                        <label>
+                                            X:
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={positionInputs.x}
+                                                onChange={(e) => setPositionInputs(prev => ({...prev, x: e.target.value}))}
+                                                className="step-input"
+                                            />
+                                        </label>
+                                        <label>
+                                            Y:
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={positionInputs.y}
+                                                onChange={(e) => setPositionInputs(prev => ({...prev, y: e.target.value}))}
+                                                className="step-input"
+                                            />
+                                        </label>
+                                        <label>
+                                            Z:
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={positionInputs.z}
+                                                onChange={(e) => setPositionInputs(prev => ({...prev, z: e.target.value}))}
+                                                className="step-input"
+                                            />
+                                        </label>
+                                        <label>
+                                            Pipette (mL):
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={positionInputs.pipette_ml}
+                                                onChange={(e) => setPositionInputs(prev => ({...prev, pipette_ml: e.target.value}))}
+                                                className="step-input"
+                                            />
+                                        </label>
+                                    </div>
+                                    <div className="position-edit-actions">
+                                        <button className="btn btn-add-step" onClick={handleSetPosition}>Apply</button>
+                                        <button className="btn btn-cancel" onClick={() => setPositionEditMode(false)}>Cancel</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="manual-info">
@@ -1834,6 +1943,15 @@ function App() {
                                                     className="form-input"
                                                 />
                                             </div>
+                                            <div className="form-group">
+                                                <label>Max Pipette Volume (mL):</label>
+                                                <input
+                                                    type="number" min="0.1" step="0.1"
+                                                    value={config.PIPETTE_MAX_ML}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_MAX_ML', parseFloat(e.target.value))}
+                                                    className="form-input"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2048,6 +2166,137 @@ function App() {
                                                     </div>
                                                 )
                                             })}
+
+                                            {/* Pipette calibration card */}
+                                            <div className="calibration-card">
+                                                <h4>Pipette</h4>
+                                                <div className="calibration-row">
+                                                    <label>Steps/mL:</label>
+                                                    <div className="calibration-spm-row">
+                                                        <input
+                                                            type="number" min="1"
+                                                            value={config.PIPETTE_STEPS_PER_ML}
+                                                            onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value) || 0)}
+                                                            className="form-input"
+                                                        />
+                                                        <button
+                                                            className="calibration-btn apply-btn"
+                                                            onClick={async () => {
+                                                                setConfigLoading(true)
+                                                                setConfigMessage('')
+                                                                try {
+                                                                    const res = await fetch('/api/config', {
+                                                                        method: 'POST',
+                                                                        headers: {'Content-Type': 'application/json'},
+                                                                        body: JSON.stringify(config)
+                                                                    })
+                                                                    const data = await res.json()
+                                                                    setConfigMessage(data.status === 'success' ? '✓ ' + data.message : '✗ Failed to save')
+                                                                } catch (err) {
+                                                                    setConfigMessage('✗ Error: ' + err.message)
+                                                                } finally {
+                                                                    setConfigLoading(false)
+                                                                }
+                                                            }}
+                                                        >
+                                                            Save
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <hr className="calibration-divider" />
+
+                                                <div className="calibration-row">
+                                                    <label>Test Steps:</label>
+                                                    <input
+                                                        type="number" min="1"
+                                                        value={calibration.pipette.testSteps}
+                                                        onChange={(e) => setCalibration(prev => ({
+                                                            ...prev,
+                                                            pipette: {...prev.pipette, testSteps: parseInt(e.target.value) || 0}
+                                                        }))}
+                                                        className="form-input"
+                                                    />
+                                                </div>
+
+                                                <div className="calibration-move-buttons">
+                                                    <button
+                                                        className="calibration-btn move-btn"
+                                                        onClick={() => handleAxisMove('pipette', calibration.pipette.testSteps, 'cw')}
+                                                    >
+                                                        Aspirate +
+                                                    </button>
+                                                    <button
+                                                        className="calibration-btn move-btn"
+                                                        onClick={() => handleAxisMove('pipette', calibration.pipette.testSteps, 'ccw')}
+                                                    >
+                                                        Dispense −
+                                                    </button>
+                                                </div>
+
+                                                <div className="calibration-row">
+                                                    <label>Measured Volume (mL):</label>
+                                                    <input
+                                                        type="number" step="0.01" min="0"
+                                                        value={calibration.pipette.measuredVolume}
+                                                        onChange={(e) => setCalibration(prev => ({
+                                                            ...prev,
+                                                            pipette: {...prev.pipette, measuredVolume: e.target.value}
+                                                        }))}
+                                                        className="form-input"
+                                                        placeholder="Enter measured mL"
+                                                    />
+                                                </div>
+
+                                                <button
+                                                    className="calibration-btn calculate-btn"
+                                                    disabled={!calibration.pipette.measuredVolume || parseFloat(calibration.pipette.measuredVolume) <= 0}
+                                                    onClick={() => {
+                                                        const vol = parseFloat(calibration.pipette.measuredVolume)
+                                                        if (vol > 0) {
+                                                            const spml = Math.round(calibration.pipette.testSteps / vol)
+                                                            setCalibration(prev => ({
+                                                                ...prev,
+                                                                pipette: {...prev.pipette, calculatedSPML: spml}
+                                                            }))
+                                                        }
+                                                    }}
+                                                >
+                                                    Calculate
+                                                </button>
+
+                                                {calibration.pipette.calculatedSPML !== null && (
+                                                    <div className="calibration-result">
+                                                        <span className="calibration-value">
+                                                            {calibration.pipette.calculatedSPML} steps/mL
+                                                        </span>
+                                                        <button
+                                                            className="calibration-btn apply-btn"
+                                                            onClick={async () => {
+                                                                const updatedConfig = {...config, PIPETTE_STEPS_PER_ML: calibration.pipette.calculatedSPML}
+                                                                setConfig(updatedConfig)
+                                                                setConfigLoading(true)
+                                                                setConfigMessage('')
+                                                                try {
+                                                                    const res = await fetch('/api/config', {
+                                                                        method: 'POST',
+                                                                        headers: {'Content-Type': 'application/json'},
+                                                                        body: JSON.stringify(updatedConfig)
+                                                                    })
+                                                                    const data = await res.json()
+                                                                    setConfigMessage(data.status === 'success' ? '✓ ' + data.message : '✗ Failed to save')
+                                                                } catch (err) {
+                                                                    setConfigMessage('✗ Error: ' + err.message)
+                                                                } finally {
+                                                                    setConfigLoading(false)
+                                                                }
+                                                            }}
+                                                        >
+                                                            Apply &amp; Save
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </>
@@ -2107,20 +2356,20 @@ function App() {
                             </button>
                         </div>
 
-                        <div className="pipette-config-control">
-                            <label>Pipette Configuration:</label>
-                            <select
-                                value={currentPipetteCount}
-                                onChange={(e) => handleSetPipetteCount(Number(e.target.value))}
-                                className="form-input form-select"
-                                disabled={isExecuting}
-                            >
-                                <option value={1}>1 Pipette</option>
-                                <option value={3}>3 Pipettes</option>
-                            </select>
-
-                            {/* Z-axis Toggle Control */}
-                            <div className="z-axis-control">
+                        <div className="pipette-config-panel">
+                            <div className="pipette-config-row">
+                                <div className="pipette-config-item">
+                                    <label>Pipette Configuration:</label>
+                                    <select
+                                        value={currentPipetteCount}
+                                        onChange={(e) => handleSetPipetteCount(Number(e.target.value))}
+                                        className="form-input form-select"
+                                        disabled={isExecuting}
+                                    >
+                                        <option value={1}>1 Pipette</option>
+                                        <option value={3}>3 Pipettes</option>
+                                    </select>
+                                </div>
                                 <button
                                     className={`btn btn-z-toggle ${zAxisUp ? 'z-up' : 'z-down'}`}
                                     onClick={handleToggleZ}
@@ -2129,34 +2378,37 @@ function App() {
                                     Z-Axis: {zAxisUp ? '⬆ UP' : '⬇ DOWN'}
                                 </button>
                             </div>
-
-                            {/* Dispense/Collect Controls */}
-                            <div className="pipette-controls">
-                                <div className="pipette-control-row">
+                            <div className="pipette-volume-row">
+                                <div className="pipette-current-volume">
+                                    Current: <strong>{axisPositions.pipette_ml ?? 0} mL</strong> / {config.PIPETTE_MAX_ML ?? 100} mL
+                                </div>
+                                <div className="pipette-volume-input">
                                     <label>Volume (mL):</label>
                                     <input
                                         type="number"
                                         min="0.1"
-                                        max="10"
+                                        max={config.PIPETTE_MAX_ML || 100}
                                         step="0.1"
                                         value={pipetteVolume}
                                         onChange={(e) => setPipetteVolume(e.target.value)}
                                         className="form-input"
                                         disabled={isExecuting}
                                     />
+                                </div>
+                                <div className="pipette-action-buttons">
                                     <button
                                         className="btn btn-collect"
                                         onClick={handleCollect}
                                         disabled={isExecuting}
                                     >
-                                        🔵 Collect
+                                        Collect
                                     </button>
                                     <button
                                         className="btn btn-dispense"
                                         onClick={handleDispense}
                                         disabled={isExecuting}
                                     >
-                                        🟢 Dispense
+                                        Dispense
                                     </button>
                                 </div>
                             </div>

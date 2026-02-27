@@ -30,7 +30,12 @@
       "Bash(git push:*)",
       "Bash(gh auth:*)",
       "Bash(cd /home/james/jamesProject/frontend && npm run build 2>&1)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(sudo supervisorctl:*)",
+      "Bash(source:*)",
+      "Bash(sudo fuser:*)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages"
     ],
     "deny": [],
     "ask": []

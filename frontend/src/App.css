@@ -183,35 +183,42 @@
     }
 }
 
-.pipette-config-control {
+/* Pipette Configuration Panel */
+.pipette-config-panel {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
     margin-bottom: 10px;
-    padding: 10px 12px;
+    padding: 12px;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: 10px;
 }
 
-.pipette-config-control label {
-    font-size: 0.9rem;
+.pipette-config-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pipette-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.pipette-config-item label {
+    font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-secondary);
-    margin: 0;
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-.pipette-config-control select {
-    flex: 1 1 120px;
-    min-width: 110px;
-    max-width: 160px;
-}
-
-/* Z-axis Control — collapse wrapper, button is direct flex child */
-.z-axis-control {
-    display: contents;
+.pipette-config-item select {
+    flex: 1;
+    min-width: 0;
 }
 
 .btn-z-toggle {
@@ -222,9 +229,8 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    flex: 1 1 140px;
-    min-width: 120px;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .btn-z-toggle.z-up {
@@ -261,34 +267,46 @@
     box-shadow: none;
 }
 
-/* Pipette Controls (Dispense/Collect) — collapse wrapper into parent flex */
-.pipette-controls {
-    display: contents;
-}
-
-.pipette-control-row {
-    display: contents;
-}
-
-.pipette-control-row label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
-    white-space: nowrap;
+/* Pipette Volume Row */
+.pipette-volume-row {
     display: flex;
     align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pipette-current-volume {
+    width: 100%;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 2px;
+}
+
+.pipette-current-volume strong {
+    color: #3b82f6;
+    font-size: 0.95rem;
+}
+
+.pipette-volume-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
 }
 
-.pipette-control-row label::before {
-    content: '💧';
-    margin-right: 5px;
-    font-size: 15px;
+.pipette-volume-input label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
 }
 
-.pipette-control-row input {
-    width: 80px;
-    flex: 0 0 80px;
+.pipette-volume-input input {
+    width: 70px;
     padding: 8px 10px;
     font-size: 14px;
     font-weight: 600;
@@ -300,15 +318,22 @@
     transition: all 0.3s ease;
 }
 
-.pipette-control-row input:focus {
+.pipette-volume-input input:focus {
     outline: none;
     border-color: #3b82f6;
     background: var(--input-focus-bg);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.pipette-control-row input:hover:not(:disabled) {
+.pipette-volume-input input:hover:not(:disabled) {
     border-color: var(--border-hover);
+}
+
+.pipette-action-buttons {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
 }
 
 .btn-collect,
@@ -325,6 +350,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     position: relative;
     overflow: hidden;
+    min-width: 0;
 }
 
 .btn-collect::before,
@@ -351,7 +377,7 @@
 
 .btn-collect:hover:not(:disabled) {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
@@ -367,7 +393,7 @@
 
 .btn-dispense:hover:not(:disabled) {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
 }
 
@@ -1069,29 +1095,32 @@
         width: 100%;
     }
 
-    /* Pipette Config Control */
-    .pipette-config-control {
-        gap: 6px;
+    /* Pipette Config Panel */
+    .pipette-config-row,
+    .pipette-volume-row {
+        flex-wrap: wrap;
     }
 
-    .pipette-config-control select {
-        flex: 1 1 100px;
+    .pipette-config-item {
+        flex: 1 1 100%;
     }
 
     .btn-z-toggle {
-        flex: 1 1 110px;
+        flex: 1 1 100%;
         padding: 8px 10px;
         font-size: 0.85rem;
     }
 
-    .pipette-control-row input {
-        flex: 1 1 70px;
-        width: auto;
+    .pipette-volume-input {
+        flex: 1 1 100%;
+    }
+
+    .pipette-action-buttons {
+        flex: 1 1 100%;
     }
 
     .btn-collect,
     .btn-dispense {
-        flex: 1 1 90px;
         padding: 8px 10px;
         font-size: 13px;
     }
@@ -1244,20 +1273,18 @@
         font-size: 0.85rem;
     }
 
-    /* Pipette Config Control */
-    .pipette-config-control {
+    /* Pipette Config Panel */
+    .pipette-config-panel {
         padding: 8px 10px;
     }
 
     .btn-z-toggle {
-        flex: 1 1 100px;
         padding: 8px 10px;
         font-size: 0.85rem;
     }
 
     .btn-collect,
     .btn-dispense {
-        flex: 1 1 80px;
         padding: 8px 6px;
         font-size: 12px;
     }
@@ -1422,7 +1449,7 @@
         min-height: 48px;
     }
 
-    .pipette-control-row input {
+    .pipette-volume-input input {
         min-height: 48px;
         font-size: 16px;
     }
@@ -1432,8 +1459,6 @@
         min-height: 48px;
         font-size: 14px;
     }
-
-
 
     .btn-collect:hover::before,
     .btn-dispense:hover::before {
@@ -1514,6 +1539,8 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .calibration-card h4 {
@@ -1541,10 +1568,12 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    min-width: 0;
 }
 
 .calibration-spm-row .form-input {
     flex: 1;
+    min-width: 0;
 }
 
 .calibration-divider {
@@ -2139,6 +2168,82 @@
     margin: 0;
     font-size: 0.95rem;
     color: var(--text-secondary);
+}
+
+/* Set Position Section */
+.set-position-section {
+    margin-top: 20px;
+}
+
+.btn-set-position {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-set-position:hover {
+    border-color: #4A90D9;
+    background: rgba(74, 144, 217, 0.08);
+}
+
+.position-edit-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.position-edit-card h3 {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+}
+
+.position-edit-hint {
+    margin: 0 0 15px 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.position-edit-inputs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.position-edit-inputs label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.position-edit-inputs .step-input {
+    width: 100px;
+}
+
+.position-edit-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-cancel {
+    padding: 8px 20px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-cancel:hover {
+    background: var(--bg-tertiary);
 }
 
 /* Manual Tab Mobile Responsive */
