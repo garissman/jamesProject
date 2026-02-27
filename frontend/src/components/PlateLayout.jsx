@@ -135,7 +135,7 @@ export default function PlateLayout({
     }
 
     return (
-        <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-[15px] max-w-2xl flex flex-col">
+        <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-[15px] flex flex-col">
             {/* Plate Header */}
             <div className="flex justify-between items-center mb-[15px]">
                 <h2 className="text-[1.3rem] m-0 font-semibold text-[var(--text-primary)]">Plate layout</h2>

@@ -786,9 +786,26 @@ class DriftTestRequest(BaseModel):
     motor: int = Field(default=1, ge=1, le=4, description="Motor to test: 1=X, 2=Y, 3=Z, 4=Pipette")
 
 
+def _move_until_limit_rpi(motor, direction, motor_speed):
+    """RPi: use motor object's move_until_limit method.
+    Returns (steps_taken, hit_limit: bool)"""
+    steps, hit = motor.move_until_limit(direction, motor_speed)
+    return steps, hit != 'none'
+
+
+def _move_until_limit_arduino(stepper, motor_num, direction, motor_speed, max_steps=500000):
+    """Arduino: use move_motor with large step count; limit stops it early.
+    motor_speed is delay in seconds - convert to microseconds for Arduino.
+    Returns (steps_taken, hit_limit: bool)"""
+    delay_us = max(50, int(motor_speed * 1_000_000))
+    result = stepper.move_motor(motor_num, max_steps, direction, delay_us)
+    return result["steps_executed"], result["limit_triggered"]
+
+
 def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num: int = 1):
     """
     Simple drift test: move back and forth between limits, count steps.
+    Works with both RPi (direct motor access) and Arduino (RPC move_motor).
     """
     global drift_test_running, drift_test_results, pipetting_controller
     import time
@@ -814,28 +831,39 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             raise Exception("Pipetting controller not initialized")
 
         stepper = pipetting_controller.stepper_controller
-        motor = stepper.get_motor(motor_num)
+        is_arduino = pipetting_controller.controller_type == 'arduino_uno_q'
 
-        has_limits = motor.limit_min_pin is not None and motor.limit_max_pin is not None
-        if not has_limits:
-            raise Exception(f"No limit switches configured for {motor_name}")
+        # Validate limit switches exist (RPi only - Arduino always has limits wired)
+        if not is_arduino:
+            motor = stepper.get_motor(motor_num)
+            has_limits = motor.limit_min_pin is not None and motor.limit_max_pin is not None
+            if not has_limits:
+                raise Exception(f"No limit switches configured for {motor_name}")
+
+        def move_until_limit(direction):
+            """Abstracted move-until-limit for both controllers"""
+            if is_arduino:
+                return _move_until_limit_arduino(stepper, motor_num, direction, motor_speed)
+            else:
+                return _move_until_limit_rpi(motor, direction, motor_speed)
 
         # Start by moving CLOCKWISE until we hit something
         drift_test_results["status"] = "homing"
         print("Drift Test: Moving CW to find first limit...")
 
         current_dir = Direction.CLOCKWISE
-        steps, hit = motor.move_until_limit(current_dir, motor_speed)
+        steps, hit = move_until_limit(current_dir)
 
-        if hit == 'none':
+        if not hit:
             # Try other direction
             current_dir = Direction.COUNTERCLOCKWISE
-            steps, hit = motor.move_until_limit(current_dir, motor_speed)
+            steps, hit = move_until_limit(current_dir)
 
-        if hit == 'none':
+        if not hit:
             raise Exception("Could not find any limit switch")
 
-        print(f"Drift Test: Found {hit.upper()} limit. Ready to start cycles.")
+        dir_label = "CW" if current_dir == Direction.CLOCKWISE else "CCW"
+        print(f"Drift Test: Found limit ({dir_label}). Ready to start cycles.")
         drift_test_results["status"] = "running"
         time.sleep(0.3)
 
@@ -854,9 +882,9 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             # Move until we hit the other limit
             print(f"Cycle {cycle}: Moving {current_dir.name}...")
             fwd_start = time.time()
-            fwd_steps, fwd_limit = motor.move_until_limit(current_dir, motor_speed)
+            fwd_steps, fwd_hit = move_until_limit(current_dir)
             fwd_time = time.time() - fwd_start
-            print(f"Cycle {cycle}: Hit {fwd_limit.upper()} after {fwd_steps} steps")
+            print(f"Cycle {cycle}: Hit limit after {fwd_steps} steps")
 
             time.sleep(0.3)
 
@@ -866,9 +894,9 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             # Move back
             print(f"Cycle {cycle}: Moving {current_dir.name}...")
             back_start = time.time()
-            back_steps, back_limit = motor.move_until_limit(current_dir, motor_speed)
+            back_steps, back_hit = move_until_limit(current_dir)
             back_time = time.time() - back_start
-            print(f"Cycle {cycle}: Hit {back_limit.upper()} after {back_steps} steps")
+            print(f"Cycle {cycle}: Hit limit after {back_steps} steps")
 
             cycle_elapsed = time.time() - cycle_start
 
@@ -938,12 +966,6 @@ async def start_drift_test(request: DriftTestRequest):
         raise HTTPException(
             status_code=503,
             detail="Pipetting controller not initialized"
-        )
-
-    if pipetting_controller.controller_type == 'arduino_uno_q':
-        raise HTTPException(
-            status_code=400,
-            detail="Drift test requires Raspberry Pi controller (uses direct motor access)"
         )
 
     drift_test_running = True
