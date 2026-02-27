@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a2a4a"/>
+      <stop offset="100%" stop-color="#0d1b2a"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0e8f0"/>
+      <stop offset="100%" stop-color="#b0bec5"/>
+    </linearGradient>
+    <linearGradient id="pipette" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#90caf9"/>
+      <stop offset="100%" stop-color="#42a5f5"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="100%" stop-color="#0288d1"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="80%" stop-color="#0277bd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#bg)"/>
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="none" stroke="#2a4a6a" stroke-width="1.5"/>
+
+  <!-- 96-well plate (simplified 4x6 grid) -->
+  <g transform="translate(16, 62)">
+    <!-- Plate body -->
+    <rect x="0" y="0" width="56" height="48" rx="4" fill="url(#plate)" opacity="0.9"/>
+    <rect x="0" y="0" width="56" height="48" rx="4" fill="none" stroke="#78909c" stroke-width="0.8"/>
+
+    <!-- Wells - 4 columns x 6 rows -->
+    <g fill="#1a2a4a" opacity="0.7">
+      <!-- Row 1 -->
+      <circle cx="8" cy="8" r="3"/>
+      <circle cx="18" cy="8" r="3"/>
+      <circle cx="28" cy="8" r="3"/>
+      <circle cx="38" cy="8" r="3"/>
+      <circle cx="48" cy="8" r="3"/>
+      <!-- Row 2 -->
+      <circle cx="8" cy="18" r="3"/>
+      <circle cx="18" cy="18" r="3"/>
+      <circle cx="28" cy="18" r="3"/>
+      <circle cx="38" cy="18" r="3"/>
+      <circle cx="48" cy="18" r="3"/>
+      <!-- Row 3 -->
+      <circle cx="8" cy="28" r="3"/>
+      <circle cx="18" cy="28" r="3"/>
+      <circle cx="28" cy="28" r="3"/>
+      <circle cx="38" cy="28" r="3"/>
+      <circle cx="48" cy="28" r="3"/>
+      <!-- Row 4 -->
+      <circle cx="8" cy="38" r="3"/>
+      <circle cx="18" cy="38" r="3"/>
+      <circle cx="28" cy="38" r="3"/>
+      <circle cx="38" cy="38" r="3"/>
+      <circle cx="48" cy="38" r="3"/>
+    </g>
+
+    <!-- Highlight wells with sample colors -->
+    <circle cx="8" cy="8" r="2.5" fill="#e53935" opacity="0.8"/>
+    <circle cx="18" cy="8" r="2.5" fill="#43a047" opacity="0.8"/>
+    <circle cx="28" cy="18" r="2.5" fill="#fb8c00" opacity="0.8"/>
+    <circle cx="38" cy="28" r="2.5" fill="#8e24aa" opacity="0.8"/>
+    <circle cx="48" cy="18" r="2.5" fill="#1e88e5" opacity="0.8"/>
+  </g>
+
+  <!-- Pipette -->
+  <g transform="translate(78, 12)">
+    <!-- Pipette plunger button -->
+    <rect x="8" y="0" width="12" height="8" rx="3" fill="#546e7a"/>
+
+    <!-- Pipette body -->
+    <rect x="6" y="8" width="16" height="50" rx="3" fill="url(#pipette)"/>
+    <rect x="6" y="8" width="16" height="50" rx="3" fill="none" stroke="#1e88e5" stroke-width="0.8"/>
+
+    <!-- Volume window -->
+    <rect x="9" y="14" width="10" height="16" rx="2" fill="#0d1b2a" opacity="0.6"/>
+    <!-- Volume markings -->
+    <line x1="10" y1="18" x2="18" y2="18" stroke="#4fc3f7" stroke-width="0.6"/>
+    <line x1="10" y1="22" x2="18" y2="22" stroke="#4fc3f7" stroke-width="0.6"/>
+    <line x1="10" y1="26" x2="18" y2="26" stroke="#4fc3f7" stroke-width="0.6"/>
+
+    <!-- Grip ridges -->
+    <line x1="8" y1="36" x2="20" y2="36" stroke="#1e88e5" stroke-width="0.5" opacity="0.5"/>
+    <line x1="8" y1="39" x2="20" y2="39" stroke="#1e88e5" stroke-width="0.5" opacity="0.5"/>
+    <line x1="8" y1="42" x2="20" y2="42" stroke="#1e88e5" stroke-width="0.5" opacity="0.5"/>
+
+    <!-- Pipette tip cone -->
+    <polygon points="10,58 18,58 16,78 12,78" fill="#e0e8f0"/>
+    <polygon points="10,58 18,58 16,78 12,78" fill="none" stroke="#90a4ae" stroke-width="0.6"/>
+
+    <!-- Pipette tip narrow end -->
+    <rect x="12.5" y="78" width="3" height="14" rx="1" fill="#e0e8f0"/>
+    <rect x="12.5" y="78" width="3" height="14" rx="1" fill="none" stroke="#90a4ae" stroke-width="0.5"/>
+
+    <!-- Liquid in tip -->
+    <rect x="13" y="84" width="2" height="7" rx="0.8" fill="url(#liquid)" opacity="0.9"/>
+
+    <!-- Drop falling -->
+    <ellipse cx="14" cy="96" rx="2" ry="2.8" fill="url(#drop)" opacity="0.85"/>
+  </g>
+
+  <!-- Subtle glow on plate from pipette area -->
+  <circle cx="86" cy="90" r="20" fill="#42a5f5" opacity="0.06"/>
+
+  <!-- Motion arrows (X/Y movement) -->
+  <g stroke="#4fc3f7" stroke-width="1.2" fill="none" opacity="0.5" stroke-linecap="round">
+    <!-- X arrow -->
+    <line x1="18" y1="56" x2="52" y2="56"/>
+    <polyline points="48,53 52,56 48,59"/>
+    <!-- Y arrow -->
+    <line x1="12" y1="64" x2="12" y2="98"/>
+    <polyline points="9,94 12,98 15,94"/>
+  </g>
+</svg>
