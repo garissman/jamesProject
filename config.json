@@ -26,5 +26,6 @@
   "INVERT_X": true,
   "INVERT_Y": false,
   "INVERT_Z": false,
-  "INVERT_PIPETTE": true
+  "INVERT_PIPETTE": true,
+  "CONTROLLER_TYPE": "raspberry_pi"
 }

@@ -294,6 +294,7 @@ async def get_pipetting_status():
         layout_type = pipetting_controller.layout_type
         current_operation = pipetting_controller.current_operation
         operation_well = pipetting_controller.operation_well
+        controller_type = pipetting_controller.controller_type
         return {
             "initialized": True,
             "position": {
@@ -304,6 +305,7 @@ async def get_pipetting_status():
             "current_well": current_well,
             "pipette_count": pipette_count,
             "layout_type": layout_type,
+            "controller_type": controller_type,
             "is_executing": is_executing,
             "current_operation": current_operation,
             "operation_well": operation_well,
@@ -518,6 +520,109 @@ async def dispense_liquid(request: VolumeRequest):
         )
 
 
+# Controller type switching endpoint
+class SetControllerTypeRequest(BaseModel):
+    """Request to switch controller type"""
+    controllerType: str = Field(..., description="Controller type: 'raspberry_pi' or 'arduino_uno_q'")
+
+
+@app.post("/api/pipetting/set-controller-type")
+async def set_controller_type(request: SetControllerTypeRequest):
+    """Switch the hardware controller type at runtime"""
+    global pipetting_controller
+
+    if request.controllerType not in ('raspberry_pi', 'arduino_uno_q'):
+        raise HTTPException(status_code=400, detail="controllerType must be 'raspberry_pi' or 'arduino_uno_q'")
+
+    try:
+        # Persist to config.json
+        cfg = settings.load()
+        cfg['CONTROLLER_TYPE'] = request.controllerType
+        settings.save(cfg)
+
+        # Reinitialize controller with new type
+        if pipetting_controller:
+            try:
+                pipetting_controller.cleanup()
+            except Exception as cleanup_error:
+                print(f"Warning during cleanup: {cleanup_error}")
+
+        pipetting_controller = PipettingController()
+        print(f"Controller switched to: {request.controllerType}")
+
+        return {
+            "status": "success",
+            "message": f"Controller switched to {request.controllerType}",
+            "controller_type": request.controllerType
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error switching controller: {str(e)}")
+
+
+# Arduino-specific endpoints (LED test, MCU ping, limit switches via RPC)
+class LedTestRequest(BaseModel):
+    """Request for LED test"""
+    pattern: str = Field("all", description="LED pattern: all, matrix, rgb, progress, motor, idle, sweep, etc.")
+    value: int = Field(0, description="Optional value for pattern")
+
+
+@app.post("/api/led/test")
+async def test_led(request: LedTestRequest):
+    """Test LED matrix and RGB LEDs on Arduino UNO Q"""
+    if pipetting_controller is None:
+        raise HTTPException(status_code=503, detail="Pipetting controller not initialized")
+
+    if pipetting_controller.controller_type != 'arduino_uno_q':
+        raise HTTPException(status_code=400, detail="LED test is only available in Arduino UNO Q mode")
+
+    try:
+        result = pipetting_controller.stepper_controller.led_test(request.pattern, request.value)
+        return {
+            "status": "success" if result else "failed",
+            "message": f"LED test '{request.pattern}' executed",
+            "pattern": request.pattern,
+            "value": request.value
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running LED test: {str(e)}")
+
+
+@app.get("/api/mcu/ping")
+async def ping_mcu():
+    """Ping the MCU to verify communication (Arduino UNO Q only)"""
+    if pipetting_controller is None:
+        raise HTTPException(status_code=503, detail="Pipetting controller not initialized")
+
+    if pipetting_controller.controller_type != 'arduino_uno_q':
+        raise HTTPException(status_code=400, detail="MCU ping is only available in Arduino UNO Q mode")
+
+    try:
+        result = pipetting_controller.stepper_controller.ping()
+        return {
+            "status": "success" if result else "failed",
+            "connected": result,
+            "message": "MCU responded with pong" if result else "No response from MCU"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error pinging MCU: {str(e)}")
+
+
+@app.get("/api/mcu/limits")
+async def get_mcu_limit_switches():
+    """Get state of all limit switches via Arduino RPC"""
+    if pipetting_controller is None:
+        raise HTTPException(status_code=503, detail="Pipetting controller not initialized")
+
+    if pipetting_controller.controller_type != 'arduino_uno_q':
+        raise HTTPException(status_code=400, detail="MCU limits endpoint is only available in Arduino UNO Q mode")
+
+    try:
+        limits = pipetting_controller.stepper_controller.get_limit_states()
+        return {"status": "success", "limits": limits}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting limit states: {str(e)}")
+
+
 # Manual axis control endpoints
 class AxisMoveRequest(BaseModel):
     """Request to move a specific axis"""
@@ -609,11 +714,12 @@ async def set_axis_position(request: SetPositionRequest):
         pipetting_controller.current_position = WellCoordinates(
             x=request.x, y=request.y, z=request.z
         )
-        # Also reset motor step counters to match
-        mapper = pipetting_controller.mapper
-        pipetting_controller.stepper_controller.get_motor(1).current_position = int(request.x * mapper.STEPS_PER_MM_X)
-        pipetting_controller.stepper_controller.get_motor(2).current_position = int(request.y * mapper.STEPS_PER_MM_Y)
-        pipetting_controller.stepper_controller.get_motor(3).current_position = int(request.z * mapper.STEPS_PER_MM_Z)
+        # Also reset motor step counters to match (RPi only — Arduino doesn't expose per-motor objects)
+        if pipetting_controller.controller_type != 'arduino_uno_q':
+            mapper = pipetting_controller.mapper
+            pipetting_controller.stepper_controller.get_motor(1).current_position = int(request.x * mapper.STEPS_PER_MM_X)
+            pipetting_controller.stepper_controller.get_motor(2).current_position = int(request.y * mapper.STEPS_PER_MM_Y)
+            pipetting_controller.stepper_controller.get_motor(3).current_position = int(request.z * mapper.STEPS_PER_MM_Z)
         pipetting_controller.pipette_ml = request.pipette_ml
         pipetting_controller.save_position()
         return {
@@ -638,6 +744,11 @@ async def get_limit_switches():
         )
 
     try:
+        # Arduino has its own /api/mcu/limits endpoint
+        if pipetting_controller.controller_type == 'arduino_uno_q':
+            limits = pipetting_controller.stepper_controller.get_limit_states()
+            return {"status": "success", "limits": limits}
+
         stepper = pipetting_controller.stepper_controller
         limit_states = stepper.check_all_limit_switches()
 
@@ -682,7 +793,7 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
     global drift_test_running, drift_test_results, pipetting_controller
     import time
     from datetime import datetime
-    from stepper_control import Direction
+    from pipetting_controller import Direction
 
     motor_name = DRIFT_TEST_MOTOR_NAMES.get(motor_num, f"Motor {motor_num}")
 
@@ -829,6 +940,12 @@ async def start_drift_test(request: DriftTestRequest):
             detail="Pipetting controller not initialized"
         )
 
+    if pipetting_controller.controller_type == 'arduino_uno_q':
+        raise HTTPException(
+            status_code=400,
+            detail="Drift test requires Raspberry Pi controller (uses direct motor access)"
+        )
+
     drift_test_running = True
 
     # Start the test in a background thread
@@ -952,6 +1069,9 @@ class ConfigurationModel(BaseModel):
     INVERT_Y:       bool = Field(..., description="Invert Y-axis motor direction")
     INVERT_Z:       bool = Field(..., description="Invert Z-axis motor direction")
     INVERT_PIPETTE: bool = Field(..., description="Invert pipette motor direction")
+
+    # Controller Type
+    CONTROLLER_TYPE: str = Field("raspberry_pi", description="Controller type: 'raspberry_pi' or 'arduino_uno_q'")
 
 
 @app.get("/api/config")

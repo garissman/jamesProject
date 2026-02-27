@@ -36,7 +36,16 @@
       "Bash(sudo fuser:*)",
       "mcp__playwright__browser_take_screenshot",
       "mcp__playwright__browser_console_messages",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(gh api:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(wc:*)",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "mcp__plugin_playwright_playwright__browser_close"
     ],
     "deny": [],
     "ask": []

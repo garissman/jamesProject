@@ -6,3 +6,7 @@ python-dotenv==1.0.0
 # Motor drift testing (Raspberry Pi only)
 RPi.GPIO>=0.7.1
 matplotlib>=3.8.0
+
+# Arduino UNO Q controller (MessagePack-RPC communication)
+msgpack>=1.0.0
+pyserial>=3.5

@@ -6,11 +6,26 @@ Handles coordinate mapping and pipetting workflows
 import json
 import time
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 from typing import Tuple, Optional
 
 import settings
-from stepper_control import StepperController, Direction
+
+
+class Direction(IntEnum):
+    """Motor rotation direction — shared enum used by both controller backends."""
+    COUNTERCLOCKWISE = 0
+    CLOCKWISE = 1
+
+
+def _create_stepper_controller(controller_type: str):
+    """Factory: import and instantiate the right StepperController backend."""
+    if controller_type == 'arduino_uno_q':
+        from stepper_control_arduino import StepperController
+    else:
+        from stepper_control import StepperController
+    return StepperController()
 
 
 @dataclass
@@ -42,7 +57,7 @@ class CoordinateMapper:
 
     # Well plate configuration from CLAUDE.md (default/legacy layout)
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-    COLUMNS = list(range(1, 13))  # 1-12
+    COLUMNS = list(range(1, 16))  # 1-15 (extended for MicroChip layout)
 
     # Physical dimensions - read from config.json at import time
     WELL_SPACING = settings.get('WELL_SPACING')   # mm between wells
@@ -117,14 +132,13 @@ class CoordinateMapper:
                 return ws_id
 
         # Calculate which column based on X coordinate
-        x_offset = coords.x - CoordinateMapper.ORIGIN_X
-        well_pitch_x = CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING
-        column_index = round(x_offset / well_pitch_x)
+        # Must subtract BED_OFFSET to match well_to_coordinates
+        x_offset = coords.x - CoordinateMapper.ORIGIN_X - CoordinateMapper.BED_OFFSET_X
+        column_index = round(x_offset / CoordinateMapper.WELL_SPACING)
 
         # Calculate which row based on Y coordinate
-        y_offset = coords.y - CoordinateMapper.ORIGIN_Y
-        well_pitch_y = CoordinateMapper.WELL_DIAMETER + CoordinateMapper.WELL_SPACING
-        row_index = round(y_offset / well_pitch_y)
+        y_offset = coords.y - CoordinateMapper.ORIGIN_Y - CoordinateMapper.BED_OFFSET_Y
+        row_index = round(y_offset / CoordinateMapper.WELL_SPACING)
 
         # Validate indices are within bounds
         if 0 <= row_index < len(CoordinateMapper.ROWS) and 0 <= column_index < len(CoordinateMapper.COLUMNS):
@@ -295,7 +309,8 @@ class PipettingController:
 
     def __init__(self):
         """Initialize the pipetting controller"""
-        self.stepper_controller = StepperController()
+        self.controller_type = settings.get('CONTROLLER_TYPE')
+        self.stepper_controller = _create_stepper_controller(self.controller_type)
         self.mapper = CoordinateMapper()
         self.stop_requested = False
         self.log_buffer = []  # Store log messages for UI display
@@ -326,12 +341,42 @@ class PipettingController:
             return Direction.COUNTERCLOCKWISE if direction == Direction.CLOCKWISE else Direction.CLOCKWISE
         return direction
 
+    def _speed(self, seconds: float):
+        """Convert speed to controller-appropriate unit.
+
+        RPi expects delay in seconds (float).
+        Arduino expects delay_us in microseconds (int).
+        """
+        if self.controller_type == 'arduino_uno_q':
+            return int(seconds * 1_000_000)
+        return seconds
+
+    def _move_motor(self, motor_id: int, steps: int, direction: Direction, speed: float, **kwargs):
+        """Wrapper around stepper_controller.move_motor that normalises the interface.
+
+        RPi signature:  move_motor(id, steps, Direction, delay_s, check_limits) -> (steps, LimitSwitchState)
+        Arduino signature: move_motor(id, steps, Direction, delay_us) -> dict
+        """
+        converted_speed = self._speed(speed)
+        if self.controller_type == 'arduino_uno_q':
+            return self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed)
+        else:
+            # RPi accepts check_limits kwarg
+            check_limits = kwargs.get('check_limits', True)
+            return self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed, check_limits=check_limits)
+
     def _move_z_safe(self, steps: int, direction: Direction, speed: float) -> int:
         """Move Z-axis motor with software step limit enforcement.
 
         Clamps the requested steps so the motor position stays within
         [0, Z_MAX_STEPS].  Returns the number of steps actually commanded.
         """
+        if self.controller_type == 'arduino_uno_q':
+            # Arduino doesn't expose get_motor(); skip software clamping
+            if steps > 0:
+                self._move_motor(3, steps, direction, speed)
+            return steps
+
         motor = self.stepper_controller.get_motor(3)
         pos = motor.current_position
 
@@ -344,7 +389,7 @@ class PipettingController:
         if clamped < steps:
             self.log(f"Z-axis: clamped {steps} -> {clamped} steps (limit: {self.Z_MAX_STEPS})")
         if clamped > 0:
-            self.stepper_controller.move_motor(3, clamped, direction, speed)
+            self._move_motor(3, clamped, direction, speed)
         return clamped
 
     def log(self, message: str):
@@ -454,13 +499,13 @@ class PipettingController:
         if y_delta != 0:
             self.log(f"  Step 2: Moving Y ({y_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
-            self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED, check_limits=False)
+            self._move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED, check_limits=False)
 
         # Step 3: Move X (check_limits=False to avoid false triggers from EMI)
         if x_delta != 0:
             self.log(f"  Step 3: Moving X ({x_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
-            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED, check_limits=False)
+            self._move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED, check_limits=False)
 
         # Step 4: Move Z down to target position
         z_down_distance = Z_UP_POSITION - target_coords.z
@@ -501,7 +546,7 @@ class PipettingController:
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         actual_ml = steps / self.PIPETTE_STEPS_PER_ML
         self.log(f"  Aspirating {actual_ml:.3f} mL ({steps} steps)...")
-        self.stepper_controller.move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
+        self._move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         self.pipette_ml += actual_ml
         self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
@@ -529,7 +574,7 @@ class PipettingController:
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         actual_ml = steps / self.PIPETTE_STEPS_PER_ML
         self.log(f"  Dispensing {actual_ml:.3f} mL ({steps} steps)...")
-        self.stepper_controller.move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
+        self._move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         self.pipette_ml = max(0.0, self.pipette_ml - actual_ml)
         self.save_position()
         time.sleep(0.5)  # Allow liquid to settle
@@ -741,6 +786,16 @@ class PipettingController:
         Home a single axis to its MIN limit switch.
         Tries first_direction, then reverses if it hits MAX instead.
         """
+        if self.controller_type == 'arduino_uno_q':
+            # Arduino uses its own home_motor RPC call
+            self.log(f"Homing {axis_name} axis via Arduino RPC...")
+            result = self.stepper_controller.home_motor(motor_id, first_direction, self._speed(self.TRAVEL_SPEED))
+            if result.get('homed'):
+                self.log(f"{axis_name} axis: homed after {result['steps_to_home']} steps")
+            else:
+                self.log(f"{axis_name} axis: WARNING - homing failed")
+            return
+
         motor = self.stepper_controller.get_motor(motor_id)
 
         if motor.check_min_limit():
@@ -783,17 +838,25 @@ class PipettingController:
             self._move_z_safe(safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = 0.0
 
-        # Move Z to 75mm CW (skip if already there)
-        z_motor = self.stepper_controller.get_motor(3)
         z_target_mm = 70.0
-        if abs(self.current_position.z - z_target_mm) < 1.0:
-            self.log(f"Z-axis already at {self.current_position.z:.1f}mm — skipping")
+
+        if self.controller_type == 'arduino_uno_q':
+            # Arduino: simple Z raise then home X/Y via RPC
+            if abs(self.current_position.z - z_target_mm) > 1.0:
+                z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
+                self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
+                self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
         else:
-            z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
-            self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
-            z_motor.reset_position()
-            self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
-            self.log(f"Z-axis at {z_motor.current_position} steps")
+            # RPi: use get_motor for position tracking
+            z_motor = self.stepper_controller.get_motor(3)
+            if abs(self.current_position.z - z_target_mm) < 1.0:
+                self.log(f"Z-axis already at {self.current_position.z:.1f}mm — skipping")
+            else:
+                z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
+                self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
+                z_motor.reset_position()
+                self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
+                self.log(f"Z-axis at {z_motor.current_position} steps")
 
         # Home X axis to MIN limit switch (CW goes toward MIN on X)
         self._home_axis_to_min(1, "X", Direction.CLOCKWISE)
@@ -917,7 +980,7 @@ class PipettingController:
         if axis == 'z':
             self._move_z_safe(steps, motor_direction, self.TRAVEL_SPEED)
         else:
-            self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
+            self._move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
 
         # Update position tracking for X, Y, Z axes
         if axis == 'x':
@@ -948,7 +1011,10 @@ class PipettingController:
         Returns:
             dict with x, y, z positions in mm and motor step counts
         """
-        motor_positions = self.stepper_controller.get_all_positions()
+        if self.controller_type == 'arduino_uno_q':
+            motor_positions = {}  # Arduino doesn't expose per-motor step counters
+        else:
+            motor_positions = self.stepper_controller.get_all_positions()
         return {
             'x': self.current_position.x,
             'y': self.current_position.y,
