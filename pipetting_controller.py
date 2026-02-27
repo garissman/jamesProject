@@ -83,20 +83,19 @@ class CoordinateMapper:
 
     @staticmethod
     def _ws_coordinates(station: str) -> WellCoordinates:
-        """Compute WS1/WS2 center coordinates from current config values."""
-        bed_offset_x = settings.get('BED_OFFSET_X')
-        bed_offset_y = settings.get('BED_OFFSET_Y')
+        """Compute WS1/WS2 center coordinates from current config values.
+        WS_POSITION_X/Y is the exact target position for WS1.
+        WS2 is offset from WS1 by WS_HEIGHT + WS_GAP in Y."""
         ws_pos_x    = settings.get('WS_POSITION_X')
         ws_pos_y    = settings.get('WS_POSITION_Y')
         ws_height   = settings.get('WS_HEIGHT')
-        ws_width    = settings.get('WS_WIDTH')
         ws_gap      = settings.get('WS_GAP')
 
-        center_x = bed_offset_x + ws_pos_x + ws_width / 2
+        center_x = ws_pos_x
         if station == 'WS1':
-            center_y = bed_offset_y + ws_pos_y + ws_height / 2
+            center_y = ws_pos_y
         else:  # WS2
-            center_y = bed_offset_y + ws_pos_y + ws_height + ws_gap + ws_height / 2
+            center_y = ws_pos_y + ws_gap
 
         return WellCoordinates(x=center_x, y=center_y, z=0.0)
 
@@ -451,17 +450,17 @@ class PipettingController:
             self._move_z_safe(z_up_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = Z_UP_POSITION
 
-        # Step 2: Move Y
+        # Step 2: Move Y (check_limits=False to avoid false triggers from EMI)
         if y_delta != 0:
             self.log(f"  Step 2: Moving Y ({y_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
-            self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED, check_limits=False)
 
-        # Step 3: Move X
+        # Step 3: Move X (check_limits=False to avoid false triggers from EMI)
         if x_delta != 0:
             self.log(f"  Step 3: Moving X ({x_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
-            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED, check_limits=False)
 
         # Step 4: Move Z down to target position
         z_down_distance = Z_UP_POSITION - target_coords.z
@@ -918,7 +917,7 @@ class PipettingController:
         if axis == 'z':
             self._move_z_safe(steps, motor_direction, self.TRAVEL_SPEED)
         else:
-            self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED)
+            self.stepper_controller.move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
 
         # Update position tracking for X, Y, Z axes
         if axis == 'x':

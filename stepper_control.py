@@ -54,6 +54,7 @@ class StepperMotor:
         self.limit_min_pin = limit_min_pin
         self.limit_max_pin = limit_max_pin
         self.stop_requested = False
+        self.ignore_limits = False  # When True, interrupt callbacks are ignored
 
         # Simulation mode: track simulated position and limit triggers
         self.simulated_travel_range = random.randint(8000, 12000)  # Simulated range in steps
@@ -89,11 +90,15 @@ class StepperMotor:
 
     def _limit_min_callback(self, channel):
         """Interrupt callback when MIN limit switch is triggered"""
+        if self.ignore_limits:
+            return
         self.limit_triggered = 'min'
         self.stop_requested = True
 
     def _limit_max_callback(self, channel):
         """Interrupt callback when MAX limit switch is triggered"""
+        if self.ignore_limits:
+            return
         self.limit_triggered = 'max'
         self.stop_requested = True
 
@@ -164,6 +169,11 @@ class StepperMotor:
         # Clear any pending interrupt-based stop so we can move away from a limit
         self.clear_limit_trigger()
 
+        # When check_limits=False, suppress interrupt callbacks entirely
+        # to prevent EMI noise from disrupting motor pulse timing
+        if not check_limits:
+            self.ignore_limits = True
+
         # Set direction
         if GPIO_AVAILABLE:
             GPIO.output(self.dir_pin, direction.value)
@@ -184,9 +194,15 @@ class StepperMotor:
         # Generate step pulses
         for i in range(steps):
             # Only honour stop_requested once we've left the starting limit,
-            # otherwise the limit-switch interrupt blocks us from moving away
+            # otherwise the limit-switch interrupt blocks us from moving away.
+            # When check_limits=False, ignore limit-triggered stops (EMI noise)
+            # but still honour user-initiated stops (limit_triggered is None).
             if self.stop_requested and left_starting_limits:
-                break
+                if check_limits or self.limit_triggered is None:
+                    break
+                else:
+                    self.stop_requested = False
+                    self.limit_triggered = None
 
             # Check BOTH limit switches before stepping
             if check_limits:
@@ -237,6 +253,9 @@ class StepperMotor:
             # Clear any interrupt-based stop that fired while still on the starting limit
             if not left_starting_limits:
                 self.stop_requested = False
+
+        # Re-enable limit interrupts
+        self.ignore_limits = False
 
         # Update position tracking
         position_delta = steps_completed if direction == Direction.CLOCKWISE else -steps_completed
