@@ -60,7 +60,8 @@
       "Bash(sshpass:*)",
       "Bash(expect:*)",
       "Bash(cp:*)",
-      "Bash(chmod +x:*)"
+      "Bash(chmod +x:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
