@@ -629,6 +629,10 @@ function App() {
             })
 
             const data = await response.json()
+            if (data.status === 'success') {
+                fetchCurrentPosition()
+                fetchAxisPositions()
+            }
             return data
         } catch (error) {
             console.error('Failed to save configuration:', error)

@@ -90,5 +90,5 @@ The application uses a single-page component architecture in `frontend/src/App.j
 - Backend CORS is configured only for any host - update `main.py` if frontend port changes
 - Well identifiers follow format: `{Row}{Column}` (e.g., A1, B2, H12)
 - The UI uses a blue gradient theme with glassmorphism effects
-- There are 2 setups of pipette, the first setup is with 1 pipette, the second is 3 pipette, by default will be 3
-  pipette
+- There are 2 setups of pipette, the first setup is with 1 pipette, the second is 3 pipette, by default will be 3 pipette
+- check UI changes with Playwright

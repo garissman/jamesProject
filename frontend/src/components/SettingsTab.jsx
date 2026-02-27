@@ -239,21 +239,21 @@ export default function SettingsTab({
                                         borderRadius: '6px',
                                         fontSize: '13px',
                                         fontWeight: 600,
-                                        background: controllerType === 'arduino_uno_q'
+                                        background: (config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q'
                                             ? 'rgba(0, 150, 255, 0.15)' : 'rgba(0, 200, 83, 0.15)',
-                                        color: controllerType === 'arduino_uno_q'
+                                        color: (config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q'
                                             ? '#0096ff' : '#00c853',
-                                        border: `1px solid ${controllerType === 'arduino_uno_q'
+                                        border: `1px solid ${(config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q'
                                             ? 'rgba(0, 150, 255, 0.3)' : 'rgba(0, 200, 83, 0.3)'}`
                                     }}>
-                                        {controllerType === 'arduino_uno_q' ? 'Arduino UNO Q' : 'Raspberry Pi 5'}
+                                        {(config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q' ? 'Arduino UNO Q' : 'Raspberry Pi 5'}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Arduino-specific controls */}
-                        {controllerType === 'arduino_uno_q' && (
+                        {(config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q' && (
                             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
                                 <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Arduino UNO Q Controls</h3>
                                 <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
@@ -730,7 +730,22 @@ export default function SettingsTab({
 
                 <div className="flex flex-col gap-[15px] items-start">
                     <button
-                        onClick={saveConfig}
+                        onClick={async () => {
+                            setConfigLoading(true)
+                            setConfigMessage('')
+                            try {
+                                const result = await saveConfig()
+                                if (result?.status === 'success') {
+                                    setConfigMessage('\u2713 Configuration saved successfully')
+                                } else {
+                                    setConfigMessage('\u2717 ' + (result?.message || 'Failed to save configuration'))
+                                }
+                            } catch (err) {
+                                setConfigMessage('\u2717 ' + err.message)
+                            } finally {
+                                setConfigLoading(false)
+                            }
+                        }}
                         disabled={configLoading}
                         className="py-3 px-8 bg-gradient-to-br from-[#4a90e2] to-[#357abd] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-[0_2px_8px_rgba(74,144,226,0.3)] hover:enabled:bg-gradient-to-br hover:enabled:from-[#357abd] hover:enabled:to-[#2868a8] hover:enabled:shadow-[0_4px_12px_rgba(74,144,226,0.4)] hover:enabled:-translate-y-px disabled:opacity-60 disabled:cursor-not-allowed"
                     >

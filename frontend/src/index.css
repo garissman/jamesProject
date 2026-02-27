@@ -171,11 +171,26 @@ body {
     padding: 4px;
 }
 
+@utility vial-grid-grouped {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(5, 1fr);
+    gap: 4px;
+    padding: 4px;
+}
+
 @utility vial-well-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: repeat(12, 1fr);
     gap: 2px;
+}
+
+@utility vial-well-grid-grouped {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap: 3px;
 }
 
 /* Toggle track pseudo-element */

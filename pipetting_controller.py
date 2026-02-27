@@ -131,6 +131,40 @@ class CoordinateMapper:
             if abs(coords.x - ws_coords.x) < 1.0 and abs(coords.y - ws_coords.y) < 1.0:
                 return ws_id
 
+        # Check if at a MicroChip or WellPlate special position
+        for mc_id, mc_raw in CoordinateMapper.MICROCHIP_COORDS.items():
+            mc_x = CoordinateMapper.BED_OFFSET_X + mc_raw[0]
+            mc_y = CoordinateMapper.BED_OFFSET_Y + mc_raw[1]
+            if abs(coords.x - mc_x) < 1.0 and abs(coords.y - mc_y) < 1.0:
+                return mc_id
+
+        for wp_id, wp_raw in CoordinateMapper.WELLPLATE_COORDS.items():
+            wp_x = CoordinateMapper.BED_OFFSET_X + wp_raw[0]
+            wp_y = CoordinateMapper.BED_OFFSET_Y + wp_raw[1]
+            if abs(coords.x - wp_x) < 1.0 and abs(coords.y - wp_y) < 1.0:
+                return wp_id
+
+        # Check if at a Vial position (VA1-VE3)
+        vial_rows = ['A', 'B', 'C', 'D', 'E']
+        vial_spacing_y = 2 * CoordinateMapper.SMALL_WELL_SPACING
+        for row_idx, row_char in enumerate(vial_rows):
+            for col_num in range(1, 4):
+                col_idx = col_num - 1
+                vx = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 20 + (col_idx * vial_spacing_y)
+                vy = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_idx * vial_spacing_y)
+                if abs(coords.x - vx) < 1.0 and abs(coords.y - vy) < 1.0:
+                    return f"V{row_char}{col_num}"
+
+        # Check if at a Small well position (SA1-SL6)
+        small_well_rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
+        for row_idx, row_char in enumerate(small_well_rows):
+            for col_num in range(1, 7):
+                col_idx = col_num - 1
+                sx = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 280 + (col_idx * CoordinateMapper.SMALL_WELL_SPACING)
+                sy = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_idx * CoordinateMapper.SMALL_WELL_SPACING)
+                if abs(coords.x - sx) < 1.0 and abs(coords.y - sy) < 1.0:
+                    return f"S{row_char}{col_num}"
+
         # Calculate which column based on X coordinate
         # Must subtract BED_OFFSET to match well_to_coordinates
         x_offset = coords.x - CoordinateMapper.ORIGIN_X - CoordinateMapper.BED_OFFSET_X

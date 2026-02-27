@@ -135,15 +135,24 @@ export default function PlateLayout({
     }
 
     return (
-        <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-[15px] min-w-0 flex flex-col">
+        <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-[15px] max-w-2xl flex flex-col">
             {/* Plate Header */}
             <div className="flex justify-between items-center mb-[15px]">
                 <h2 className="text-[1.3rem] m-0 font-semibold text-[var(--text-primary)]">Plate layout</h2>
                 <div className="flex gap-5 text-base text-[var(--text-secondary)] flex-wrap">
                     <span>Position: {selectedWell}</span>
                     <span>Status: {systemStatus}</span>
-                    <span style={{fontSize: '11px', opacity: 0.7}}>
-                        {controllerType === 'arduino_uno_q' ? 'Arduino' : 'RPi'}
+                    <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: (config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q'
+                            ? 'rgba(0, 150, 255, 0.15)' : 'rgba(0, 200, 83, 0.15)',
+                        color: (config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q'
+                            ? '#0096ff' : '#00c853',
+                    }}>
+                        {(config.CONTROLLER_TYPE || controllerType) === 'arduino_uno_q' ? 'Arduino' : 'RPi'}
                     </span>
                     {currentOperation !== 'idle' && operationWell && (
                         <span className={`py-1 px-3 rounded-xl text-[0.9rem] font-semibold animate-fade-in ${
@@ -394,7 +403,7 @@ export default function PlateLayout({
                                             }`}
                                             onClick={() => onWellClick(middleWell)}
                                         >
-                                            {wellIds.map((wId, i) => {
+                                            {wellIds.map((wId) => {
                                                 return (
                                                     <div
                                                         key={wId}
@@ -493,99 +502,174 @@ export default function PlateLayout({
                 </div>
             ) : (
                 /* Vial Layout */
-                <div className="layout-grid">
-                    {/* WS1 -- row 1, cols 1-6 */}
-                    <div
-                        className={`flex items-center justify-center rounded text-[0.65rem] font-semibold text-[var(--text-primary)] bg-[var(--well-bg)] border-2 border-[var(--border-color)] transition-all duration-200 relative cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)] ${
-                            selectedWell === 'WS1' ? '!bg-gradient-to-br !from-[#4CAF50] !to-[#45a049] !text-white !border-[#45a049] shadow-[0_0_12px_rgba(76,175,80,0.5)]' : ''
-                        } ${targetWell === 'WS1' ? '!border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.5)]' : ''} ${getQuickOpClasses('WS1')}`}
-                        style={{gridColumn: '1/7', gridRow: '1/2'}}
-                        onClick={() => onWellClick('WS1')}
-                    >
-                        WS1
-                        {renderQuickOpBadges('WS1')}
+                <div className="layout-grid grid grid-cols-3">
+                    <div>
+                        {/* WS1 -- row 1, cols 1-6 */}
+                        <div
+                            className={`h-8 flex items-center justify-center rounded text-[0.65rem] font-semibold text-[var(--text-primary)] bg-[var(--well-bg)] border-2 border-[var(--border-color)] transition-all duration-200 relative cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)] ${
+                                selectedWell === 'WS1' ? '!bg-gradient-to-br !from-[#4CAF50] !to-[#45a049] !text-white !border-[#45a049] shadow-[0_0_12px_rgba(76,175,80,0.5)]' : ''
+                            } ${targetWell === 'WS1' ? '!border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.5)]' : ''} ${getQuickOpClasses('WS1')}`}
+                            onClick={() => onWellClick('WS1')}
+                        >
+                            WS1
+                            {renderQuickOpBadges('WS1')}
+                        </div>
+                        {/* WS2 -- row 2, cols 1-6 */}
+                        <div
+                            className={`h-8 flex items-center justify-center rounded text-[0.65rem] font-semibold text-[var(--text-primary)] bg-[var(--well-bg)] border-2 border-[var(--border-color)] transition-all duration-200 relative cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)] ${
+                                selectedWell === 'WS2' ? '!bg-gradient-to-br !from-[#4CAF50] !to-[#45a049] !text-white !border-[#45a049] shadow-[0_0_12px_rgba(76,175,80,0.5)]' : ''
+                            } ${targetWell === 'WS2' ? '!border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.5)]' : ''} ${getQuickOpClasses('WS2')}`}
+                            onClick={() => onWellClick('WS2')}
+                        >
+                            WS2
+                            {renderQuickOpBadges('WS2')}
+                        </div>
+                        {['A', 'B', 'C', 'D', 'E'].map(row => {
+                            const vialIds = [1, 2, 3].map(c => `V${row}${c}`)
+                            const middleVial = `V${row}2`
+                            const isGroupSelected = vialIds.some(v => v === selectedWell)
+                            const isTarget = vialIds.some(v => v === targetWell)
+                            const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
+                            const isOperating = vialIds.some(v => opWells.includes(v)) && currentOperation !== 'idle'
+                            const isQPickup = quickOpMode && vialIds.some(v => quickOpWells.pickup === v)
+                            const isQDropoff = quickOpMode && vialIds.some(v => quickOpWells.dropoff === v)
+                            const isQRinse = quickOpMode && vialIds.some(v => quickOpWells.rinse === v)
+                            return (
+                                <div
+                                    key={middleVial}
+                                    className={`grid h-16 grid-cols-3 place-items-center justify-center gap-1 rounded-lg cursor-pointer transition-all duration-300 relative border-2 ${
+                                        isGroupSelected
+                                            ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.1)] shadow-[0_0_12px_rgba(76,175,80,0.3)]'
+                                            : 'border-[var(--border-color)] bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)]'
+                                    } ${isTarget ? '!border-[#FF9800] shadow-[0_0_10px_rgba(255,152,0,0.5)]' : ''
+                                    } ${isOperating && currentOperation === 'aspirating' ? '!border-[#3b82f6] shadow-[0_0_12px_#3b82f6] animate-aspirate !bg-[rgba(59,130,246,0.15)]' : ''
+                                    } ${isOperating && currentOperation === 'dispensing' ? '!border-[#10b981] shadow-[0_0_12px_#10b981] animate-dispense !bg-[rgba(16,185,129,0.15)]' : ''
+                                    } ${isOperating && currentOperation === 'moving' ? '!border-[#f59e0b] shadow-[0_0_10px_#f59e0b] animate-move' : ''
+                                    } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
+                                    } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
+                                    } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                    }`}
+                                    onClick={() => onWellClick(middleVial)}
+                                >
+                                    {vialIds.map(vId => (
+                                        <div
+                                            key={vId}
+                                            className={`w-10 h-10 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-[0.7rem] font-semibold ${
+                                                isGroupSelected
+                                                    ? '!bg-gradient-to-br !from-[#4CAF50] !to-[#45a049] !border-[#45a049] !text-white shadow-[0_0_8px_rgba(76,175,80,0.5)]'
+                                                    : 'bg-[var(--well-bg)] border-[var(--border-color)] text-[var(--text-primary)]'
+                                            }`}
+                                        >
+                                            {vId}
+                                        </div>
+                                    ))}
+                                    {isQPickup && <span
+                                        className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">P</span>}
+                                    {isQDropoff && <span
+                                        className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
+                                    {isQRinse && <span
+                                        className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                </div>
+                            )
+                        })}
                     </div>
-                    {/* WS2 -- row 2, cols 1-6 */}
-                    <div
-                        className={`flex items-center justify-center rounded text-[0.65rem] font-semibold text-[var(--text-primary)] bg-[var(--well-bg)] border-2 border-[var(--border-color)] transition-all duration-200 relative cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)] ${
-                            selectedWell === 'WS2' ? '!bg-gradient-to-br !from-[#4CAF50] !to-[#45a049] !text-white !border-[#45a049] shadow-[0_0_12px_rgba(76,175,80,0.5)]' : ''
-                        } ${targetWell === 'WS2' ? '!border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.5)]' : ''} ${getQuickOpClasses('WS2')}`}
-                        style={{gridColumn: '1/7', gridRow: '2/3'}}
-                        onClick={() => onWellClick('WS2')}
-                    >
-                        WS2
-                        {renderQuickOpBadges('WS2')}
-                    </div>
-
-                    {/* Vials sub-grid -- rows 3-12, cols 1-6 (5 rows x 3 cols = 15 vials) */}
-                    <div className="well-grid vial-grid" style={{gridColumn: '1/7', gridRow: '3/13'}}>
-                        {['A', 'B', 'C', 'D', 'E'].flatMap(row =>
-                            [1, 2, 3].map(col => {
-                                const vialId = `V${row}${col}`
-                                const isQPickup = quickOpMode && quickOpWells.pickup === vialId
-                                const isQDropoff = quickOpMode && quickOpWells.dropoff === vialId
-                                const isQRinse = quickOpMode && quickOpWells.rinse === vialId
+                    <div>
+                        {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].flatMap(row =>
+                            [0].map(groupIdx => {
+                                const cols = [groupIdx * 3 + 1, groupIdx * 3 + 2, groupIdx * 3 + 3]
+                                const wellIds = cols.map(c => `${row}${c}`)
+                                const middleWell = `${row}${cols[1]}`
+                                const isGroupSelected = wellIds.some(w => w === selectedWell)
+                                const isTarget = wellIds.some(w => w === targetWell)
                                 const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                const isOperating = opWells.includes(vialId) && currentOperation !== 'idle'
+                                const isOperating = wellIds.some(w => opWells.includes(w)) && currentOperation !== 'idle'
+                                const isQPickup = quickOpMode && wellIds.some(w => quickOpWells.pickup === w)
+                                const isQDropoff = quickOpMode && wellIds.some(w => quickOpWells.dropoff === w)
+                                const isQRinse = quickOpMode && wellIds.some(w => quickOpWells.rinse === w)
                                 return (
                                     <div
-                                        key={vialId}
-                                        className={`w-[60px] h-[60px] bg-[var(--well-bg)] border-2 border-[var(--border-color)] rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 font-semibold text-[var(--text-primary)] text-[0.9rem] relative hover:bg-[var(--bg-overlay)] hover:border-[var(--border-hover)] ${
-                                            selectedWell === vialId ? 'bg-gradient-to-br from-[#4CAF50] to-[#45a049] text-white border-[#45a049] shadow-[0_0_15px_rgba(76,175,80,0.6)]' : ''
-                                        } ${targetWell === vialId ? 'border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.6)]' : ''
-                                        } ${isOperating && currentOperation === 'aspirating' ? 'border-[3px] !border-[#3b82f6] shadow-[0_0_12px_#3b82f6] animate-aspirate !bg-[rgba(59,130,246,0.2)]' : ''
-                                        } ${isOperating && currentOperation === 'dispensing' ? 'border-[3px] !border-[#10b981] shadow-[0_0_12px_#10b981] animate-dispense !bg-[rgba(16,185,129,0.2)]' : ''
-                                        } ${isOperating && currentOperation === 'moving' ? 'border-[3px] !border-[#f59e0b] shadow-[0_0_10px_#f59e0b] animate-move' : ''
-                                        } ${isQPickup ? '!border-2 !border-[#2196F3] !bg-[rgba(33,150,243,0.2)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
-                                        } ${isQDropoff ? '!border-2 !border-[#4CAF50] !bg-[rgba(76,175,80,0.2)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
-                                        } ${isQRinse ? '!border-2 !border-[#FF9800] !bg-[rgba(255,152,0,0.2)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                        key={middleWell}
+                                        className={`grid grid-cols-3 place-items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative p-1 border-2 ${
+                                            isGroupSelected
+                                                ? 'border-[#4CAF50] bg-[rgba(76,175,80,0.1)] shadow-[0_0_10px_rgba(76,175,80,0.3)]'
+                                                : 'border-[var(--border-color)] bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)]'
+                                        } ${isTarget ? '!border-[#FF9800] shadow-[0_0_10px_rgba(255,152,0,0.5)]' : ''
+                                        } ${isOperating && currentOperation === 'aspirating' ? '!border-[#3b82f6] shadow-[0_0_12px_#3b82f6] animate-aspirate !bg-[rgba(59,130,246,0.15)]' : ''
+                                        } ${isOperating && currentOperation === 'dispensing' ? '!border-[#10b981] shadow-[0_0_12px_#10b981] animate-dispense !bg-[rgba(16,185,129,0.15)]' : ''
+                                        } ${isOperating && currentOperation === 'moving' ? '!border-[#f59e0b] shadow-[0_0_10px_#f59e0b] animate-move' : ''
+                                        } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
+                                        } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
+                                        } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
                                         }`}
-                                        onClick={() => onWellClick(vialId)}
+                                        onClick={() => onWellClick(middleWell)}
                                     >
-                                        {vialId}
+                                        {wellIds.map(wId => (
+                                            <div
+                                                key={wId}
+                                                className={`w-5 h-5 rounded-full border transition-all duration-200 ${
+                                                    isGroupSelected
+                                                        ? 'bg-gradient-to-br from-[#4CAF50] to-[#45a049] border-[#45a049] shadow-[0_0_4px_rgba(76,175,80,0.6)]'
+                                                        : 'bg-[var(--well-bg)] border-[var(--border-color)]'
+                                                }`}
+                                            />
+                                        ))}
                                         {isQPickup && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">P</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">P</span>}
                                         {isQDropoff && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                         {isQRinse && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
                                     </div>
                                 )
                             })
                         )}
                     </div>
-
-                    {/* Small wells sub-grid -- rows 1-12, cols 7-21 (12 rows x 6 cols = 72 wells) */}
-                    <div className="well-grid vial-well-grid" style={{gridColumn: '7/22', gridRow: '1/13'}}>
+                    <div>
                         {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].flatMap(row =>
-                            [1, 2, 3, 4, 5, 6].map(col => {
-                                const wellId = `S${row}${col}`
-                                const isQPickup = quickOpMode && quickOpWells.pickup === wellId
-                                const isQDropoff = quickOpMode && quickOpWells.dropoff === wellId
-                                const isQRinse = quickOpMode && quickOpWells.rinse === wellId
+                            [1].map(groupIdx => {
+                                const cols = [groupIdx * 3 + 1, groupIdx * 3 + 2, groupIdx * 3 + 3]
+                                const wellIds = cols.map(c => `${row}${c}`)
+                                const middleWell = `${row}${cols[1]}`
+                                const isGroupSelected = wellIds.some(w => w === selectedWell)
+                                const isTarget = wellIds.some(w => w === targetWell)
                                 const opWells = operationWell ? getPipetteWells(operationWell, currentPipetteCount) : []
-                                const isOperating = opWells.includes(wellId) && currentOperation !== 'idle'
+                                const isOperating = wellIds.some(w => opWells.includes(w)) && currentOperation !== 'idle'
+                                const isQPickup = quickOpMode && wellIds.some(w => quickOpWells.pickup === w)
+                                const isQDropoff = quickOpMode && wellIds.some(w => quickOpWells.dropoff === w)
+                                const isQRinse = quickOpMode && wellIds.some(w => quickOpWells.rinse === w)
                                 return (
                                     <div
-                                        key={wellId}
-                                        className={`w-9 h-9 bg-[var(--well-bg)] border border-[var(--border-color)] rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 text-[0.7rem] text-transparent relative hover:bg-[var(--bg-overlay)] hover:border-[var(--border-hover)] hover:text-[var(--text-tertiary)] ${
-                                            selectedWell === wellId ? 'bg-gradient-to-br from-[#4CAF50] to-[#45a049] border-[#45a049] shadow-[0_0_15px_rgba(76,175,80,0.6)]' : ''
-                                        } ${targetWell === wellId ? 'border-[#FF9800] shadow-[0_0_12px_rgba(255,152,0,0.6)]' : ''
-                                        } ${isOperating && currentOperation === 'aspirating' ? 'border-[3px] !border-[#3b82f6] shadow-[0_0_12px_#3b82f6] animate-aspirate !bg-[rgba(59,130,246,0.2)]' : ''
-                                        } ${isOperating && currentOperation === 'dispensing' ? 'border-[3px] !border-[#10b981] shadow-[0_0_12px_#10b981] animate-dispense !bg-[rgba(16,185,129,0.2)]' : ''
-                                        } ${isOperating && currentOperation === 'moving' ? 'border-[3px] !border-[#f59e0b] shadow-[0_0_10px_#f59e0b] animate-move' : ''
-                                        } ${isQPickup ? '!border-2 !border-[#2196F3] !bg-[rgba(33,150,243,0.2)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
-                                        } ${isQDropoff ? '!border-2 !border-[#4CAF50] !bg-[rgba(76,175,80,0.2)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
-                                        } ${isQRinse ? '!border-2 !border-[#FF9800] !bg-[rgba(255,152,0,0.2)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                        key={middleWell}
+                                        className={`grid grid-cols-3 place-items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative p-1 border-2 ${
+                                            isGroupSelected
+                                                ? 'border-[#4CAF50] bg-[rgba(76,175,80,0.1)] shadow-[0_0_10px_rgba(76,175,80,0.3)]'
+                                                : 'border-[var(--border-color)] bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)]'
+                                        } ${isTarget ? '!border-[#FF9800] shadow-[0_0_10px_rgba(255,152,0,0.5)]' : ''
+                                        } ${isOperating && currentOperation === 'aspirating' ? '!border-[#3b82f6] shadow-[0_0_12px_#3b82f6] animate-aspirate !bg-[rgba(59,130,246,0.15)]' : ''
+                                        } ${isOperating && currentOperation === 'dispensing' ? '!border-[#10b981] shadow-[0_0_12px_#10b981] animate-dispense !bg-[rgba(16,185,129,0.15)]' : ''
+                                        } ${isOperating && currentOperation === 'moving' ? '!border-[#f59e0b] shadow-[0_0_10px_#f59e0b] animate-move' : ''
+                                        } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
+                                        } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
+                                        } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
                                         }`}
-                                        onClick={() => onWellClick(wellId)}
+                                        onClick={() => onWellClick(middleWell)}
                                     >
+                                        {wellIds.map(wId => (
+                                            <div
+                                                key={wId}
+                                                className={`w-5 h-5 rounded-full border transition-all duration-200 ${
+                                                    isGroupSelected
+                                                        ? 'bg-gradient-to-br from-[#4CAF50] to-[#45a049] border-[#45a049] shadow-[0_0_4px_rgba(76,175,80,0.6)]'
+                                                        : 'bg-[var(--well-bg)] border-[var(--border-color)]'
+                                                }`}
+                                            />
+                                        ))}
                                         {isQPickup && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">P</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">P</span>}
                                         {isQDropoff && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                         {isQRinse && <span
-                                            className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
                                     </div>
                                 )
                             })
