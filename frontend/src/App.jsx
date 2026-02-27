@@ -80,11 +80,11 @@ function App() {
     const [quickOpStep, setQuickOpStep] = useState(0) // 0=pickup, 1=dropoff, 2=rinse
     const [quickOpVolume, setQuickOpVolume] = useState('1.0') // Default volume for quick ops
 
-    // Z-axis toggle state
-    const [zAxisUp, setZAxisUp] = useState(true) // true = up, false = down
-
     // Axis positions state (for Manual tab)
     const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {}})
+
+    // Z-axis state derived from actual position (70mm = up, 0mm = down)
+    const zAxisUp = axisPositions.z >= 35
     const [axisStepInputs, setAxisStepInputs] = useState({x: 10, y: 10, z: 10, pipette: 10})
     const [positionEditMode, setPositionEditMode] = useState(false)
     const [positionInputs, setPositionInputs] = useState({x: 0, y: 0, z: 0, pipette_ml: 0})
@@ -611,14 +611,14 @@ function App() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({direction: zAxisUp ? 'up' : 'down'})
+                body: JSON.stringify({direction: zAxisUp ? 'down' : 'up'})
             })
 
             const data = await response.json()
 
             if (response.ok) {
-                setZAxisUp(!zAxisUp)
                 console.log(`${data.message}`)
+                fetchAxisPositions()
             } else {
                 console.error(`Error: ${data.detail || 'Failed to toggle Z-axis'}`)
             }
@@ -866,11 +866,6 @@ function App() {
                     setOperationWell(data.operation_well)
                 }
 
-                // Sync Z-axis toggle with actual position
-                // Button shows the action: UP when Z is low, DOWN when Z is high
-                if (data.position) {
-                    setZAxisUp(data.position.z <= 5)
-                }
             } else {
                 console.log('No position data available:', data)
                 setSystemStatus(data.message || 'System not ready')
@@ -2371,11 +2366,11 @@ function App() {
                                     </select>
                                 </div>
                                 <button
-                                    className={`btn btn-z-toggle ${zAxisUp ? 'z-up' : 'z-down'}`}
+                                    className={`btn btn-z-toggle ${zAxisUp ? 'z-down' : 'z-up'}`}
                                     onClick={handleToggleZ}
                                     disabled={isExecuting}
                                 >
-                                    Z-Axis: {zAxisUp ? '⬆ UP' : '⬇ DOWN'}
+                                    Z-Axis: {zAxisUp ? '⬇ DOWN' : '⬆ UP'}
                                 </button>
                             </div>
                             <div className="pipette-volume-row">

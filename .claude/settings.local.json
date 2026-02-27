@@ -35,7 +35,8 @@
       "Bash(source:*)",
       "Bash(sudo fuser:*)",
       "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_console_messages"
+      "mcp__playwright__browser_console_messages",
+      "Bash(npx vite:*)"
     ],
     "deny": [],
     "ask": []
