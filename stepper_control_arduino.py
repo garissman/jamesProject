@@ -251,16 +251,21 @@ class StepperController:
         Get current state of all limit switches
 
         Returns:
-            List of dicts with motor_id, triggered, and pin for each motor
+            List of dicts with motor_id, min/max triggered states, and pins.
+            Result bitmask from MCU: bit0=min triggered, bit1=max triggered.
         """
         limits = []
         for motor_id in range(1, 5):
+            config = DEFAULT_MOTOR_CONFIG.get(motor_id, {})
             result = self._call_rpc("get_limit", motor_id)
-            triggered = result == 1 if result is not None else False
+            bitmask = result if result is not None and result >= 0 else 0
             limits.append({
                 "motor_id": motor_id,
-                "triggered": triggered,
-                "pin": 9 + motor_id  # Pins 10-13
+                "min_triggered": bool(bitmask & 1),
+                "max_triggered": bool(bitmask & 2),
+                "triggered": bitmask > 0,  # backwards compat: any limit hit
+                "limit_min_pin": config.get("limit_min_pin"),
+                "limit_max_pin": config.get("limit_max_pin"),
             })
         return limits
 
@@ -379,10 +384,10 @@ class StepperController:
 
 # Motor configuration defaults
 DEFAULT_MOTOR_CONFIG = {
-    1: {"name": "X-axis", "pulse_pin": 2, "dir_pin": 3, "limit_pin": 10},
-    2: {"name": "Y-axis", "pulse_pin": 4, "dir_pin": 5, "limit_pin": 11},
-    3: {"name": "Z-axis", "pulse_pin": 6, "dir_pin": 7, "limit_pin": 12},
-    4: {"name": "Pipette", "pulse_pin": 8, "dir_pin": 9, "limit_pin": 13},
+    1: {"name": "X-axis", "pulse_pin": 2, "dir_pin": 3, "limit_min_pin": 10, "limit_max_pin": 12},
+    2: {"name": "Y-axis", "pulse_pin": 4, "dir_pin": 5, "limit_min_pin": 11, "limit_max_pin": 13},
+    3: {"name": "Z-axis", "pulse_pin": 6, "dir_pin": 7, "limit_min_pin": None, "limit_max_pin": None},
+    4: {"name": "Pipette", "pulse_pin": 8, "dir_pin": 9, "limit_min_pin": None, "limit_max_pin": None},
 }
 
 

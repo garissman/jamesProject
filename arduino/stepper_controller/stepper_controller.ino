@@ -41,20 +41,21 @@ uint8_t matrixFrame[MATRIX_ROWS * MATRIX_COLS];
 uint8_t rgb3_r = 0, rgb3_g = 0, rgb3_b = 0;
 uint8_t rgb4_r = 0, rgb4_g = 0, rgb4_b = 0;
 
-// Motor pin definitions
+// Motor pin definitions (limitMinPin/limitMaxPin = -1 means no limit switch)
 struct MotorConfig {
   int pulsePin;
   int dirPin;
-  int limitPin;
+  int limitMinPin;
+  int limitMaxPin;
   bool initialized;
 };
 
 // Default motor pin configuration
 MotorConfig motors[NUM_MOTORS] = {
-  {2, 3, 10, false},   // Motor 1 (X-axis)
-  {4, 5, 11, false},   // Motor 2 (Y-axis)
-  {6, 7, 12, false},   // Motor 3 (Z-axis)
-  {8, 9, 13, false}    // Motor 4 (Pipette)
+  {2, 3, 10, 12, false},   // Motor 1 (X-axis)  - min D10, max D12
+  {4, 5, 11, 13, false},   // Motor 2 (Y-axis)  - min D11, max D13
+  {6, 7, -1, -1, false},   // Motor 3 (Z-axis)  - no limit switches
+  {8, 9, -1, -1, false}    // Motor 4 (Pipette) - no limit switches
 };
 
 // ============== Helper Functions ==============
@@ -235,13 +236,39 @@ void initMotor(int idx) {
   pinMode(motors[idx].dirPin, OUTPUT);
   digitalWrite(motors[idx].pulsePin, LOW);
   digitalWrite(motors[idx].dirPin, LOW);
-  pinMode(motors[idx].limitPin, INPUT_PULLUP);
+  if (motors[idx].limitMinPin >= 0) {
+    pinMode(motors[idx].limitMinPin, INPUT_PULLUP);
+  }
+  if (motors[idx].limitMaxPin >= 0) {
+    pinMode(motors[idx].limitMaxPin, INPUT_PULLUP);
+  }
   motors[idx].initialized = true;
 }
 
-bool isLimitTriggered(int idx) {
+// Check if min limit switch is triggered (direction == 0, moving toward min)
+bool isLimitMinTriggered(int idx) {
   if (idx < 0 || idx >= NUM_MOTORS) return true;
-  return digitalRead(motors[idx].limitPin) == LOW;
+  if (motors[idx].limitMinPin < 0) return false;
+  return digitalRead(motors[idx].limitMinPin) == LOW;
+}
+
+// Check if max limit switch is triggered (direction == 1, moving toward max)
+bool isLimitMaxTriggered(int idx) {
+  if (idx < 0 || idx >= NUM_MOTORS) return true;
+  if (motors[idx].limitMaxPin < 0) return false;
+  return digitalRead(motors[idx].limitMaxPin) == LOW;
+}
+
+// Check if either limit switch is triggered for the current direction
+// direction 0 (CCW) = moving toward min, direction 1 (CW) = moving toward max
+bool isLimitTriggered(int idx, int direction) {
+  if (direction == 0) return isLimitMinTriggered(idx);
+  return isLimitMaxTriggered(idx);
+}
+
+// Check if any limit switch is triggered (either min or max)
+bool isAnyLimitTriggered(int idx) {
+  return isLimitMinTriggered(idx) || isLimitMaxTriggered(idx);
 }
 
 int executeSteps(int idx, int direction, int steps, long delayUs, bool respectLimit) {
@@ -254,7 +281,7 @@ int executeSteps(int idx, int direction, int steps, long delayUs, bool respectLi
   showMotorIndicator(idx);
 
   for (int i = 0; i < steps; i++) {
-    if (respectLimit && isLimitTriggered(idx)) break;
+    if (respectLimit && isLimitTriggered(idx, direction)) break;
 
     digitalWrite(motors[idx].pulsePin, HIGH);
     delayMicroseconds(delayUs);
@@ -306,7 +333,7 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
   showMotorIndicator(idx);
 
   while (steps < max_steps) {
-    if (isLimitTriggered(idx)) {
+    if (isLimitTriggered(idx, direction)) {
       showSuccessPattern();
       return steps;
     }
@@ -326,10 +353,14 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
   return -3;  // Max steps reached without hitting limit
 }
 
-// get_limit(motor_id) -> 1 if triggered, 0 if not, -1 if invalid
+// get_limit(motor_id) -> bitmask: bit0=min, bit1=max (0=none, 1=min, 2=max, 3=both), -1 if invalid
 int rpc_get_limit(int motor_id) {
   if (motor_id < 1 || motor_id > NUM_MOTORS) return -1;
-  return isLimitTriggered(motor_id - 1) ? 1 : 0;
+  int idx = motor_id - 1;
+  int result = 0;
+  if (isLimitMinTriggered(idx)) result |= 1;
+  if (isLimitMaxTriggered(idx)) result |= 2;
+  return result;
 }
 
 // stop_motor(motor_id) -> 1 if success
