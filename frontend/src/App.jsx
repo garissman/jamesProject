@@ -15,6 +15,8 @@ function App() {
 
     // Configuration state
     const [config, setConfig] = useState({
+        BED_OFFSET_X: 70.0,
+        BED_OFFSET_Y: 15.0,
         WELL_SPACING: 4.0,
         WELL_DIAMETER: 8.0,
         WELL_HEIGHT: 14.0,
@@ -906,13 +908,24 @@ function App() {
         setConfigLoading(true)
         setConfigMessage('')
 
+        // Parse all string values to numbers before saving
+        const parsed = {}
+        for (const [key, value] of Object.entries(config)) {
+            if (typeof value === 'string' && !['true','false'].includes(value)) {
+                parsed[key] = Number(value) || 0
+            } else {
+                parsed[key] = value
+            }
+        }
+        setConfig(parsed)
+
         try {
             const response = await fetch('/api/config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(config)
+                body: JSON.stringify(parsed)
             })
 
             const data = await response.json()
@@ -1779,32 +1792,56 @@ function App() {
                             {settingsSubTab === 'layout' ? (
                                 <>
                                     <div className="config-section">
+                                        <h3>Bed Offset</h3>
+                                        <div className="config-grid">
+                                            <div className="form-group">
+                                                <label>Bed X Offset (mm):</label>
+                                                <input
+                                                    type="text"
+                                                    value={config.BED_OFFSET_X}
+                                                    onChange={(e) => handleConfigChange('BED_OFFSET_X', e.target.value)}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Bed Y Offset (mm):</label>
+                                                <input
+                                                    type="text"
+                                                    value={config.BED_OFFSET_Y}
+                                                    onChange={(e) => handleConfigChange('BED_OFFSET_Y', e.target.value)}
+                                                    className="form-input"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="config-section">
                                         <h3>MicroChip Layout Well Dimensions</h3>
                                         <div className="config-grid">
                                             <div className="form-group">
                                                 <label>Well Spacing (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.WELL_SPACING}
-                                                    onChange={(e) => handleConfigChange('WELL_SPACING', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WELL_SPACING', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Well Diameter (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.WELL_DIAMETER}
-                                                    onChange={(e) => handleConfigChange('WELL_DIAMETER', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WELL_DIAMETER', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Well Height (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.WELL_HEIGHT}
-                                                    onChange={(e) => handleConfigChange('WELL_HEIGHT', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WELL_HEIGHT', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
@@ -1815,31 +1852,38 @@ function App() {
                                         <h3>Washing Station Dimensions</h3>
                                         <div className="config-grid">
                                             <div className="form-group">
-                                                <label>Y Offset (mm):</label>
-                                                <input type="number" step="0.1" min="0"
-                                                    value={config.WS_OFFSET_Y}
-                                                    onChange={(e) => handleConfigChange('WS_OFFSET_Y', parseFloat(e.target.value))}
+                                                <label>X Position (mm):</label>
+                                                <input type="text"
+                                                    value={config.WS_POSITION_X}
+                                                    onChange={(e) => handleConfigChange('WS_POSITION_X', e.target.value)}
+                                                    className="form-input" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Y Position (mm):</label>
+                                                <input type="text"
+                                                    value={config.WS_POSITION_Y}
+                                                    onChange={(e) => handleConfigChange('WS_POSITION_Y', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                             <div className="form-group">
                                                 <label>Height (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.WS_HEIGHT}
-                                                    onChange={(e) => handleConfigChange('WS_HEIGHT', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WS_HEIGHT', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                             <div className="form-group">
                                                 <label>Width (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.WS_WIDTH}
-                                                    onChange={(e) => handleConfigChange('WS_WIDTH', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WS_WIDTH', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                             <div className="form-group">
                                                 <label>Gap Between WS1 & WS2 (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.WS_GAP}
-                                                    onChange={(e) => handleConfigChange('WS_GAP', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('WS_GAP', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                         </div>
@@ -1850,23 +1894,23 @@ function App() {
                                         <div className="config-grid">
                                             <div className="form-group">
                                                 <label>Vial Well Spacing (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.VIAL_WELL_SPACING}
-                                                    onChange={(e) => handleConfigChange('VIAL_WELL_SPACING', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_SPACING', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                             <div className="form-group">
                                                 <label>Vial Well Diameter (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.VIAL_WELL_DIAMETER}
-                                                    onChange={(e) => handleConfigChange('VIAL_WELL_DIAMETER', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_DIAMETER', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                             <div className="form-group">
                                                 <label>Vial Well Height (mm):</label>
-                                                <input type="number" step="0.1" min="0"
+                                                <input type="text"
                                                     value={config.VIAL_WELL_HEIGHT}
-                                                    onChange={(e) => handleConfigChange('VIAL_WELL_HEIGHT', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('VIAL_WELL_HEIGHT', e.target.value)}
                                                     className="form-input" />
                                             </div>
                                         </div>
@@ -1880,27 +1924,27 @@ function App() {
                                             <div className="form-group">
                                                 <label>X-Axis Steps/mm:</label>
                                                 <input
-                                                    type="number" min="1"
+                                                    type="text"
                                                     value={config.STEPS_PER_MM_X}
-                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_X', parseInt(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_X', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Y-Axis Steps/mm:</label>
                                                 <input
-                                                    type="number" min="1"
+                                                    type="text"
                                                     value={config.STEPS_PER_MM_Y}
-                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Y', parseInt(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Y', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Z-Axis Steps/mm:</label>
                                                 <input
-                                                    type="number" min="1"
+                                                    type="text"
                                                     value={config.STEPS_PER_MM_Z}
-                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Z', parseInt(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('STEPS_PER_MM_Z', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
@@ -1932,18 +1976,18 @@ function App() {
                                             <div className="form-group">
                                                 <label>Pipette Steps/mL:</label>
                                                 <input
-                                                    type="number" min="1"
+                                                    type="text"
                                                     value={config.PIPETTE_STEPS_PER_ML}
-                                                    onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Max Pipette Volume (mL):</label>
                                                 <input
-                                                    type="number" min="0.1" step="0.1"
+                                                    type="text"
                                                     value={config.PIPETTE_MAX_ML}
-                                                    onChange={(e) => handleConfigChange('PIPETTE_MAX_ML', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_MAX_ML', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
@@ -1956,36 +2000,36 @@ function App() {
                                             <div className="form-group">
                                                 <label>Pickup Depth (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.PICKUP_DEPTH}
-                                                    onChange={(e) => handleConfigChange('PICKUP_DEPTH', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('PICKUP_DEPTH', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Dropoff Depth (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.DROPOFF_DEPTH}
-                                                    onChange={(e) => handleConfigChange('DROPOFF_DEPTH', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('DROPOFF_DEPTH', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Safe Height (mm):</label>
                                                 <input
-                                                    type="number" step="0.1" min="0"
+                                                    type="text"
                                                     value={config.SAFE_HEIGHT}
-                                                    onChange={(e) => handleConfigChange('SAFE_HEIGHT', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('SAFE_HEIGHT', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Rinse Cycles:</label>
                                                 <input
-                                                    type="number" min="0"
+                                                    type="text"
                                                     value={config.RINSE_CYCLES}
-                                                    onChange={(e) => handleConfigChange('RINSE_CYCLES', parseInt(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('RINSE_CYCLES', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
@@ -1998,18 +2042,18 @@ function App() {
                                             <div className="form-group">
                                                 <label>Travel Speed (s/step):</label>
                                                 <input
-                                                    type="number" step="0.0001" min="0"
+                                                    type="text"
                                                     value={config.TRAVEL_SPEED}
-                                                    onChange={(e) => handleConfigChange('TRAVEL_SPEED', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('TRAVEL_SPEED', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
                                             <div className="form-group">
                                                 <label>Pipette Speed (s/step):</label>
                                                 <input
-                                                    type="number" step="0.0001" min="0"
+                                                    type="text"
                                                     value={config.PIPETTE_SPEED}
-                                                    onChange={(e) => handleConfigChange('PIPETTE_SPEED', parseFloat(e.target.value))}
+                                                    onChange={(e) => handleConfigChange('PIPETTE_SPEED', e.target.value)}
                                                     className="form-input"
                                                 />
                                             </div>
@@ -2036,9 +2080,9 @@ function App() {
                                                             <label>Steps/mm:</label>
                                                             <div className="calibration-spm-row">
                                                                 <input
-                                                                    type="number" min="1"
+                                                                    type="text"
                                                                     value={config[configKey]}
-                                                                    onChange={(e) => handleConfigChange(configKey, parseInt(e.target.value) || 0)}
+                                                                    onChange={(e) => handleConfigChange(configKey, e.target.value)}
                                                                     className="form-input"
                                                                 />
                                                                 <button
@@ -2169,9 +2213,9 @@ function App() {
                                                     <label>Steps/mL:</label>
                                                     <div className="calibration-spm-row">
                                                         <input
-                                                            type="number" min="1"
+                                                            type="text"
                                                             value={config.PIPETTE_STEPS_PER_ML}
-                                                            onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', parseInt(e.target.value) || 0)}
+                                                            onChange={(e) => handleConfigChange('PIPETTE_STEPS_PER_ML', e.target.value)}
                                                             className="form-input"
                                                         />
                                                         <button

@@ -12,6 +12,8 @@ CONFIG_FILE = Path(__file__).parent / "config.json"
 
 # Default values (used when config.json is absent or a key is missing)
 DEFAULTS: dict[str, Any] = {
+    "BED_OFFSET_X":           70.0,
+    "BED_OFFSET_Y":           15.0,
     "WELL_SPACING":           4.0,
     "WELL_DIAMETER":          8.0,
     "WELL_HEIGHT":           14.0,
@@ -29,7 +31,8 @@ DEFAULTS: dict[str, Any] = {
     "RINSE_CYCLES":           3,
     "TRAVEL_SPEED":           0.001,
     "PIPETTE_SPEED":          0.002,
-    "WS_OFFSET_Y":            5.0,
+    "WS_POSITION_X":          0.0,
+    "WS_POSITION_Y":          5.0,
     "WS_HEIGHT":             15.0,
     "WS_WIDTH":              60.0,
     "WS_GAP":                 1.0,

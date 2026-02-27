@@ -54,7 +54,11 @@ class CoordinateMapper:
     STEPS_PER_MM_Y = settings.get('STEPS_PER_MM_Y')  # Adjust based on calibration
     STEPS_PER_MM_Z = settings.get('STEPS_PER_MM_Z')  # Adjust based on calibration
 
-    # Origin offset (position of well A1)
+    # Bed offset (position of well A1 relative to home)
+    BED_OFFSET_X = settings.get('BED_OFFSET_X')  # mm
+    BED_OFFSET_Y = settings.get('BED_OFFSET_Y')  # mm
+
+    # Origin offset
     ORIGIN_X = 0.0  # mm
     ORIGIN_Y = 0.0  # mm
 
@@ -80,16 +84,19 @@ class CoordinateMapper:
     @staticmethod
     def _ws_coordinates(station: str) -> WellCoordinates:
         """Compute WS1/WS2 center coordinates from current config values."""
-        ws_offset_y = settings.get('WS_OFFSET_Y')
+        bed_offset_x = settings.get('BED_OFFSET_X')
+        bed_offset_y = settings.get('BED_OFFSET_Y')
+        ws_pos_x    = settings.get('WS_POSITION_X')
+        ws_pos_y    = settings.get('WS_POSITION_Y')
         ws_height   = settings.get('WS_HEIGHT')
         ws_width    = settings.get('WS_WIDTH')
         ws_gap      = settings.get('WS_GAP')
 
-        center_x = ws_width / 2
+        center_x = bed_offset_x + ws_pos_x + ws_width / 2
         if station == 'WS1':
-            center_y = ws_offset_y + ws_height / 2
+            center_y = bed_offset_y + ws_pos_y + ws_height / 2
         else:  # WS2
-            center_y = ws_offset_y + ws_height + ws_gap + ws_height / 2
+            center_y = bed_offset_y + ws_pos_y + ws_height + ws_gap + ws_height / 2
 
         return WellCoordinates(x=center_x, y=center_y, z=0.0)
 
@@ -174,12 +181,12 @@ class CoordinateMapper:
         # Check for MicroChip layout special wells
         if well_id in CoordinateMapper.MICROCHIP_COORDS:
             coords = CoordinateMapper.MICROCHIP_COORDS[well_id]
-            return WellCoordinates(x=coords[0], y=coords[1], z=coords[2])
+            return WellCoordinates(x=CoordinateMapper.BED_OFFSET_X + coords[0], y=CoordinateMapper.BED_OFFSET_Y + coords[1], z=coords[2])
 
         # Check for WellPlate layout special wells
         if well_id in CoordinateMapper.WELLPLATE_COORDS:
             coords = CoordinateMapper.WELLPLATE_COORDS[well_id]
-            return WellCoordinates(x=coords[0], y=coords[1], z=coords[2])
+            return WellCoordinates(x=CoordinateMapper.BED_OFFSET_X + coords[0], y=CoordinateMapper.BED_OFFSET_Y + coords[1], z=coords[2])
 
         # Handle Vial Layout vials (VA1, VA2, etc.)
         if well_id.startswith('V') and len(well_id) >= 3:
@@ -193,8 +200,8 @@ class CoordinateMapper:
                 # Vials positioned on left side, aligned with small well grid
                 # 1 vial = 2 small wells in height
                 vial_spacing_y = 2 * CoordinateMapper.SMALL_WELL_SPACING  # 2 * 45 = 90mm
-                x = CoordinateMapper.ORIGIN_X + 20 + (col_index * vial_spacing_y)  # Same spacing in X
-                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * vial_spacing_y)  # 90mm spacing in Y
+                x = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 20 + (col_index * vial_spacing_y)
+                y = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_index * vial_spacing_y)
                 return WellCoordinates(x=x, y=y, z=0.0)
 
         # Handle WellPlate small wells (SA1, SA2, etc.)
@@ -207,8 +214,8 @@ class CoordinateMapper:
                 row_index = small_well_rows.index(row_char)
                 col_index = col_num - 1
                 # Small wells positioned on right side
-                x = CoordinateMapper.ORIGIN_X + 280 + (col_index * CoordinateMapper.SMALL_WELL_SPACING)
-                y = CoordinateMapper.ORIGIN_Y + 60 + (row_index * CoordinateMapper.SMALL_WELL_SPACING)
+                x = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 280 + (col_index * CoordinateMapper.SMALL_WELL_SPACING)
+                y = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_index * CoordinateMapper.SMALL_WELL_SPACING)
                 return WellCoordinates(x=x, y=y, z=0.0)
 
         # Standard well format (A1-H15 for MicroChip, A1-H12 for legacy)
@@ -223,8 +230,8 @@ class CoordinateMapper:
 
             # For MicroChip layout (8x15), wells start at offset
             # For legacy layout (8x12), use standard spacing
-            well_offset_x = 70   # A1 is 70mm to the right of home
-            well_offset_y = 15   # A1 is 15mm up from home
+            well_offset_x = CoordinateMapper.BED_OFFSET_X
+            well_offset_y = CoordinateMapper.BED_OFFSET_Y
 
             # Calculate physical coordinates
             # X increases with column number
@@ -375,7 +382,7 @@ class PipettingController:
                 "well": self.get_current_well(),
                 "pipette_count": self.current_pipette_count,
                 "layout_type": self.layout_type,
-                "pipette_ml": round(self.pipette_ml, 3)
+                "pipette_ml": self.pipette_ml
             }
             with open(self.POSITION_FILE, 'w') as f:
                 json.dump(position_data, f, indent=2)
@@ -434,30 +441,34 @@ class PipettingController:
         # Calculate relative movements
         x_delta = target_steps[0] - current_steps[0]
         y_delta = target_steps[1] - current_steps[1]
-        z_delta = target_steps[2] - current_steps[2]
 
-        # Move Z up to safe height first (if moving down)
-        if z_delta < 0:
-            safe_z_steps = int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-            self._move_z_safe(safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+        # Step 1: Move Z up to top limit
+        Z_UP_POSITION = 70.0
+        z_up_distance = Z_UP_POSITION - self.current_position.z
+        if z_up_distance > 0:
+            z_up_steps = int(z_up_distance * self.mapper.STEPS_PER_MM_Z)
+            self.log(f"  Step 1: Z up to {Z_UP_POSITION}mm ({z_up_steps} steps)")
+            self._move_z_safe(z_up_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+            self.current_position.z = Z_UP_POSITION
 
-        # Move X and Y
-        if x_delta != 0:
-            direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
-            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
-
+        # Step 2: Move Y
         if y_delta != 0:
+            self.log(f"  Step 2: Moving Y ({y_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
             self.stepper_controller.move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED)
 
-        # Move Z to target position
-        if z_delta != 0:
-            # Account for safe height movement
-            if z_delta < 0:
-                total_z = abs(z_delta) + int(self.SAFE_HEIGHT * self.mapper.STEPS_PER_MM_Z)
-                self._move_z_safe(total_z, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-            else:
-                self._move_z_safe(abs(z_delta), self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
+        # Step 3: Move X
+        if x_delta != 0:
+            self.log(f"  Step 3: Moving X ({x_delta} steps)")
+            direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
+            self.stepper_controller.move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED)
+
+        # Step 4: Move Z down to target position
+        z_down_distance = Z_UP_POSITION - target_coords.z
+        if z_down_distance > 0:
+            z_down_steps = int(z_down_distance * self.mapper.STEPS_PER_MM_Z)
+            self.log(f"  Step 4: Z down to {target_coords.z}mm ({z_down_steps} steps)")
+            self._move_z_safe(z_down_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Update current position
         self.current_position = target_coords
@@ -940,10 +951,10 @@ class PipettingController:
         """
         motor_positions = self.stepper_controller.get_all_positions()
         return {
-            'x': round(self.current_position.x, 2),
-            'y': round(self.current_position.y, 2),
-            'z': round(self.current_position.z, 2),
-            'pipette_ml': round(self.pipette_ml, 3),
+            'x': self.current_position.x,
+            'y': self.current_position.y,
+            'z': self.current_position.z,
+            'pipette_ml': self.pipette_ml,
             'motor_steps': motor_positions
         }
 

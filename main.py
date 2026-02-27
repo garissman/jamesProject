@@ -907,6 +907,10 @@ async def clear_drift_test_results():
 
 class ConfigurationModel(BaseModel):
     """Configuration settings model"""
+    # Bed Offset
+    BED_OFFSET_X: float = Field(..., description="Bed X offset from home in mm")
+    BED_OFFSET_Y: float = Field(..., description="Bed Y offset from home in mm")
+
     # Well Plate Physical Dimensions
     WELL_SPACING: float = Field(..., gt=0, description="Spacing between well centers in mm")
     WELL_DIAMETER: float = Field(..., gt=0, description="Diameter of each well in mm")
@@ -937,10 +941,11 @@ class ConfigurationModel(BaseModel):
     PIPETTE_SPEED: float = Field(..., gt=0, description="Pipetting operation speed (seconds/step)")
 
     # Washing Station Dimensions
-    WS_OFFSET_Y: float = Field(..., ge=0, description="Y offset from origin to WS1 start in mm")
-    WS_HEIGHT:   float = Field(..., gt=0, description="Height of each washing station in mm")
-    WS_WIDTH:    float = Field(..., gt=0, description="Width of each washing station in mm")
-    WS_GAP:      float = Field(..., ge=0, description="Gap between WS1 and WS2 in mm")
+    WS_POSITION_X: float = Field(..., description="X position of washing station in mm")
+    WS_POSITION_Y: float = Field(..., description="Y position of washing station in mm")
+    WS_HEIGHT:     float = Field(..., gt=0, description="Height of each washing station in mm")
+    WS_WIDTH:      float = Field(..., gt=0, description="Width of each washing station in mm")
+    WS_GAP:        float = Field(..., ge=0, description="Gap between WS1 and WS2 in mm")
 
     # Motor Inversion Flags
     INVERT_X:       bool = Field(..., description="Invert X-axis motor direction")
@@ -980,6 +985,8 @@ async def update_configuration(config: ConfigurationModel):
         # Patch CoordinateMapper class-level attributes so they reflect new values
         # without requiring a full process restart (class attrs are set at import time)
         from pipetting_controller import CoordinateMapper
+        CoordinateMapper.BED_OFFSET_X       = cfg['BED_OFFSET_X']
+        CoordinateMapper.BED_OFFSET_Y       = cfg['BED_OFFSET_Y']
         CoordinateMapper.WELL_SPACING       = cfg['WELL_SPACING']
         CoordinateMapper.WELL_DIAMETER      = cfg['WELL_DIAMETER']
         CoordinateMapper.WELL_HEIGHT        = cfg['WELL_HEIGHT']
