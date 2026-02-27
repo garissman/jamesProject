@@ -265,9 +265,13 @@ export default function SettingsTab({
                                                 try {
                                                     const r = await fetch('/api/mcu/ping')
                                                     const data = await r.json()
-                                                    setConfigMessage(data.connected ? 'MCU: Connected (pong)' : 'MCU: No response')
+                                                    if (!r.ok) {
+                                                        setConfigMessage('MCU: ' + (data.detail || 'Error'))
+                                                    } else {
+                                                        setConfigMessage(data.connected ? 'MCU: Connected (pong)' : 'MCU: No response from MCU')
+                                                    }
                                                 } catch (e) {
-                                                    setConfigMessage('MCU: Connection failed')
+                                                    setConfigMessage('MCU: Connection failed - ' + e.message)
                                                 }
                                             }}
                                         >

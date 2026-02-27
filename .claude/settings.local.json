@@ -47,7 +47,20 @@
       "mcp__plugin_playwright_playwright__browser_install",
       "mcp__plugin_playwright_playwright__browser_close",
       "mcp__plugin_playwright_playwright__browser_select_option",
-      "Bash(kill %1:*)"
+      "Bash(kill %1:*)",
+      "Bash(arduino-cli version:*)",
+      "Bash(arduino-cli board:*)",
+      "Bash(arduino-cli core:*)",
+      "Bash(arduino-cli lib:*)",
+      "Bash(arduino-cli compile:*)",
+      "Bash(arduino-cli upload:*)",
+      "Bash(pip3 list:*)",
+      "Bash(arp:*)",
+      "Bash(brew install:*)",
+      "Bash(sshpass:*)",
+      "Bash(expect:*)",
+      "Bash(cp:*)",
+      "Bash(chmod +x:*)"
     ],
     "deny": [],
     "ask": []

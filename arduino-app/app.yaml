@@ -1,0 +1,5 @@
+name: JamesProject
+icon: ⚗
+description: Laboratory sampler with web control interface
+ports:
+  - 8000
