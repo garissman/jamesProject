@@ -553,6 +553,42 @@ export default function DriftTestTab() {
                                 }} />
                             </div>
                         </div>
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Running Average Time</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={cycleOpts('Seconds')} data={{
+                                    labels,
+                                    datasets: (() => {
+                                        let fwdSum = 0, bwdSum = 0, cycleSum = 0
+                                        const avgFwd = [], avgBwd = [], avgCycle = []
+                                        cycles.forEach((c, i) => {
+                                            fwdSum += c.forward_time; bwdSum += c.backward_time; cycleSum += c.total_cycle_time
+                                            avgFwd.push(+(fwdSum / (i + 1)).toFixed(2))
+                                            avgBwd.push(+(bwdSum / (i + 1)).toFixed(2))
+                                            avgCycle.push(+(cycleSum / (i + 1)).toFixed(2))
+                                        })
+                                        return [
+                                            { label: 'Avg Forward Time', data: avgFwd, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                            { label: 'Avg Backward Time', data: avgBwd, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, pointRadius: 3 },
+                                            { label: 'Avg Cycle Time', data: avgCycle, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                        ]
+                                    })(),
+                                }} />
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Inter-Cycle Step Delta</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={cycleOpts('Steps')} data={{
+                                    labels,
+                                    datasets: [
+                                        { label: 'Fwd Delta', data: cycles.map(c => c.fwd_delta ?? 0), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                        { label: 'Bwd Delta', data: cycles.map(c => c.bwd_delta ?? 0), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.3, pointRadius: 3 },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
                     </>
                 )
             })()}
