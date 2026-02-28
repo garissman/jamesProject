@@ -27,5 +27,5 @@
   "INVERT_Y": false,
   "INVERT_Z": false,
   "INVERT_PIPETTE": true,
-  "CONTROLLER_TYPE": "arduino_uno_q"
+  "CONTROLLER_TYPE": "raspberry_pi"
 }
