@@ -15,6 +15,20 @@ import 'chartjs-adapter-date-fns'
 
 ChartJS.register(CategoryScale, LinearScale, TimeScale, PointElement, LineElement, Title, Tooltip, Legend)
 
+// Compute inter-cycle deltas from raw step data (frontend fallback when backend doesn't provide them)
+function withDeltas(cycles) {
+    return cycles.map((c, i) => {
+        if (c.fwd_delta != null) return c // backend already provided deltas
+        if (i === 0) return { ...c, fwd_delta: null, bwd_delta: null }
+        const prev = cycles[i - 1]
+        return {
+            ...c,
+            fwd_delta: c.forward_steps - prev.forward_steps,
+            bwd_delta: c.backward_steps - prev.backward_steps,
+        }
+    })
+}
+
 export default function DriftTestTab() {
     const [driftTestConfig, setDriftTestConfig] = useState({
         cycles: 10,
@@ -362,7 +376,7 @@ export default function DriftTestTab() {
 
             {/* Test Summary — computed live from cycle data */}
             {driftTestResults?.cycles?.length > 0 && (() => {
-                const c = driftTestResults.cycles
+                const c = withDeltas(driftTestResults.cycles)
                 const n = c.length
                 const avg = (arr) => (arr.reduce((a, b) => a + b, 0) / n).toFixed(2)
                 const sum = (arr) => arr.reduce((a, b) => a + b, 0).toFixed(2)
@@ -473,7 +487,7 @@ export default function DriftTestTab() {
                             </tr>
                             </thead>
                             <tbody>
-                            {driftTestResults.cycles.map((cycle, index) => (
+                            {withDeltas(driftTestResults.cycles).map((cycle, index) => (
                                 <tr key={index} className="hover:bg-[var(--bg-overlay)]">
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.cycle_number}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono text-[0.8rem]">{cycle.timestamp ? new Date(cycle.timestamp).toLocaleTimeString() : '-'}</td>
@@ -496,7 +510,7 @@ export default function DriftTestTab() {
 
             {/* Charts by Cycle */}
             {driftTestResults?.cycles?.length > 1 && (() => {
-                const cycles = driftTestResults.cycles
+                const cycles = withDeltas(driftTestResults.cycles)
                 const labels = cycles.map(c => c.cycle_number)
                 const cycleOpts = (yLabel) => ({
                     responsive: true,
