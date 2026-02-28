@@ -789,7 +789,7 @@ class DriftTestRequest(BaseModel):
 def _move_until_limit_rpi(motor, direction, motor_speed):
     """RPi: use motor object's move_until_limit method.
     Returns (steps_taken, hit_limit: bool)"""
-    steps, hit = motor.move_until_limit(direction, motor_speed)
+    steps, hit = motor.move_until_limit(direction, motor_speed, override_min_delay=True)
     return steps, hit != 'none'
 
 

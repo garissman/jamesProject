@@ -434,8 +434,11 @@ export default function SettingsTab({
                                         type="text"
                                         value={config.TRAVEL_SPEED}
                                         onChange={(e) => handleConfigChange('TRAVEL_SPEED', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
+                                        className={`p-3 px-4 text-base border-2 rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)] ${parseFloat(config.TRAVEL_SPEED) < 0.0001 && config.TRAVEL_SPEED !== '' ? 'border-red-500' : 'border-[var(--input-border)]'}`}
                                     />
+                                    {parseFloat(config.TRAVEL_SPEED) < 0.0001 && config.TRAVEL_SPEED !== '' && (
+                                        <span className="text-red-500 text-xs font-medium">Minimum allowed value is 0.0001s</span>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Pipette Speed (s/step):</label>
@@ -443,8 +446,11 @@ export default function SettingsTab({
                                         type="text"
                                         value={config.PIPETTE_SPEED}
                                         onChange={(e) => handleConfigChange('PIPETTE_SPEED', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
+                                        className={`p-3 px-4 text-base border-2 rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)] ${parseFloat(config.PIPETTE_SPEED) < 0.0001 && config.PIPETTE_SPEED !== '' ? 'border-red-500' : 'border-[var(--input-border)]'}`}
                                     />
+                                    {parseFloat(config.PIPETTE_SPEED) < 0.0001 && config.PIPETTE_SPEED !== '' && (
+                                        <span className="text-red-500 text-xs font-medium">Minimum allowed value is 0.0001s</span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -744,7 +750,7 @@ export default function SettingsTab({
                                 setConfigLoading(false)
                             }
                         }}
-                        disabled={configLoading}
+                        disabled={configLoading || parseFloat(config.TRAVEL_SPEED) < 0.0001 || parseFloat(config.PIPETTE_SPEED) < 0.0001}
                         className="py-3 px-8 bg-gradient-to-br from-[#4a90e2] to-[#357abd] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-[0_2px_8px_rgba(74,144,226,0.3)] hover:enabled:bg-gradient-to-br hover:enabled:from-[#357abd] hover:enabled:to-[#2868a8] hover:enabled:shadow-[0_4px_12px_rgba(74,144,226,0.4)] hover:enabled:-translate-y-px disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {configLoading ? 'Saving...' : 'Save Configuration'}

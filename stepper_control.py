@@ -264,7 +264,7 @@ class StepperMotor:
         return steps_completed, limit_state
 
     def move_until_limit(self, direction: Direction, delay: float = 0.001,
-                         max_steps: int = 0) -> Tuple[int, str]:
+                         max_steps: int = 0, override_min_delay: bool = False) -> Tuple[int, str]:
         """
         Move in direction until the OPPOSITE limit switch is hit.
         If started at min, only looks for max (and vice versa).
@@ -272,14 +272,15 @@ class StepperMotor:
 
         Args:
             direction: Direction to move
-            delay: Step delay in seconds (minimum 0.0001)
+            delay: Step delay in seconds (minimum 0.0001 unless overridden)
             max_steps: Safety limit
+            override_min_delay: If True, skip the MIN_DELAY clamp (drift test only)
 
         Returns:
             Tuple of (steps_taken, which_limit: 'min'|'max'|'none')
         """
         MIN_DELAY = 0.0001
-        actual_delay = max(delay, MIN_DELAY)
+        actual_delay = delay if override_min_delay else max(delay, MIN_DELAY)
         CHECK_INTERVAL = 50  # Check switches every N steps (while motor is paused)
 
         # Suppress limit switch interrupts during movement to prevent EMI issues
