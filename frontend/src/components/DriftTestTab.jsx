@@ -377,6 +377,12 @@ export default function DriftTestTab() {
                 const avgBwdTime = avg(c.map(x => x.backward_time))
                 const avgCycleTime = avg(c.map(x => x.total_cycle_time))
                 const totalTime = sum(c.map(x => x.total_cycle_time))
+                const fwdDeltas = n > 1 ? c.slice(1).map(x => Math.abs(x.fwd_delta ?? 0)) : [0]
+                const bwdDeltas = n > 1 ? c.slice(1).map(x => Math.abs(x.bwd_delta ?? 0)) : [0]
+                const avgFwdDelta = (fwdDeltas.reduce((a, b) => a + b, 0) / fwdDeltas.length).toFixed(1)
+                const maxFwdDelta = Math.max(...fwdDeltas)
+                const avgBwdDelta = (bwdDeltas.reduce((a, b) => a + b, 0) / bwdDeltas.length).toFixed(1)
+                const maxBwdDelta = Math.max(...bwdDeltas)
 
                 return (
                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
@@ -424,6 +430,22 @@ export default function DriftTestTab() {
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Total Test Time:</span>
                             <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{totalTime} s</span>
                         </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Fwd Delta:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgFwdDelta} steps</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Max Fwd Delta:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{maxFwdDelta} steps</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Bwd Delta:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgBwdDelta} steps</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Max Bwd Delta:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{maxBwdDelta} steps</span>
+                        </div>
                     </div>
                 </div>
                 )
@@ -446,6 +468,8 @@ export default function DriftTestTab() {
                                 <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Cycle Time (s)</th>
                                 <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Difference</th>
                                 <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Drift (mm)</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Fwd &Delta;</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Bwd &Delta;</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -460,6 +484,8 @@ export default function DriftTestTab() {
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.total_cycle_time}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.step_difference}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.drift_mm}</td>
+                                    <td className={`py-2.5 px-[15px] text-center border-b border-[var(--border-color)] font-mono ${cycle.fwd_delta != null && cycle.fwd_delta !== 0 ? (cycle.fwd_delta > 0 ? 'text-[#10b981]' : 'text-[#ef4444]') : 'text-[var(--text-tertiary)]'}`}>{cycle.fwd_delta != null ? (cycle.fwd_delta > 0 ? '+' : '') + cycle.fwd_delta : '—'}</td>
+                                    <td className={`py-2.5 px-[15px] text-center border-b border-[var(--border-color)] font-mono ${cycle.bwd_delta != null && cycle.bwd_delta !== 0 ? (cycle.bwd_delta > 0 ? 'text-[#10b981]' : 'text-[#ef4444]') : 'text-[var(--text-tertiary)]'}`}>{cycle.bwd_delta != null ? (cycle.bwd_delta > 0 ? '+' : '') + cycle.bwd_delta : '—'}</td>
                                 </tr>
                             ))}
                             </tbody>

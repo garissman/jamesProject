@@ -919,6 +919,11 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             step_difference = abs(fwd_steps - back_steps)
             drift_mm = step_difference / steps_per_mm
 
+            # Inter-cycle deltas (how steps changed from previous cycle)
+            prev = drift_test_results["cycles"][-1] if drift_test_results["cycles"] else None
+            fwd_delta = fwd_steps - prev["forward_steps"] if prev else 0
+            bwd_delta = back_steps - prev["backward_steps"] if prev else 0
+
             # Store cycle data
             cycle_data = {
                 "cycle_number": cycle,
@@ -929,7 +934,9 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
                 "backward_time": round(back_time, 2),
                 "total_cycle_time": round(cycle_elapsed, 2),
                 "step_difference": step_difference,
-                "drift_mm": round(drift_mm, 3)
+                "drift_mm": round(drift_mm, 3),
+                "fwd_delta": fwd_delta,
+                "bwd_delta": bwd_delta,
             }
 
             drift_test_results["cycles"].append(cycle_data)
@@ -946,6 +953,10 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             cycle_times = [c["total_cycle_time"] for c in cycles_data]
             n = len(cycles_data)
 
+            # Inter-cycle deltas (skip first cycle which has delta=0)
+            fwd_deltas = [abs(c["fwd_delta"]) for c in cycles_data[1:]] if n > 1 else [0]
+            bwd_deltas = [abs(c["bwd_delta"]) for c in cycles_data[1:]] if n > 1 else [0]
+
             drift_test_results["summary"] = {
                 "total_cycles": n,
                 "avg_forward_steps": round(sum(fwd_steps_list) / n, 1),
@@ -957,6 +968,10 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
                 "avg_backward_time": round(sum(back_times) / n, 2),
                 "avg_cycle_time": round(sum(cycle_times) / n, 2),
                 "total_test_time": round(sum(cycle_times), 2),
+                "avg_fwd_delta": round(sum(fwd_deltas) / len(fwd_deltas), 1),
+                "max_fwd_delta": max(fwd_deltas),
+                "avg_bwd_delta": round(sum(bwd_deltas) / len(bwd_deltas), 1),
+                "max_bwd_delta": max(bwd_deltas),
             }
 
         if drift_test_results["status"] == "running":
