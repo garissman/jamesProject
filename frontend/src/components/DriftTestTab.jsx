@@ -1,4 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Line } from 'react-chartjs-2'
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+} from 'chart.js'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 export default function DriftTestTab() {
     const [driftTestConfig, setDriftTestConfig] = useState({
@@ -317,6 +330,30 @@ export default function DriftTestTab() {
                                 />
                             </div>
                         )}
+                        {driftTestResults.start_time && (
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-[var(--text-secondary)]">Start Time:</span>
+                                <span className="font-mono font-semibold py-1 px-3 rounded-md bg-[var(--bg-overlay)] text-[0.85rem]">
+                                    {new Date(driftTestResults.start_time).toLocaleString()}
+                                </span>
+                            </div>
+                        )}
+                        {driftTestResults.end_time && (
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-[var(--text-secondary)]">End Time:</span>
+                                <span className="font-mono font-semibold py-1 px-3 rounded-md bg-[var(--bg-overlay)] text-[0.85rem]">
+                                    {new Date(driftTestResults.end_time).toLocaleString()}
+                                </span>
+                            </div>
+                        )}
+                        {driftTestResults.error && (
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-[#ef4444]">Error:</span>
+                                <span className="font-mono font-semibold py-1 px-3 rounded-md bg-[rgba(239,68,68,0.15)] text-[#ef4444] text-[0.85rem]">
+                                    {driftTestResults.error}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -350,6 +387,22 @@ export default function DriftTestTab() {
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Min Drift:</span>
                             <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.min_drift_mm} mm</span>
                         </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Forward Time:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_forward_time} s</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Backward Time:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_backward_time} s</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Cycle Time:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_cycle_time} s</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
+                            <span className="text-[0.85rem] text-[var(--text-tertiary)]">Total Test Time:</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.total_test_time} s</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -358,23 +411,31 @@ export default function DriftTestTab() {
             {driftTestResults?.cycles?.length > 0 && (
                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
                     <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Cycle Data</h3>
-                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <div className="overflow-x-auto">
                         <table className="w-full border-collapse text-[0.9rem]">
                             <thead>
                             <tr>
-                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)] sticky top-0">Cycle</th>
-                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)] sticky top-0">Forward Steps</th>
-                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)] sticky top-0">Backward Steps</th>
-                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)] sticky top-0">Difference</th>
-                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)] sticky top-0">Drift (mm)</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Cycle</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Timestamp</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Fwd Steps</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Fwd Time (s)</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Bwd Steps</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Bwd Time (s)</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Cycle Time (s)</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Difference</th>
+                                <th className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] bg-[var(--bg-overlay)] font-semibold text-[var(--text-primary)]">Drift (mm)</th>
                             </tr>
                             </thead>
                             <tbody>
-                            {driftTestResults.cycles.slice(-20).map((cycle, index) => (
+                            {driftTestResults.cycles.map((cycle, index) => (
                                 <tr key={index} className="hover:bg-[var(--bg-overlay)]">
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.cycle_number}</td>
+                                    <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono text-[0.8rem]">{cycle.timestamp ? new Date(cycle.timestamp).toLocaleTimeString() : '-'}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.forward_steps}</td>
+                                    <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.forward_time}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.backward_steps}</td>
+                                    <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.backward_time}</td>
+                                    <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.total_cycle_time}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.step_difference}</td>
                                     <td className="py-2.5 px-[15px] text-center border-b border-[var(--border-color)] text-[var(--text-secondary)] font-mono">{cycle.drift_mm}</td>
                                 </tr>
@@ -382,11 +443,71 @@ export default function DriftTestTab() {
                             </tbody>
                         </table>
                     </div>
-                    {driftTestResults.cycles.length > 20 && (
-                        <p className="mt-2.5 text-[0.85rem] text-[var(--text-tertiary)] italic text-center">Showing last 20 cycles of {driftTestResults.cycles.length}</p>
-                    )}
                 </div>
             )}
+
+            {/* Charts */}
+            {driftTestResults?.cycles?.length > 1 && (() => {
+                const cycles = driftTestResults.cycles
+                const labels = cycles.map(c => c.cycle_number)
+                const chartOpts = (title, yLabel) => ({
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: 'var(--text-secondary)', usePointStyle: true, padding: 15 } },
+                        title: { display: false },
+                        tooltip: { mode: 'index', intersect: false },
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Cycle', color: 'var(--text-tertiary)' }, ticks: { color: 'var(--text-tertiary)' }, grid: { color: 'var(--border-color)' } },
+                        y: { title: { display: true, text: yLabel, color: 'var(--text-tertiary)' }, ticks: { color: 'var(--text-tertiary)' }, grid: { color: 'var(--border-color)' } },
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                })
+
+                return (
+                    <>
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Steps per Cycle</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={chartOpts('Steps per Cycle', 'Steps')} data={{
+                                    labels,
+                                    datasets: [
+                                        { label: 'Forward Steps', data: cycles.map(c => c.forward_steps), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                        { label: 'Backward Steps', data: cycles.map(c => c.backward_steps), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, pointRadius: 3 },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Drift per Cycle</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={chartOpts('Drift per Cycle', 'mm')} data={{
+                                    labels,
+                                    datasets: [
+                                        { label: 'Drift (mm)', data: cycles.map(c => c.drift_mm), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.3, pointRadius: 3, fill: true },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Time per Cycle</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={chartOpts('Time per Cycle', 'Seconds')} data={{
+                                    labels,
+                                    datasets: [
+                                        { label: 'Forward Time', data: cycles.map(c => c.forward_time), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                        { label: 'Backward Time', data: cycles.map(c => c.backward_time), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, pointRadius: 3 },
+                                        { label: 'Cycle Time', data: cycles.map(c => c.total_cycle_time), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
+                    </>
+                )
+            })()}
         </div>
     )
 }

@@ -502,7 +502,7 @@ export default function PlateLayout({
                 </div>
             ) : (
                 /* Vial Layout */
-                <div className="layout-grid grid grid-cols-3">
+                <div className="grid grid-cols-3 gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg overflow-auto mt-2.5 [&>div]:flex [&>div]:flex-col [&>div]:gap-2">
                     <div>
                         {/* WS1 -- row 1, cols 1-6 */}
                         <div

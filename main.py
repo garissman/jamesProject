@@ -942,17 +942,26 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
 
         # Calculate summary
         if drift_test_results["cycles"]:
-            drifts = [c["drift_mm"] for c in drift_test_results["cycles"]]
-            fwd_steps_list = [c["forward_steps"] for c in drift_test_results["cycles"]]
-            back_steps_list = [c["backward_steps"] for c in drift_test_results["cycles"]]
+            cycles_data = drift_test_results["cycles"]
+            drifts = [c["drift_mm"] for c in cycles_data]
+            fwd_steps_list = [c["forward_steps"] for c in cycles_data]
+            back_steps_list = [c["backward_steps"] for c in cycles_data]
+            fwd_times = [c["forward_time"] for c in cycles_data]
+            back_times = [c["backward_time"] for c in cycles_data]
+            cycle_times = [c["total_cycle_time"] for c in cycles_data]
+            n = len(cycles_data)
 
             drift_test_results["summary"] = {
-                "total_cycles": len(drift_test_results["cycles"]),
-                "avg_forward_steps": round(sum(fwd_steps_list) / len(fwd_steps_list), 1),
-                "avg_backward_steps": round(sum(back_steps_list) / len(back_steps_list), 1),
-                "avg_drift_mm": round(sum(drifts) / len(drifts), 3),
+                "total_cycles": n,
+                "avg_forward_steps": round(sum(fwd_steps_list) / n, 1),
+                "avg_backward_steps": round(sum(back_steps_list) / n, 1),
+                "avg_drift_mm": round(sum(drifts) / n, 3),
                 "max_drift_mm": round(max(drifts), 3),
-                "min_drift_mm": round(min(drifts), 3)
+                "min_drift_mm": round(min(drifts), 3),
+                "avg_forward_time": round(sum(fwd_times) / n, 2),
+                "avg_backward_time": round(sum(back_times) / n, 2),
+                "avg_cycle_time": round(sum(cycle_times) / n, 2),
+                "total_test_time": round(sum(cycle_times), 2),
             }
 
         if drift_test_results["status"] == "running":
