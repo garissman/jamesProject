@@ -264,72 +264,11 @@ class StepperMotor:
         return steps_completed, limit_state
 
     def move_until_limit(self, direction: Direction, delay: float = 0.001,
-                         max_steps: int = 50000) -> Tuple[int, bool]:
+                         max_steps: int = 0) -> Tuple[int, str]:
         """
-        Move motor until limit switch is triggered
-
-        Args:
-            direction: Direction to move
-            delay: Step delay in seconds
-            max_steps: Maximum steps before giving up (safety limit)
-
-        Returns:
-            Tuple of (steps_taken, limit_reached)
-        """
-        self.stop_requested = False
-
-        # Determine which limit to check
-        if direction == Direction.CLOCKWISE:
-            limit_pin = self.limit_max_pin
-        else:
-            limit_pin = self.limit_min_pin
-
-        if limit_pin is None:
-            print(
-                f"Warning: No limit switch configured for {self.name} in {'max' if direction == Direction.CLOCKWISE else 'min'} direction")
-            return 0, False
-
-        # Set direction
-        if GPIO_AVAILABLE:
-            GPIO.output(self.dir_pin, direction.value)
-            time.sleep(0.001)  # Small delay for direction change
-
-        steps_taken = 0
-
-        while not self.check_limit_switch(limit_pin):
-            if self.stop_requested:
-                break
-
-            if steps_taken >= max_steps:
-                print(f"Warning: {self.name} reached safety limit ({max_steps} steps)")
-                return steps_taken, False
-
-            if GPIO_AVAILABLE:
-                GPIO.output(self.pulse_pin, GPIO.HIGH)
-                time.sleep(delay)
-                GPIO.output(self.pulse_pin, GPIO.LOW)
-                time.sleep(delay)
-            else:
-                # Simulation mode: faster delay for testing, update simulated position
-                time.sleep(delay * 0.01)  # Much faster in simulation mode
-                if direction == Direction.CLOCKWISE:
-                    self.simulated_position += 1
-                else:
-                    self.simulated_position -= 1
-
-            steps_taken += 1
-
-        # Update position
-        position_delta = steps_taken if direction == Direction.CLOCKWISE else -steps_taken
-        self.current_position += position_delta
-
-        return steps_taken, self.check_limit_switch(limit_pin)
-
-    def move_until_limit(self, direction: Direction, delay: float = 0.001,
-                         max_steps: int = 100000) -> Tuple[int, str]:
-        """
-        Simple: Move in direction until ANY limit switch is hit.
-        Checks limit AFTER each step so we can move away from current limit.
+        Move in direction until the OPPOSITE limit switch is hit.
+        If started at min, only looks for max (and vice versa).
+        Pauses motor pulses before reading switches to avoid EMI interference.
 
         Args:
             direction: Direction to move
@@ -341,14 +280,25 @@ class StepperMotor:
         """
         MIN_DELAY = 0.0001
         actual_delay = max(delay, MIN_DELAY)
+        CHECK_INTERVAL = 50  # Check switches every N steps (while motor is paused)
 
-        # Clear any pending interrupt-based stop so we can move away from a limit
+        # Suppress limit switch interrupts during movement to prevent EMI issues
+        self.ignore_limits = True
         self.clear_limit_trigger()
 
-        # Remember if we started at a limit (so we can ignore it until we leave)
+        # Remember which limit we started at so we only look for the OTHER one
         started_at_min = self.check_min_limit()
         started_at_max = self.check_max_limit()
         left_starting_limit = not (started_at_min or started_at_max)
+
+        # Decide which limit to look for (the opposite of where we started)
+        # If not at any limit, check both
+        check_for_min = not started_at_min
+        check_for_max = not started_at_max
+
+        print(f"{self.name}: move_until_limit {direction.name}, "
+              f"started_min={started_at_min}, started_max={started_at_max}, "
+              f"check_min={check_for_min}, check_max={check_for_max}")
 
         # Set direction
         if GPIO_AVAILABLE:
@@ -357,57 +307,61 @@ class StepperMotor:
 
         steps_taken = 0
 
-        while steps_taken < max_steps:
-            # Only honour stop_requested once we've left the starting limit,
-            # otherwise the limit-switch interrupt blocks us from moving away
-            if self.stop_requested and left_starting_limit:
-                break
+        try:
+            while max_steps == 0 or steps_taken < max_steps:
+                # Move a batch of steps
+                batch = CHECK_INTERVAL if max_steps == 0 else min(CHECK_INTERVAL, max_steps - steps_taken)
+                for _ in range(batch):
+                    if GPIO_AVAILABLE:
+                        GPIO.output(self.pulse_pin, GPIO.HIGH)
+                        time.sleep(actual_delay)
+                        GPIO.output(self.pulse_pin, GPIO.LOW)
+                        time.sleep(actual_delay)
+                    else:
+                        time.sleep(actual_delay * 0.01)
+                        if direction == Direction.CLOCKWISE:
+                            self.simulated_position += 1
+                        else:
+                            self.simulated_position -= 1
 
-            # Take one step FIRST
-            if GPIO_AVAILABLE:
-                GPIO.output(self.pulse_pin, GPIO.HIGH)
-                time.sleep(actual_delay)
-                GPIO.output(self.pulse_pin, GPIO.LOW)
-                time.sleep(actual_delay)
-            else:
-                time.sleep(actual_delay * 0.01)
-                if direction == Direction.CLOCKWISE:
-                    self.simulated_position += 1
-                else:
-                    self.simulated_position -= 1
+                steps_taken += batch
 
-            steps_taken += 1
+                # Pause briefly to let EMI settle, then read switches cleanly
+                time.sleep(0.001)
 
-            # Check if we've left the starting limit
-            if not left_starting_limit:
-                if started_at_min and not self.check_min_limit():
-                    left_starting_limit = True
-                    print(f"{self.name}: Left MIN limit at step {steps_taken}")
-                elif started_at_max and not self.check_max_limit():
-                    left_starting_limit = True
-                    print(f"{self.name}: Left MAX limit at step {steps_taken}")
-                # Clear interrupt-based stop while still on starting limit
-                self.stop_requested = False
+                # Check if we've left the starting limit
+                if not left_starting_limit:
+                    if started_at_min and not self.check_min_limit():
+                        left_starting_limit = True
+                        print(f"{self.name}: Left MIN limit at step {steps_taken}")
+                    elif started_at_max and not self.check_max_limit():
+                        left_starting_limit = True
+                        print(f"{self.name}: Left MAX limit at step {steps_taken}")
+                    continue  # Don't check target limit until we've left the start
 
-            # Only check for hitting limits AFTER we've left the starting limit
-            if left_starting_limit:
-                if self.check_min_limit():
+                # Only check the target limit(s) — motor is paused so no EMI
+                if check_for_min and self.check_min_limit():
                     print(f"{self.name}: Hit MIN at step {steps_taken}")
                     return steps_taken, 'min'
 
-                if self.check_max_limit():
+                if check_for_max and self.check_max_limit():
                     print(f"{self.name}: Hit MAX at step {steps_taken}")
                     return steps_taken, 'max'
+
+        finally:
+            # Re-enable limit switch interrupts
+            self.ignore_limits = False
+            self.clear_limit_trigger()
 
         print(f"Warning: {self.name} max steps reached ({max_steps})")
         return steps_taken, 'none'
 
     def move_until_any_limit(self, direction: Direction, delay: float = 0.001,
-                             max_steps: int = 100000) -> Tuple[int, str]:
+                             max_steps: int = 0) -> Tuple[int, str]:
         """Alias for move_until_limit for backwards compatibility"""
         return self.move_until_limit(direction, delay, max_steps)
 
-    def home(self, delay: float = 0.001, max_steps: int = 50000) -> bool:
+    def home(self, delay: float = 0.001, max_steps: int = 0) -> bool:
         """
         Home the motor by moving to minimum limit switch
 
@@ -423,11 +377,11 @@ class StepperMotor:
             return False
 
         print(f"Homing {self.name}...")
-        steps, reached = self.move_until_limit(Direction.COUNTERCLOCKWISE, delay, max_steps)
+        steps, hit = self.move_until_limit(Direction.COUNTERCLOCKWISE, delay, max_steps)
 
-        if reached:
+        if hit != 'none':
             self.current_position = 0
-            print(f"  {self.name} homed successfully ({steps} steps)")
+            print(f"  {self.name} homed successfully ({steps} steps, hit {hit})")
             return True
         else:
             print(f"  {self.name} homing failed")
@@ -544,7 +498,7 @@ class StepperController:
         return motor.step(direction, steps, delay, check_limits)
 
     def move_motor_until_limit(self, motor_id: int, direction: Direction,
-                               delay: float = 0.001, max_steps: int = 50000) -> Tuple[int, bool]:
+                               delay: float = 0.001, max_steps: int = 0) -> Tuple[int, str]:
         """
         Move a motor until its limit switch is triggered
 
@@ -555,7 +509,7 @@ class StepperController:
             max_steps: Maximum steps (safety limit)
 
         Returns:
-            Tuple of (steps_taken, limit_reached)
+            Tuple of (steps_taken, which_limit: 'min'|'max'|'none')
         """
         motor = self.get_motor(motor_id)
         return motor.move_until_limit(direction, delay, max_steps)
@@ -607,7 +561,7 @@ class StepperController:
             for motor_id, motor in self.motors.items()
         }
 
-    def home_motor(self, motor_id: int, delay: float = 0.001, max_steps: int = 50000) -> bool:
+    def home_motor(self, motor_id: int, delay: float = 0.001, max_steps: int = 0) -> bool:
         """
         Home a specific motor using its limit switch
 
@@ -623,7 +577,7 @@ class StepperController:
         return motor.home(delay, max_steps)
 
     def home_all(self, home_sequence: List[Tuple[int, int, Direction]] = None,
-                 use_limits: bool = True, delay: float = 0.001, max_steps: int = 50000):
+                 use_limits: bool = True, delay: float = 0.001, max_steps: int = 0):
         """
         Home all motors to starting position
 
