@@ -4,14 +4,16 @@ import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
+    TimeScale,
     PointElement,
     LineElement,
     Title,
     Tooltip,
     Legend,
 } from 'chart.js'
+import 'chartjs-adapter-date-fns'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, TimeScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 export default function DriftTestTab() {
     const [driftTestConfig, setDriftTestConfig] = useState({
@@ -358,54 +360,74 @@ export default function DriftTestTab() {
                 </div>
             )}
 
-            {/* Test Summary */}
-            {driftTestResults?.summary && (
+            {/* Test Summary — computed live from cycle data */}
+            {driftTestResults?.cycles?.length > 0 && (() => {
+                const c = driftTestResults.cycles
+                const n = c.length
+                const avg = (arr) => (arr.reduce((a, b) => a + b, 0) / n).toFixed(2)
+                const sum = (arr) => arr.reduce((a, b) => a + b, 0).toFixed(2)
+                const s = driftTestResults.summary || {}
+                const avgFwdSteps = s.avg_forward_steps ?? Math.round(c.reduce((a, x) => a + x.forward_steps, 0) / n * 10) / 10
+                const avgBwdSteps = s.avg_backward_steps ?? Math.round(c.reduce((a, x) => a + x.backward_steps, 0) / n * 10) / 10
+                const drifts = c.map(x => x.drift_mm)
+                const avgDrift = s.avg_drift_mm ?? +(drifts.reduce((a, b) => a + b, 0) / n).toFixed(3)
+                const maxDrift = s.max_drift_mm ?? +Math.max(...drifts).toFixed(3)
+                const minDrift = s.min_drift_mm ?? +Math.min(...drifts).toFixed(3)
+                const avgFwdTime = avg(c.map(x => x.forward_time))
+                const avgBwdTime = avg(c.map(x => x.backward_time))
+                const avgCycleTime = avg(c.map(x => x.total_cycle_time))
+                const totalTime = sum(c.map(x => x.total_cycle_time))
+
+                return (
                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
-                    <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Test Summary</h3>
+                    <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">
+                        Test Summary {driftTestRunning && <span className="text-[0.85rem] font-normal text-[var(--text-tertiary)]">(live)</span>}
+                    </h3>
                     <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[15px]">
                         <div className="flex flex-col gap-1.5 p-3 bg-[var(--bg-overlay)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Total Cycles:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.total_cycles}</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{n}</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[var(--bg-overlay)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Forward Steps:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_forward_steps}</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgFwdSteps}</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[var(--bg-overlay)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Backward Steps:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_backward_steps}</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgBwdSteps}</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Drift:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_drift_mm} mm</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgDrift} mm</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[var(--bg-overlay)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Max Drift:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.max_drift_mm} mm</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{maxDrift} mm</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[var(--bg-overlay)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Min Drift:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.min_drift_mm} mm</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{minDrift} mm</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Forward Time:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_forward_time} s</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgFwdTime} s</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Backward Time:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_backward_time} s</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgBwdTime} s</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Avg Cycle Time:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.avg_cycle_time} s</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{avgCycleTime} s</span>
                         </div>
                         <div className="flex flex-col gap-1.5 p-3 bg-[rgba(59,130,246,0.15)] border border-[rgba(59,130,246,0.3)] rounded-lg">
                             <span className="text-[0.85rem] text-[var(--text-tertiary)]">Total Test Time:</span>
-                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{driftTestResults.summary.total_test_time} s</span>
+                            <span className="text-[1.2rem] font-bold font-mono text-[var(--text-primary)]">{totalTime} s</span>
                         </div>
                     </div>
                 </div>
-            )}
+                )
+            })()}
 
             {/* Cycle Data Table */}
             {driftTestResults?.cycles?.length > 0 && (
@@ -446,11 +468,11 @@ export default function DriftTestTab() {
                 </div>
             )}
 
-            {/* Charts */}
+            {/* Charts by Cycle */}
             {driftTestResults?.cycles?.length > 1 && (() => {
                 const cycles = driftTestResults.cycles
                 const labels = cycles.map(c => c.cycle_number)
-                const chartOpts = (title, yLabel) => ({
+                const cycleOpts = (yLabel) => ({
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
@@ -470,7 +492,7 @@ export default function DriftTestTab() {
                         <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
                             <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Steps per Cycle</h3>
                             <div style={{ height: '300px' }}>
-                                <Line options={chartOpts('Steps per Cycle', 'Steps')} data={{
+                                <Line options={cycleOpts('Steps')} data={{
                                     labels,
                                     datasets: [
                                         { label: 'Forward Steps', data: cycles.map(c => c.forward_steps), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
@@ -483,7 +505,7 @@ export default function DriftTestTab() {
                         <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
                             <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Drift per Cycle</h3>
                             <div style={{ height: '300px' }}>
-                                <Line options={chartOpts('Drift per Cycle', 'mm')} data={{
+                                <Line options={cycleOpts('mm')} data={{
                                     labels,
                                     datasets: [
                                         { label: 'Drift (mm)', data: cycles.map(c => c.drift_mm), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.3, pointRadius: 3, fill: true },
@@ -495,12 +517,68 @@ export default function DriftTestTab() {
                         <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
                             <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Time per Cycle</h3>
                             <div style={{ height: '300px' }}>
-                                <Line options={chartOpts('Time per Cycle', 'Seconds')} data={{
+                                <Line options={cycleOpts('Seconds')} data={{
                                     labels,
                                     datasets: [
                                         { label: 'Forward Time', data: cycles.map(c => c.forward_time), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3 },
                                         { label: 'Backward Time', data: cycles.map(c => c.backward_time), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, pointRadius: 3 },
                                         { label: 'Cycle Time', data: cycles.map(c => c.total_cycle_time), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', tension: 0.3, pointRadius: 3 },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
+                    </>
+                )
+            })()}
+
+            {/* Charts by Timestamp */}
+            {driftTestResults?.cycles?.length > 1 && (() => {
+                const cycles = driftTestResults.cycles
+                const hasTimestamps = cycles.every(c => c.timestamp)
+                if (!hasTimestamps) return null
+
+                const timeOpts = (yLabel) => ({
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: 'var(--text-secondary)', usePointStyle: true, padding: 15 } },
+                        title: { display: false },
+                        tooltip: { mode: 'index', intersect: false },
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'second', displayFormats: { second: 'HH:mm:ss' }, tooltipFormat: 'HH:mm:ss' },
+                            title: { display: true, text: 'Time', color: 'var(--text-tertiary)' },
+                            ticks: { color: 'var(--text-tertiary)', maxRotation: 45 },
+                            grid: { color: 'var(--border-color)' },
+                        },
+                        y: { title: { display: true, text: yLabel, color: 'var(--text-tertiary)' }, ticks: { color: 'var(--text-tertiary)' }, grid: { color: 'var(--border-color)' } },
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                })
+
+                const timeData = (values, color, fill = false) => values.map((v, i) => ({ x: new Date(cycles[i].timestamp), y: v }))
+
+                return (
+                    <>
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Drift over Time</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={timeOpts('mm')} data={{
+                                    datasets: [
+                                        { label: 'Drift (mm)', data: timeData(cycles.map(c => c.drift_mm)), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.3, pointRadius: 3, fill: true },
+                                    ],
+                                }} />
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+                            <h3 className="m-0 mb-[15px] text-[1.1rem] font-semibold text-[var(--text-primary)]">Step Difference over Time</h3>
+                            <div style={{ height: '300px' }}>
+                                <Line options={timeOpts('Steps')} data={{
+                                    datasets: [
+                                        { label: 'Step Difference', data: timeData(cycles.map(c => c.step_difference)), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.3, pointRadius: 3, fill: true },
                                     ],
                                 }} />
                             </div>

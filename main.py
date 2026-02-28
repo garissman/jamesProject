@@ -883,7 +883,6 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
         dir_label = "CW" if current_dir == Direction.CLOCKWISE else "CCW"
         print(f"Drift Test: Found limit ({dir_label}). Ready to start cycles.")
         drift_test_results["status"] = "running"
-        time.sleep(0.3)
 
         # Now just go back and forth
         for cycle in range(1, cycles + 1):
@@ -903,8 +902,6 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             fwd_steps, fwd_hit = move_until_limit(current_dir)
             fwd_time = time.time() - fwd_start
             print(f"Cycle {cycle}: Hit limit after {fwd_steps} steps")
-
-            time.sleep(0.3)
 
             # Reverse again
             current_dir = Direction.COUNTERCLOCKWISE if current_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
@@ -938,9 +935,7 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             drift_test_results["cycles"].append(cycle_data)
             print(f"Drift Test: Cycle {cycle}/{cycles} - Forward: {fwd_steps}, Backward: {back_steps}, Drift: {drift_mm:.3f}mm")
 
-            time.sleep(0.3)  # Brief pause between cycles
-
-        # Calculate summary
+        # Calculate summary at the end
         if drift_test_results["cycles"]:
             cycles_data = drift_test_results["cycles"]
             drifts = [c["drift_mm"] for c in cycles_data]

@@ -206,6 +206,7 @@ export default function SettingsTab({
                     </>
                 ) : settingsSubTab === 'motor' ? (
                     <>
+                        {import.meta.env.DEV && (
                         <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
                             <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Controller Type</h3>
                             <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
@@ -251,6 +252,7 @@ export default function SettingsTab({
                                 </div>
                             </div>
                         </div>
+                        )}
 
                         {/* Arduino-specific controls */}
                         {controllerType === 'arduino_uno_q' && (
