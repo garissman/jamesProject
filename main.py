@@ -789,13 +789,29 @@ class DriftTestRequest(BaseModel):
 def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num: int = 1):
     """
     Simple drift test: move back and forth between limits, count steps.
+    Respects motor inversion settings so directions are physically correct.
     """
     global drift_test_running, drift_test_results, pipetting_controller
     import time
     from datetime import datetime
-    from pipetting_controller import Direction
+    from pipetting_controller import Direction, PipettingController
 
     motor_name = DRIFT_TEST_MOTOR_NAMES.get(motor_num, f"Motor {motor_num}")
+
+    # Get inversion flag for this motor
+    invert_map = {
+        1: PipettingController.INVERT_X,
+        2: PipettingController.INVERT_Y,
+        3: PipettingController.INVERT_Z,
+        4: PipettingController.INVERT_PIPETTE,
+    }
+    invert = invert_map.get(motor_num, False)
+
+    def inv(direction):
+        """Flip direction if motor is inverted."""
+        if invert:
+            return Direction.COUNTERCLOCKWISE if direction == Direction.CLOCKWISE else Direction.CLOCKWISE
+        return direction
 
     drift_test_results = {
         "status": "running",
@@ -820,16 +836,18 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
         if not has_limits:
             raise Exception(f"No limit switches configured for {motor_name}")
 
-        # Start by moving CLOCKWISE until we hit something
+        # Start by moving toward max (CW, respecting inversion)
         drift_test_results["status"] = "homing"
-        print("Drift Test: Moving CW to find first limit...")
+        print(f"Drift Test: Homing {motor_name} (inverted={invert})...")
 
-        current_dir = Direction.CLOCKWISE
+        current_dir = inv(Direction.CLOCKWISE)
+        print(f"Drift Test: Moving {current_dir.name} to find first limit...")
         steps, hit = motor.move_until_limit(current_dir, motor_speed)
 
         if hit == 'none':
             # Try other direction
-            current_dir = Direction.COUNTERCLOCKWISE
+            current_dir = inv(Direction.COUNTERCLOCKWISE)
+            print(f"Drift Test: Trying {current_dir.name}...")
             steps, hit = motor.move_until_limit(current_dir, motor_speed)
 
         if hit == 'none':

@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Light Theme Variables */
 :root[data-theme="light"] {
@@ -100,82 +102,85 @@ body {
 }
 
 /* Custom animation utilities */
-@utility animate-pulse-well {
-    animation: pulse 1.5s infinite;
-}
+@layer utilities {
+    .animate-pulse-well {
+        animation: pulse 1.5s infinite;
+    }
 
-@utility animate-aspirate {
-    animation: aspirate-pulse 1s infinite;
-}
+    .animate-aspirate {
+        animation: aspirate-pulse 1s infinite;
+    }
 
-@utility animate-dispense {
-    animation: dispense-pulse 1s infinite;
-}
+    .animate-dispense {
+        animation: dispense-pulse 1s infinite;
+    }
 
-@utility animate-move {
-    animation: move-pulse 0.8s infinite;
-}
+    .animate-move {
+        animation: move-pulse 0.8s infinite;
+    }
 
-@utility animate-fade-in {
-    animation: fade-in 0.3s ease;
-}
+    .animate-fade-in {
+        animation: fade-in 0.3s ease;
+    }
 
-@utility animate-quick-op-pulse {
-    animation: quick-op-pulse 2s infinite;
-}
+    .animate-quick-op-pulse {
+        animation: quick-op-pulse 2s infinite;
+    }
 
-/* Toggle switch track - needs pseudo-element styling */
-@utility toggle-track {
-    position: relative;
-    width: 36px;
-    height: 20px;
-    background: var(--border-color);
-    border-radius: 10px;
-    transition: background 0.2s ease;
-    flex-shrink: 0;
-}
+    .toggle-track {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        background: var(--border-color);
+        border-radius: 10px;
+        transition: background 0.2s ease;
+        flex-shrink: 0;
+    }
 
-/* Layout grid with CSS custom property for cell size */
-@utility layout-grid {
-    display: grid;
-    grid-template-columns: repeat(21, var(--cell-size, 34px));
-    grid-template-rows: repeat(12, var(--cell-size, 34px));
-    gap: 3px;
-    padding: 12px;
-    background: var(--bg-tertiary);
-    border-radius: 8px;
-    overflow: auto;
-    margin-top: 10px;
-}
+    .layout-grid {
+        display: grid;
+        grid-template-columns: repeat(21, var(--cell-size, 34px));
+        grid-template-rows: repeat(12, var(--cell-size, 34px));
+        gap: 3px;
+        padding: 12px;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        overflow: auto;
+        margin-top: 10px;
+    }
 
-/* Sub-grid zones */
-@utility mc-well-grid {
-    display: grid;
-    grid-template-columns: repeat(15, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    gap: 2px;
-}
+    .mc-well-grid {
+        display: grid;
+        grid-template-columns: repeat(15, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        gap: 2px;
+    }
 
-@utility mc-well-grid-grouped {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    gap: 3px;
-}
+    .mc-well-grid-grouped {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        gap: 3px;
+    }
 
-@utility vial-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-    gap: 4px;
-    padding: 4px;
-}
+    .vial-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(5, 1fr);
+        gap: 4px;
+        padding: 4px;
+    }
 
-@utility vial-well-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(12, 1fr);
-    gap: 2px;
+    .vial-well-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        grid-template-rows: repeat(12, 1fr);
+        gap: 2px;
+    }
+
+    .progress-gradient {
+        background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+    }
 }
 
 /* Toggle track pseudo-element */
@@ -217,9 +222,4 @@ input:checked + .toggle-track-checked::after {
 
 @media (max-width: 800px) {
     .layout-grid { --cell-size: 20px; }
-}
-
-/* Progress bar gradient */
-@utility progress-gradient {
-    background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
 }

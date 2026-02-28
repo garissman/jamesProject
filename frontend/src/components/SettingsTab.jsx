@@ -350,7 +350,7 @@ export default function SettingsTab({
                                             onChange={(e) => handleConfigChange(key, e.target.checked)}
                                             className="hidden"
                                         />
-                                        <span className="toggle-track toggle-track-dot" />
+                                        <span className="toggle-track toggle-track-dot toggle-track-checked" />
                                         <span className="text-[0.85rem] text-[var(--text-primary)]">{label}</span>
                                     </label>
                                 ))}
@@ -730,7 +730,18 @@ export default function SettingsTab({
 
                 <div className="flex flex-col gap-[15px] items-start">
                     <button
-                        onClick={saveConfig}
+                        onClick={async () => {
+                            setConfigLoading(true)
+                            setConfigMessage('')
+                            try {
+                                const data = await saveConfig()
+                                setConfigMessage(data.status === 'success' ? '\u2713 ' + (data.message || 'Configuration saved') : '\u2717 Failed to save')
+                            } catch (err) {
+                                setConfigMessage('\u2717 Error: ' + err.message)
+                            } finally {
+                                setConfigLoading(false)
+                            }
+                        }}
                         disabled={configLoading}
                         className="py-3 px-8 bg-gradient-to-br from-[#4a90e2] to-[#357abd] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-[0_2px_8px_rgba(74,144,226,0.3)] hover:enabled:bg-gradient-to-br hover:enabled:from-[#357abd] hover:enabled:to-[#2868a8] hover:enabled:shadow-[0_4px_12px_rgba(74,144,226,0.4)] hover:enabled:-translate-y-px disabled:opacity-60 disabled:cursor-not-allowed"
                     >
