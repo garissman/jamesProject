@@ -1,5 +1,7 @@
+import asyncio
 import threading
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -230,7 +232,7 @@ async def home_pipetting_system():
         )
 
     try:
-        pipetting_controller.home()
+        await asyncio.to_thread(pipetting_controller.home)
         return {"status": "success", "message": "System moved to home position (well A1)"}
     except Exception as e:
         raise HTTPException(
@@ -260,7 +262,7 @@ async def move_to_well(request: MoveToWellRequest):
 
     try:
         # Move to the specified well
-        pipetting_controller.move_to_well(request.wellId, 0)
+        await asyncio.to_thread(pipetting_controller.move_to_well, request.wellId, 0)
         return {"status": "success", "message": f"Moved to well {request.wellId}"}
     except ValueError as e:
         raise HTTPException(
@@ -456,7 +458,7 @@ async def toggle_z_axis(request: ToggleZRequest):
         )
 
     try:
-        pipetting_controller.toggle_z(request.direction)
+        await asyncio.to_thread(pipetting_controller.toggle_z, request.direction)
         return {
             "status": "success",
             "message": f"Z-axis moved {request.direction}",
@@ -484,7 +486,7 @@ async def aspirate_liquid(request: VolumeRequest):
         )
 
     try:
-        pipetting_controller.aspirate(request.volume)
+        await asyncio.to_thread(pipetting_controller.aspirate, request.volume)
         return {
             "status": "success",
             "message": f"Aspirated {request.volume} mL",
@@ -507,7 +509,7 @@ async def dispense_liquid(request: VolumeRequest):
         )
 
     try:
-        pipetting_controller.dispense(request.volume)
+        await asyncio.to_thread(pipetting_controller.dispense, request.volume)
         return {
             "status": "success",
             "message": f"Dispensed {request.volume} mL",
@@ -576,7 +578,7 @@ async def test_led(request: LedTestRequest):
         raise HTTPException(status_code=400, detail="LED test is only available in Arduino UNO Q mode")
 
     try:
-        result = pipetting_controller.stepper_controller.led_test(request.pattern, request.value)
+        result = await asyncio.to_thread(pipetting_controller.stepper_controller.led_test, request.pattern, request.value)
         return {
             "status": "success" if result else "failed",
             "message": f"LED test '{request.pattern}' executed",
@@ -597,7 +599,7 @@ async def ping_mcu():
         raise HTTPException(status_code=400, detail="MCU ping is only available in Arduino UNO Q mode")
 
     try:
-        result = pipetting_controller.stepper_controller.ping()
+        result = await asyncio.to_thread(pipetting_controller.stepper_controller.ping)
         return {
             "status": "success" if result else "failed",
             "connected": result,
@@ -617,7 +619,7 @@ async def get_mcu_limit_switches():
         raise HTTPException(status_code=400, detail="MCU limits endpoint is only available in Arduino UNO Q mode")
 
     try:
-        limits = pipetting_controller.stepper_controller.get_limit_states()
+        limits = await asyncio.to_thread(pipetting_controller.stepper_controller.get_limit_states)
         return {"status": "success", "limits": limits}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting limit states: {str(e)}")
@@ -653,7 +655,8 @@ async def move_axis(request: AxisMoveRequest):
         )
 
     try:
-        positions = pipetting_controller.move_axis(
+        positions = await asyncio.to_thread(
+            pipetting_controller.move_axis,
             request.axis,
             request.steps,
             request.direction
@@ -746,7 +749,7 @@ async def get_limit_switches():
     try:
         # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
-            limits = pipetting_controller.stepper_controller.get_limit_states()
+            limits = await asyncio.to_thread(pipetting_controller.stepper_controller.get_limit_states)
             limit_states = {}
             pin_config = {}
             for lim in limits:
