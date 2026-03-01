@@ -599,6 +599,8 @@ async def ping_mcu():
         raise HTTPException(status_code=400, detail="MCU ping is only available in Arduino UNO Q mode")
 
     try:
+        if pipetting_controller.stepper_controller.lock.locked():
+            return {"status": "busy", "connected": True, "message": "MCU is busy (motor moving)"}
         result = await asyncio.to_thread(pipetting_controller.stepper_controller.ping)
         return {
             "status": "success" if result else "failed",
@@ -619,6 +621,8 @@ async def get_mcu_limit_switches():
         raise HTTPException(status_code=400, detail="MCU limits endpoint is only available in Arduino UNO Q mode")
 
     try:
+        if pipetting_controller.stepper_controller.lock.locked():
+            return {"status": "busy", "limits": [], "message": "MCU is busy"}
         limits = await asyncio.to_thread(pipetting_controller.stepper_controller.get_limit_states)
         return {"status": "success", "limits": limits}
     except Exception as e:
@@ -749,6 +753,15 @@ async def get_limit_switches():
     try:
         # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
+            # Non-blocking: return busy if MCU is occupied (e.g. during motor move)
+            if pipetting_controller.stepper_controller.lock.locked():
+                return {
+                    "status": "busy",
+                    "message": "MCU is busy (motor moving)",
+                    "limit_states": {},
+                    "pin_configuration": {},
+                    "limits": [],
+                }
             limits = await asyncio.to_thread(pipetting_controller.stepper_controller.get_limit_states)
             limit_states = {}
             pin_config = {}

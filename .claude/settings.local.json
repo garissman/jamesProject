@@ -61,7 +61,11 @@
       "Bash(expect:*)",
       "Bash(cp:*)",
       "Bash(chmod +x:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(ssh-add:*)",
+      "Bash(bash:*)",
+      "Bash(./deploy.sh:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
