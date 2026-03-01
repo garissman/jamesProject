@@ -744,10 +744,27 @@ async def get_limit_switches():
         )
 
     try:
-        # Arduino has its own /api/mcu/limits endpoint
+        # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
             limits = pipetting_controller.stepper_controller.get_limit_states()
-            return {"status": "success", "limits": limits}
+            limit_states = {}
+            pin_config = {}
+            for lim in limits:
+                mid = lim["motor_id"]
+                limit_states[mid] = {
+                    "min": lim["min_triggered"],
+                    "max": lim["max_triggered"],
+                }
+                pin_config[mid] = {
+                    "min_pin": lim.get("limit_min_pin"),
+                    "max_pin": lim.get("limit_max_pin"),
+                }
+            return {
+                "status": "success",
+                "limit_states": limit_states,
+                "pin_configuration": pin_config,
+                "limits": limits,
+            }
 
         stepper = pipetting_controller.stepper_controller
         limit_states = stepper.check_all_limit_switches()

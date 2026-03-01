@@ -61,9 +61,8 @@ app.add_middleware(
 )
 
 # Frontend static files configuration
-# In Arduino Lab App layout, assets/ is a sibling of python/
 FRONTEND_DIST_DIR = Path(__file__).parent.parent / "assets"
-FRONTEND_DEV_DIR = Path(__file__).parent / "frontend"  # not used on device
+FRONTEND_DEV_DIR = Path(__file__).parent / "frontend"
 
 
 # Pydantic models for pipetting operations
@@ -745,10 +744,27 @@ async def get_limit_switches():
         )
 
     try:
-        # Arduino has its own /api/mcu/limits endpoint
+        # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
             limits = pipetting_controller.stepper_controller.get_limit_states()
-            return {"status": "success", "limits": limits}
+            limit_states = {}
+            pin_config = {}
+            for lim in limits:
+                mid = lim["motor_id"]
+                limit_states[mid] = {
+                    "min": lim["min_triggered"],
+                    "max": lim["max_triggered"],
+                }
+                pin_config[mid] = {
+                    "min_pin": lim.get("limit_min_pin"),
+                    "max_pin": lim.get("limit_max_pin"),
+                }
+            return {
+                "status": "success",
+                "limit_states": limit_states,
+                "pin_configuration": pin_config,
+                "limits": limits,
+            }
 
         stepper = pipetting_controller.stepper_controller
         limit_states = stepper.check_all_limit_switches()
@@ -790,7 +806,7 @@ class DriftTestRequest(BaseModel):
 def _move_until_limit_rpi(motor, direction, motor_speed):
     """RPi: use motor object's move_until_limit method.
     Returns (steps_taken, hit_limit: bool)"""
-    steps, hit = motor.move_until_limit(direction, motor_speed)
+    steps, hit = motor.move_until_limit(direction, motor_speed, override_min_delay=True)
     return steps, hit != 'none'
 
 
@@ -807,13 +823,29 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
     """
     Simple drift test: move back and forth between limits, count steps.
     Works with both RPi (direct motor access) and Arduino (RPC move_motor).
+    Respects motor inversion settings so directions are physically correct.
     """
     global drift_test_running, drift_test_results, pipetting_controller
     import time
     from datetime import datetime
-    from pipetting_controller import Direction
+    from pipetting_controller import Direction, PipettingController
 
     motor_name = DRIFT_TEST_MOTOR_NAMES.get(motor_num, f"Motor {motor_num}")
+
+    # Get inversion flag for this motor
+    invert_map = {
+        1: PipettingController.INVERT_X,
+        2: PipettingController.INVERT_Y,
+        3: PipettingController.INVERT_Z,
+        4: PipettingController.INVERT_PIPETTE,
+    }
+    invert = invert_map.get(motor_num, False)
+
+    def inv(direction):
+        """Flip direction if motor is inverted."""
+        if invert:
+            return Direction.COUNTERCLOCKWISE if direction == Direction.CLOCKWISE else Direction.CLOCKWISE
+        return direction
 
     drift_test_results = {
         "status": "running",
@@ -848,16 +880,18 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             else:
                 return _move_until_limit_rpi(motor, direction, motor_speed)
 
-        # Start by moving CLOCKWISE until we hit something
+        # Start by moving toward max (CW, respecting inversion)
         drift_test_results["status"] = "homing"
-        print("Drift Test: Moving CW to find first limit...")
+        print(f"Drift Test: Homing {motor_name} (inverted={invert})...")
 
-        current_dir = Direction.CLOCKWISE
+        current_dir = inv(Direction.CLOCKWISE)
+        print(f"Drift Test: Moving {current_dir.name} to find first limit...")
         steps, hit = move_until_limit(current_dir)
 
         if not hit:
             # Try other direction
-            current_dir = Direction.COUNTERCLOCKWISE
+            current_dir = inv(Direction.COUNTERCLOCKWISE)
+            print(f"Drift Test: Trying {current_dir.name}...")
             steps, hit = move_until_limit(current_dir)
 
         if not hit:
@@ -866,7 +900,6 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
         dir_label = "CW" if current_dir == Direction.CLOCKWISE else "CCW"
         print(f"Drift Test: Found limit ({dir_label}). Ready to start cycles.")
         drift_test_results["status"] = "running"
-        time.sleep(0.3)
 
         # Now just go back and forth
         for cycle in range(1, cycles + 1):
@@ -887,8 +920,6 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             fwd_time = time.time() - fwd_start
             print(f"Cycle {cycle}: Hit limit after {fwd_steps} steps")
 
-            time.sleep(0.3)
-
             # Reverse again
             current_dir = Direction.COUNTERCLOCKWISE if current_dir == Direction.CLOCKWISE else Direction.CLOCKWISE
 
@@ -905,6 +936,11 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
             step_difference = abs(fwd_steps - back_steps)
             drift_mm = step_difference / steps_per_mm
 
+            # Inter-cycle deltas (how steps changed from previous cycle)
+            prev = drift_test_results["cycles"][-1] if drift_test_results["cycles"] else None
+            fwd_delta = fwd_steps - prev["forward_steps"] if prev else 0
+            bwd_delta = back_steps - prev["backward_steps"] if prev else 0
+
             # Store cycle data
             cycle_data = {
                 "cycle_number": cycle,
@@ -915,27 +951,44 @@ def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num
                 "backward_time": round(back_time, 2),
                 "total_cycle_time": round(cycle_elapsed, 2),
                 "step_difference": step_difference,
-                "drift_mm": round(drift_mm, 3)
+                "drift_mm": round(drift_mm, 3),
+                "fwd_delta": fwd_delta,
+                "bwd_delta": bwd_delta,
             }
 
             drift_test_results["cycles"].append(cycle_data)
             print(f"Drift Test: Cycle {cycle}/{cycles} - Forward: {fwd_steps}, Backward: {back_steps}, Drift: {drift_mm:.3f}mm")
 
-            time.sleep(0.3)  # Brief pause between cycles
-
-        # Calculate summary
+        # Calculate summary at the end
         if drift_test_results["cycles"]:
-            drifts = [c["drift_mm"] for c in drift_test_results["cycles"]]
-            fwd_steps_list = [c["forward_steps"] for c in drift_test_results["cycles"]]
-            back_steps_list = [c["backward_steps"] for c in drift_test_results["cycles"]]
+            cycles_data = drift_test_results["cycles"]
+            drifts = [c["drift_mm"] for c in cycles_data]
+            fwd_steps_list = [c["forward_steps"] for c in cycles_data]
+            back_steps_list = [c["backward_steps"] for c in cycles_data]
+            fwd_times = [c["forward_time"] for c in cycles_data]
+            back_times = [c["backward_time"] for c in cycles_data]
+            cycle_times = [c["total_cycle_time"] for c in cycles_data]
+            n = len(cycles_data)
+
+            # Inter-cycle deltas (skip first cycle which has delta=0)
+            fwd_deltas = [abs(c["fwd_delta"]) for c in cycles_data[1:]] if n > 1 else [0]
+            bwd_deltas = [abs(c["bwd_delta"]) for c in cycles_data[1:]] if n > 1 else [0]
 
             drift_test_results["summary"] = {
-                "total_cycles": len(drift_test_results["cycles"]),
-                "avg_forward_steps": round(sum(fwd_steps_list) / len(fwd_steps_list), 1),
-                "avg_backward_steps": round(sum(back_steps_list) / len(back_steps_list), 1),
-                "avg_drift_mm": round(sum(drifts) / len(drifts), 3),
+                "total_cycles": n,
+                "avg_forward_steps": round(sum(fwd_steps_list) / n, 1),
+                "avg_backward_steps": round(sum(back_steps_list) / n, 1),
+                "avg_drift_mm": round(sum(drifts) / n, 3),
                 "max_drift_mm": round(max(drifts), 3),
-                "min_drift_mm": round(min(drifts), 3)
+                "min_drift_mm": round(min(drifts), 3),
+                "avg_forward_time": round(sum(fwd_times) / n, 2),
+                "avg_backward_time": round(sum(back_times) / n, 2),
+                "avg_cycle_time": round(sum(cycle_times) / n, 2),
+                "total_test_time": round(sum(cycle_times), 2),
+                "avg_fwd_delta": round(sum(fwd_deltas) / len(fwd_deltas), 1),
+                "max_fwd_delta": max(fwd_deltas),
+                "avg_bwd_delta": round(sum(bwd_deltas) / len(bwd_deltas), 1),
+                "max_bwd_delta": max(bwd_deltas),
             }
 
         if drift_test_results["status"] == "running":

@@ -41,6 +41,7 @@ class StepperController:
         self.msg_id = 0
         self.lock = threading.Lock()
         self._connect()
+        self._init_all_motors()
 
     def _connect(self):
         """Connect to arduino-router socket"""
@@ -54,6 +55,14 @@ class StepperController:
         except Exception as e:
             print(f"Failed to connect to arduino-router: {e}")
             raise
+
+    def _init_all_motors(self):
+        """Initialize all 4 motors on the MCU"""
+        for motor_id in range(1, 5):
+            if self.init_motor(motor_id):
+                print(f"Motor {motor_id} initialized")
+            else:
+                print(f"Warning: Motor {motor_id} failed to initialize")
 
     def _next_msg_id(self) -> int:
         """Get next message ID"""
@@ -195,7 +204,7 @@ class StepperController:
             return {"steps_executed": 0, "limit_triggered": False}
 
     def home_motor(self, motor_id: int, direction: Direction = Direction.COUNTERCLOCKWISE,
-                   delay_us: int = 2000, max_steps: int = 10000) -> Dict:
+                   delay_us: int = 2000, max_steps: int = 200000) -> Dict:
         """
         Home a motor by moving until limit switch is triggered
 

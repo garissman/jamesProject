@@ -1,5 +1,4 @@
 name: JamesProject
-icon: ⚗
+icon: 👩🏻‍🔬
 description: Laboratory sampler with web control interface
-ports:
-  - 8000
+ports: [8000]

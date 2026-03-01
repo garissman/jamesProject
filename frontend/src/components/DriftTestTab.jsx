@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
     Chart as ChartJS,
@@ -72,7 +72,10 @@ export default function DriftTestTab() {
         }
     }
 
+    const driftStatusPending = useRef(false)
     const fetchDriftTestStatus = useCallback(async () => {
+        if (driftStatusPending.current) return
+        driftStatusPending.current = true
         try {
             const response = await fetch('/api/drift-test/status')
             const data = await response.json()
@@ -82,6 +85,8 @@ export default function DriftTestTab() {
             }
         } catch (error) {
             console.error('Failed to fetch drift test status:', error)
+        } finally {
+            driftStatusPending.current = false
         }
     }, [])
 
@@ -98,7 +103,10 @@ export default function DriftTestTab() {
         }
     }
 
+    const limitSwitchPending = useRef(false)
     const fetchLimitSwitches = useCallback(async () => {
+        if (limitSwitchPending.current) return
+        limitSwitchPending.current = true
         setLimitSwitchLoading(true)
         try {
             const response = await fetch('/api/limit-switches')
@@ -112,6 +120,7 @@ export default function DriftTestTab() {
             setLimitSwitchStatus({error: 'Could not reach backend'})
         } finally {
             setLimitSwitchLoading(false)
+            limitSwitchPending.current = false
         }
     }, [])
 

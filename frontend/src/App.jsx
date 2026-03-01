@@ -540,15 +540,20 @@ function App() {
         }
     }
 
-    // ── Fetch functions ──
+    // ── Fetch functions (with in-flight guards to avoid stacking requests) ──
+
+    const statusPending = useRef(false)
+    const axisPending = useRef(false)
+    const logsPending = useRef(false)
 
     const fetchCurrentPosition = async () => {
+        if (statusPending.current) return
+        statusPending.current = true
         try {
             const response = await fetch('/api/pipetting/status')
             const data = await response.json()
 
             if (data.initialized && data.current_well) {
-                console.log('Current well position:', data.current_well)
                 setSelectedWell(data.current_well)
                 setSystemStatus(data.message || 'System ready')
 
@@ -559,16 +564,19 @@ function App() {
                 if (data.current_operation !== undefined) setCurrentOperation(data.current_operation)
                 if (data.operation_well !== undefined) setOperationWell(data.operation_well)
             } else {
-                console.log('No position data available:', data)
                 setSystemStatus(data.message || 'System not ready')
             }
         } catch (error) {
             console.error('Failed to fetch current position:', error)
             setSystemStatus('Backend offline')
+        } finally {
+            statusPending.current = false
         }
     }
 
     const fetchAxisPositions = async () => {
+        if (axisPending.current) return
+        axisPending.current = true
         try {
             const response = await fetch('/api/axis/positions')
             const data = await response.json()
@@ -578,10 +586,14 @@ function App() {
             }
         } catch (error) {
             console.error('Failed to fetch axis positions:', error)
+        } finally {
+            axisPending.current = false
         }
     }
 
     const fetchLogs = async () => {
+        if (logsPending.current) return
+        logsPending.current = true
         try {
             const response = await fetch('/api/pipetting/logs?last_n=100')
             const data = await response.json()
@@ -591,6 +603,8 @@ function App() {
             }
         } catch (error) {
             console.error('Failed to fetch logs:', error)
+        } finally {
+            logsPending.current = false
         }
     }
 

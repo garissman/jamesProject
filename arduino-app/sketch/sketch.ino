@@ -332,7 +332,7 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
   int steps = 0;
   showMotorIndicator(idx);
 
-  while (steps < max_steps) {
+  while (true) {
     if (isLimitTriggered(idx, direction)) {
       showSuccessPattern();
       return steps;
@@ -344,13 +344,10 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
     delayMicroseconds(delay_us);
     steps++;
 
-    if (steps % 100 == 0) {
-      showProgressBar((steps * 100) / max_steps);
+    if (steps % 1000 == 0) {
+      showProgressBar((steps % 10000) / 100);
     }
   }
-
-  showErrorPattern();
-  return -3;  // Max steps reached without hitting limit
 }
 
 // get_limit(motor_id) -> bitmask: bit0=min, bit1=max (0=none, 1=min, 2=max, 3=both), -1 if invalid
@@ -517,6 +514,21 @@ int rpc_set_rgb(int led_num, int r, int g, int b) {
 
 // ============== Setup & Loop ==============
 
+// pin_test(motor_id, count) - blink pulse pin slowly (1s on, 1s off) for multimeter testing
+int rpc_pin_test(int motor_id, int count) {
+  if (motor_id < 1 || motor_id > NUM_MOTORS) return -1;
+  int idx = motor_id - 1;
+  int pin = motors[idx].pulsePin;
+  pinMode(pin, OUTPUT);
+  for (int i = 0; i < count; i++) {
+    digitalWrite(pin, HIGH);
+    delay(1000);
+    digitalWrite(pin, LOW);
+    delay(1000);
+  }
+  return count;
+}
+
 void setup() {
   // Initialize LED Matrix
   matrix.begin();
@@ -563,6 +575,7 @@ void setup() {
   Bridge.provide("led_test", rpc_led_test);
   Bridge.provide("init_motor", rpc_init_motor);
   Bridge.provide("set_rgb", rpc_set_rgb);
+  Bridge.provide("pin_test", rpc_pin_test);
 
   // Show success
   showSuccessPattern();

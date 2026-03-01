@@ -29,14 +29,12 @@ export default function NavBar({ activeTab, setActiveTab, controllerType, theme,
       >
         <span className="text-[1.2rem]">{'\u2194'}</span> Manual
       </button>
-      {controllerType !== 'arduino_uno_q' && (
-        <button
-          className={tabClass('drift-test')}
-          onClick={() => setActiveTab('drift-test')}
-        >
-          <span className="text-[1.2rem]">{'\u27F3'}</span> Drift Test
-        </button>
-      )}
+      <button
+        className={tabClass('drift-test')}
+        onClick={() => setActiveTab('drift-test')}
+      >
+        <span className="text-[1.2rem]">{'\u27F3'}</span> Drift Test
+      </button>
       <button
         className={tabClass('settings')}
         onClick={() => setActiveTab('settings')}

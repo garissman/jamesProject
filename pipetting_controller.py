@@ -393,7 +393,9 @@ class PipettingController:
         """
         converted_speed = self._speed(speed)
         if self.controller_type == 'arduino_uno_q':
-            return self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed)
+            result = self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed)
+            self.log(f"Arduino RPC move result: motor={motor_id}, steps={steps}, dir={direction}, delay_us={converted_speed}, result={result}")
+            return result
         else:
             # RPi accepts check_limits kwarg
             check_limits = kwargs.get('check_limits', True)
