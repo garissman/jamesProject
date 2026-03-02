@@ -65,7 +65,8 @@
       "Bash(ssh-add:*)",
       "Bash(bash:*)",
       "Bash(./deploy.sh:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(ping:*)"
     ],
     "deny": [],
     "ask": []
