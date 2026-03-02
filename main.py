@@ -827,12 +827,12 @@ def _move_until_limit_rpi(motor, direction, motor_speed):
 
 
 def _move_until_limit_arduino(stepper, motor_num, direction, motor_speed, max_steps=500000):
-    """Arduino: use move_motor with large step count; limit stops it early.
+    """Arduino: use dedicated move_until_limit RPC for proper limit handling.
     motor_speed is delay in seconds - convert to microseconds for Arduino.
     Returns (steps_taken, hit_limit: bool)"""
     delay_us = max(50, int(motor_speed * 1_000_000))
-    result = stepper.move_motor(motor_num, max_steps, direction, delay_us)
-    return result["steps_executed"], result["limit_triggered"]
+    result = stepper.move_until_limit(motor_num, direction, delay_us, max_steps)
+    return result["steps_taken"], result["hit_limit"]
 
 
 def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num: int = 1):

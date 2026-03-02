@@ -276,9 +276,6 @@ int executeSteps(int idx, int direction, int steps, long delayUs, bool respectLi
   delayMicroseconds(5);
 
   int executed = 0;
-  int progressInterval = max(1, steps / 10);
-
-  showMotorIndicator(idx);
 
   for (int i = 0; i < steps; i++) {
     if (respectLimit && isLimitTriggered(idx, direction)) break;
@@ -288,15 +285,7 @@ int executeSteps(int idx, int direction, int steps, long delayUs, bool respectLi
     digitalWrite(motors[idx].pulsePin, LOW);
     delayMicroseconds(delayUs);
     executed++;
-
-    if (executed % progressInterval == 0) {
-      showProgressBar((executed * 100) / steps);
-    }
   }
-
-  showProgressBar(100);
-  delay(100);
-  showSuccessPattern();
 
   return executed;
 }
@@ -317,7 +306,10 @@ int rpc_move(int motor_id, int steps, int direction, int delay_us) {
   int idx = motor_id - 1;
   if (!motors[idx].initialized) return -2;
 
-  return executeSteps(idx, direction, steps, delay_us, true);
+  showMotorIndicator(idx);
+  int executed = executeSteps(idx, direction, steps, delay_us, true);
+  showSuccessPattern();
+  return executed;
 }
 
 // home_motor(motor_id, direction, delay_us, max_steps) -> steps_to_home (-1 if failed)
@@ -326,13 +318,14 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
   int idx = motor_id - 1;
   if (!motors[idx].initialized) return -2;
 
+  showMotorIndicator(idx);
+
   digitalWrite(motors[idx].dirPin, direction ? HIGH : LOW);
   delayMicroseconds(5);
 
   int steps = 0;
-  showMotorIndicator(idx);
 
-  while (true) {
+  while (steps < max_steps) {
     if (isLimitTriggered(idx, direction)) {
       showSuccessPattern();
       return steps;
@@ -343,11 +336,68 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
     digitalWrite(motors[idx].pulsePin, LOW);
     delayMicroseconds(delay_us);
     steps++;
+  }
 
-    if (steps % 1000 == 0) {
-      showProgressBar((steps % 10000) / 100);
+  showErrorPattern();
+  return -3;  // Max steps reached without hitting limit
+}
+
+// move_until_limit(motor_id, direction, delay_us, max_steps) -> steps taken (positive),
+// or negative error code. Properly handles starting at a limit and finding the opposite one.
+int rpc_move_until_limit(int motor_id, int direction, int delay_us, int max_steps) {
+  if (motor_id < 1 || motor_id > NUM_MOTORS) return -1;
+  int idx = motor_id - 1;
+  if (!motors[idx].initialized) return -2;
+
+  digitalWrite(motors[idx].dirPin, direction ? HIGH : LOW);
+  delayMicroseconds(5);
+
+  // Remember which limits are triggered at the start so we can leave them
+  bool startedAtMin = isLimitMinTriggered(idx);
+  bool startedAtMax = isLimitMaxTriggered(idx);
+  bool leftStartingLimit = !(startedAtMin || startedAtMax);
+
+  // We want to find the OPPOSITE limit from where we started
+  bool checkForMin = !startedAtMin;
+  bool checkForMax = !startedAtMax;
+
+  int steps = 0;
+  int checkInterval = 50;
+
+  while (max_steps == 0 || steps < max_steps) {
+    // Move a batch of steps without limit checking (clean pulse train)
+    int batch = (max_steps == 0) ? checkInterval : min(checkInterval, max_steps - steps);
+    for (int i = 0; i < batch; i++) {
+      digitalWrite(motors[idx].pulsePin, HIGH);
+      delayMicroseconds(delay_us);
+      digitalWrite(motors[idx].pulsePin, LOW);
+      delayMicroseconds(delay_us);
+    }
+    steps += batch;
+
+    // Brief pause to let EMI settle before reading switches
+    delayMicroseconds(500);
+
+    // Check if we've left the starting limit
+    if (!leftStartingLimit) {
+      if (startedAtMin && !isLimitMinTriggered(idx)) {
+        leftStartingLimit = true;
+      } else if (startedAtMax && !isLimitMaxTriggered(idx)) {
+        leftStartingLimit = true;
+      }
+      continue;
+    }
+
+    // Check target limits (motor is paused, no EMI)
+    if (checkForMin && isLimitMinTriggered(idx)) {
+      return steps;
+    }
+    if (checkForMax && isLimitMaxTriggered(idx)) {
+      return steps;
     }
   }
+
+  return -3;  // Max steps reached without hitting limit
 }
 
 // get_limit(motor_id) -> bitmask: bit0=min, bit1=max (0=none, 1=min, 2=max, 3=both), -1 if invalid
@@ -569,6 +619,7 @@ void setup() {
   Bridge.provide("ping", rpc_ping);
   Bridge.provide("move", rpc_move);
   Bridge.provide("home", rpc_home);
+  Bridge.provide("move_until_limit", rpc_move_until_limit);
   Bridge.provide("get_limit", rpc_get_limit);
   Bridge.provide("stop", rpc_stop);
   Bridge.provide("stop_all", rpc_stop_all);

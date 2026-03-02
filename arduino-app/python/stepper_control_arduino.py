@@ -203,6 +203,39 @@ class StepperController:
         else:
             return {"steps_executed": 0, "limit_triggered": False}
 
+    def move_until_limit(self, motor_id: int, direction: Direction,
+                         delay_us: int = 1000, max_steps: int = 500000) -> Dict:
+        """
+        Move motor until the opposite limit switch is hit.
+        Properly handles starting at a limit and finding the other one.
+        Uses batched stepping with EMI-safe limit checks on the MCU.
+
+        Args:
+            motor_id: Motor number (1-4)
+            direction: Direction of rotation
+            delay_us: Microseconds between steps (controls speed)
+            max_steps: Maximum steps before giving up (0 = no limit)
+
+        Returns:
+            Dict with steps_taken and hit_limit
+        """
+        # Timeout: generous to allow full travel
+        move_time = (max_steps * delay_us * 2) / 1_000_000
+        timeout = max(30, move_time + 10)
+
+        result = self._call_rpc("move_until_limit", motor_id, int(direction),
+                                delay_us, max_steps, timeout=timeout)
+
+        if result is None:
+            return {"steps_taken": 0, "hit_limit": False}
+
+        if result >= 0:
+            return {"steps_taken": result, "hit_limit": True}
+        elif result == -3:
+            return {"steps_taken": max_steps, "hit_limit": False}
+        else:
+            return {"steps_taken": 0, "hit_limit": False}
+
     def home_motor(self, motor_id: int, direction: Direction = Direction.COUNTERCLOCKWISE,
                    delay_us: int = 2000, max_steps: int = 200000) -> Dict:
         """
