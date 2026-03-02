@@ -326,6 +326,7 @@ function App() {
     }
 
     const handleHome = async () => {
+        setIsExecuting(true)
         try {
             const response = await fetch('/api/pipetting/home', {
                 method: 'POST',
@@ -337,11 +338,14 @@ function App() {
             if (response.ok) {
                 console.log(`${data.message}`)
                 fetchCurrentPosition()
+                fetchAxisPositions()
             } else {
                 console.error(`Error: ${data.detail || 'Failed to home system'}`)
             }
         } catch (error) {
             console.error(`Error: Unable to connect to backend. ${error.message}`)
+        } finally {
+            setIsExecuting(false)
         }
     }
 

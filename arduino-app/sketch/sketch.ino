@@ -300,14 +300,15 @@ String rpc_ping() {
   return String("pong");
 }
 
-// move_motor(motor_id, steps, direction, delay_us) -> steps_executed
-int rpc_move(int motor_id, int steps, int direction, int delay_us) {
+// move_motor(motor_id, steps, direction, delay_us, respect_limit) -> steps_executed
+// respect_limit: 1 = stop at limit switches, 0 = ignore limits (for inverted motors)
+int rpc_move(int motor_id, int steps, int direction, int delay_us, int respect_limit) {
   if (motor_id < 1 || motor_id > NUM_MOTORS) return -1;
   int idx = motor_id - 1;
   if (!motors[idx].initialized) return -2;
 
   showMotorIndicator(idx);
-  int executed = executeSteps(idx, direction, steps, delay_us, true);
+  int executed = executeSteps(idx, direction, steps, delay_us, respect_limit != 0);
   showSuccessPattern();
   return executed;
 }
@@ -325,7 +326,7 @@ int rpc_home(int motor_id, int direction, int delay_us, int max_steps) {
 
   int steps = 0;
 
-  while (steps < max_steps) {
+  while (max_steps == 0 || steps < max_steps) {
     if (isLimitTriggered(idx, direction)) {
       showSuccessPattern();
       return steps;

@@ -231,7 +231,10 @@ async def home_pipetting_system():
             detail="Pipetting controller not initialized"
         )
 
+    global is_executing
     try:
+        is_executing = True
+        pipetting_controller.current_operation = "homing"
         await asyncio.to_thread(pipetting_controller.home)
         return {"status": "success", "message": "System moved to home position (well A1)"}
     except Exception as e:
@@ -239,6 +242,9 @@ async def home_pipetting_system():
             status_code=500,
             detail=f"Error homing system: {str(e)}"
         )
+    finally:
+        is_executing = False
+        pipetting_controller.current_operation = "idle"
 
 
 class MoveToWellRequest(BaseModel):
@@ -753,8 +759,14 @@ async def get_limit_switches():
     try:
         # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
-            # Non-blocking: return busy if MCU is occupied (e.g. during motor move)
+            # Non-blocking: return cached data if MCU is occupied (e.g. during motor move)
             if pipetting_controller.stepper_controller.lock.locked():
+                cached = getattr(get_limit_switches, '_last_result', None)
+                if cached:
+                    result = cached.copy()
+                    result["status"] = "busy"
+                    result["message"] = "MCU is busy (motor moving) - showing last known state"
+                    return result
                 return {
                     "status": "busy",
                     "message": "MCU is busy (motor moving)",
@@ -775,12 +787,14 @@ async def get_limit_switches():
                     "min_pin": lim.get("limit_min_pin"),
                     "max_pin": lim.get("limit_max_pin"),
                 }
-            return {
+            result = {
                 "status": "success",
                 "limit_states": limit_states,
                 "pin_configuration": pin_config,
                 "limits": limits,
             }
+            get_limit_switches._last_result = result.copy()
+            return result
 
         stepper = pipetting_controller.stepper_controller
         limit_states = stepper.check_all_limit_switches()
@@ -826,13 +840,43 @@ def _move_until_limit_rpi(motor, direction, motor_speed):
     return steps, hit != 'none'
 
 
-def _move_until_limit_arduino(stepper, motor_num, direction, motor_speed, max_steps=500000):
+def _move_until_limit_arduino(stepper, motor_num, direction, motor_speed):
     """Arduino: use dedicated move_until_limit RPC for proper limit handling.
     motor_speed is delay in seconds - convert to microseconds for Arduino.
     Returns (steps_taken, hit_limit: bool)"""
     delay_us = max(50, int(motor_speed * 1_000_000))
-    result = stepper.move_until_limit(motor_num, direction, delay_us, max_steps)
+    result = stepper.move_until_limit(motor_num, direction, delay_us)
+    # Refresh the limit switch cache now that motor is stopped
+    _refresh_limit_cache(stepper)
     return result["steps_taken"], result["hit_limit"]
+
+
+def _refresh_limit_cache(stepper):
+    """Read limit switches from MCU and update the cache used by /api/limit-switches"""
+    try:
+        import time
+        time.sleep(0.05)  # Brief settle time after motor stops
+        limits = stepper.get_limit_states()
+        limit_states = {}
+        pin_config = {}
+        for lim in limits:
+            mid = lim["motor_id"]
+            limit_states[mid] = {
+                "min": lim["min_triggered"],
+                "max": lim["max_triggered"],
+            }
+            pin_config[mid] = {
+                "min_pin": lim.get("limit_min_pin"),
+                "max_pin": lim.get("limit_max_pin"),
+            }
+        get_limit_switches._last_result = {
+            "status": "success",
+            "limit_states": limit_states,
+            "pin_configuration": pin_config,
+            "limits": limits,
+        }
+    except Exception as e:
+        print(f"Warning: failed to refresh limit cache: {e}")
 
 
 def run_drift_test(cycles: int, motor_speed: float, steps_per_mm: int, motor_num: int = 1):

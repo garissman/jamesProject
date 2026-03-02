@@ -139,9 +139,14 @@ class StepperController:
                 try:
                     msgpack.unpackb(data, raw=False)
                     return data
-                except msgpack.exceptions.ExtraData:
-                    # More data than needed, return what we have
-                    return data
+                except msgpack.exceptions.ExtraData as e:
+                    # More data than needed — extract only the first message
+                    # to avoid corrupting the stream for the next RPC call
+                    unpacker = msgpack.Unpacker(raw=False)
+                    unpacker.feed(data)
+                    first_msg = next(unpacker)
+                    # Re-pack just the first message
+                    return msgpack.packb(first_msg)
                 except msgpack.exceptions.UnpackValueError:
                     # Incomplete message, continue reading
                     continue
@@ -182,7 +187,7 @@ class StepperController:
             steps: Number of steps to move
             direction: Direction of rotation
             delay_us: Microseconds between steps (controls speed)
-            respect_limit: Stop if limit switch triggered (always true in RPC version)
+            respect_limit: Stop if limit switch triggered
 
         Returns:
             Dict with steps_executed and limit_triggered
@@ -191,7 +196,8 @@ class StepperController:
         move_time = (steps * delay_us * 2) / 1_000_000  # seconds
         timeout = max(10, move_time + 5)
 
-        result = self._call_rpc("move", motor_id, steps, int(direction), delay_us, timeout=timeout)
+        result = self._call_rpc("move", motor_id, steps, int(direction), delay_us,
+                                1 if respect_limit else 0, timeout=timeout)
 
         if result is None:
             return {"steps_executed": 0, "limit_triggered": False}
@@ -204,9 +210,9 @@ class StepperController:
             return {"steps_executed": 0, "limit_triggered": False}
 
     def move_until_limit(self, motor_id: int, direction: Direction,
-                         delay_us: int = 1000, max_steps: int = 500000) -> Dict:
+                         delay_us: int = 1000, max_steps: int = 110000) -> Dict:
         """
-        Move motor until the opposite limit switch is hit.
+        Move motor until a limit switch is hit.
         Properly handles starting at a limit and finding the other one.
         Uses batched stepping with EMI-safe limit checks on the MCU.
 
@@ -214,12 +220,11 @@ class StepperController:
             motor_id: Motor number (1-4)
             direction: Direction of rotation
             delay_us: Microseconds between steps (controls speed)
-            max_steps: Maximum steps before giving up (0 = no limit)
+            max_steps: Maximum steps before giving up (0 = no limit, keeps going until switch)
 
         Returns:
             Dict with steps_taken and hit_limit
         """
-        # Timeout: generous to allow full travel
         move_time = (max_steps * delay_us * 2) / 1_000_000
         timeout = max(30, move_time + 10)
 
@@ -237,7 +242,7 @@ class StepperController:
             return {"steps_taken": 0, "hit_limit": False}
 
     def home_motor(self, motor_id: int, direction: Direction = Direction.COUNTERCLOCKWISE,
-                   delay_us: int = 2000, max_steps: int = 200000) -> Dict:
+                   delay_us: int = 2000, max_steps: int = 110000) -> Dict:
         """
         Home a motor by moving until limit switch is triggered
 
@@ -245,13 +250,13 @@ class StepperController:
             motor_id: Motor number (1-4)
             direction: Direction to move toward home
             delay_us: Microseconds between steps
-            max_steps: Maximum steps before giving up
+            max_steps: Maximum steps before giving up (0 = no limit, keeps going until switch)
 
         Returns:
             Dict with steps_to_home and homed status
         """
         move_time = (max_steps * delay_us * 2) / 1_000_000
-        timeout = max(15, move_time + 5)
+        timeout = max(30, move_time + 10)
 
         result = self._call_rpc("home", motor_id, int(direction), delay_us, max_steps, timeout=timeout)
 
@@ -266,7 +271,7 @@ class StepperController:
             return {"steps_to_home": 0, "homed": False}
 
     def home_all(self, direction: Direction = Direction.COUNTERCLOCKWISE,
-                 delay_us: int = 2000, max_steps: int = 10000) -> Dict:
+                 delay_us: int = 2000, max_steps: int = 110000) -> Dict:
         """
         Home all motors sequentially
 

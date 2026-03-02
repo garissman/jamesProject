@@ -753,8 +753,13 @@ async def get_limit_switches():
     try:
         # Arduino: transform flat limits array to match frontend format
         if pipetting_controller.controller_type == 'arduino_uno_q':
-            # Non-blocking: return busy if MCU is occupied (e.g. during motor move)
+            # Non-blocking: return cached data if MCU is occupied (e.g. during motor move)
             if pipetting_controller.stepper_controller.lock.locked():
+                cached = getattr(get_limit_switches, '_last_result', None)
+                if cached:
+                    cached["status"] = "busy"
+                    cached["message"] = "MCU is busy (motor moving) - showing last known state"
+                    return cached
                 return {
                     "status": "busy",
                     "message": "MCU is busy (motor moving)",
@@ -775,12 +780,14 @@ async def get_limit_switches():
                     "min_pin": lim.get("limit_min_pin"),
                     "max_pin": lim.get("limit_max_pin"),
                 }
-            return {
+            result = {
                 "status": "success",
                 "limit_states": limit_states,
                 "pin_configuration": pin_config,
                 "limits": limits,
             }
+            get_limit_switches._last_result = result.copy()
+            return result
 
         stepper = pipetting_controller.stepper_controller
         limit_states = stepper.check_all_limit_switches()

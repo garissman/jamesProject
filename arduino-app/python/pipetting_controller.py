@@ -392,13 +392,12 @@ class PipettingController:
         Arduino signature: move_motor(id, steps, Direction, delay_us) -> dict
         """
         converted_speed = self._speed(speed)
+        check_limits = kwargs.get('check_limits', True)
         if self.controller_type == 'arduino_uno_q':
-            result = self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed)
-            self.log(f"Arduino RPC move result: motor={motor_id}, steps={steps}, dir={direction}, delay_us={converted_speed}, result={result}")
+            result = self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed, respect_limit=check_limits)
+            self.log(f"Arduino RPC move result: motor={motor_id}, steps={steps}, dir={direction}, delay_us={converted_speed}, check_limits={check_limits}, result={result}")
             return result
         else:
-            # RPi accepts check_limits kwarg
-            check_limits = kwargs.get('check_limits', True)
             return self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed, check_limits=check_limits)
 
     def _move_z_safe(self, steps: int, direction: Direction, speed: float) -> int:
@@ -823,13 +822,39 @@ class PipettingController:
         Tries first_direction, then reverses if it hits MAX instead.
         """
         if self.controller_type == 'arduino_uno_q':
-            # Arduino uses its own home_motor RPC call
-            self.log(f"Homing {axis_name} axis via Arduino RPC...")
-            result = self.stepper_controller.home_motor(motor_id, first_direction, self._speed(self.TRAVEL_SPEED))
-            if result.get('homed'):
-                self.log(f"{axis_name} axis: homed after {result['steps_to_home']} steps")
-            else:
-                self.log(f"{axis_name} axis: WARNING - homing failed")
+            # Arduino: use move_until_limit which properly finds the MIN limit
+            # Use single get_limit RPC (not get_limit_states which queries all 4 motors)
+            def _check_min(mid):
+                result = self.stepper_controller._call_rpc("get_limit", mid)
+                return bool(result is not None and result >= 0 and (result & 1))
+
+            if _check_min(motor_id):
+                self.log(f"{axis_name} axis already at MIN limit")
+                return
+
+            self.log(f"Homing {axis_name} axis to MIN limit...")
+            speed = self._speed(self.TRAVEL_SPEED)
+
+            # first_direction is already the correct hardware direction toward MIN
+            second_direction = Direction.COUNTERCLOCKWISE if first_direction == Direction.CLOCKWISE else Direction.CLOCKWISE
+
+            for direction in [first_direction, second_direction]:
+                result = self.stepper_controller.move_until_limit(motor_id, direction, speed)
+                self.log(f"{axis_name} axis: moved {direction.name} {result['steps_taken']} steps, hit_limit={result['hit_limit']}")
+                time.sleep(0.1)  # Let MCU settle before next RPC
+
+                if result['hit_limit']:
+                    # Single RPC to check which limit we hit
+                    if _check_min(motor_id):
+                        self.log(f"{axis_name} axis: reached MIN limit")
+                        return
+                    else:
+                        self.log(f"{axis_name} axis: hit MAX limit, reversing...")
+                        continue
+
+                self.log(f"{axis_name} axis: WARNING - no limit found in {direction.name}")
+
+            self.log(f"{axis_name} axis: WARNING - could not reach MIN limit")
             return
 
         motor = self.stepper_controller.get_motor(motor_id)
