@@ -25,12 +25,7 @@ export default function ManualTab({
   }
 
   const onApplyPosition = () => {
-    handleSetPosition(
-      parseFloat(positionInputs.x),
-      parseFloat(positionInputs.y),
-      parseFloat(positionInputs.z),
-      parseFloat(positionInputs.pipette_ml)
-    )
+    handleSetPosition(positionInputs)
     setPositionEditMode(false)
   }
 

@@ -380,6 +380,12 @@ class PipettingController:
                 self.pipette_ml = saved.get('pipette_ml', 0.0)
         except Exception:
             pass
+        # Sync Z motor step counter with persisted position so _move_z_safe
+        # allows movement in both directions after a restart.
+        if self.controller_type != 'arduino_uno_q':
+            z_motor = self.stepper_controller.get_motor(3)
+            z_motor.current_position = int(self.current_position.z * self.mapper.STEPS_PER_MM_Z)
+
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
         self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
 
@@ -1001,27 +1007,18 @@ class PipettingController:
         Args:
             direction: 'up' or 'down'
         """
-        Z_UP_POSITION = 70.0  # mm — top position
-        Z_DOWN_POSITION = 0.0  # mm — bottom position
+        Z_TOGGLE_STEPS = 8000
 
         if direction == 'up':
-            distance = Z_UP_POSITION - self.current_position.z
-            if distance <= 0:
-                self.log("Z-axis already at top")
-                return
-            z_steps = int(distance * self.mapper.STEPS_PER_MM_Z)
-            self._move_z_safe(z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-            self.current_position.z = Z_UP_POSITION
-            self.log(f"Z-axis moved UP to {Z_UP_POSITION}mm")
+            self._move_motor(3, Z_TOGGLE_STEPS, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED, check_limits=False)
+            distance_mm = Z_TOGGLE_STEPS / self.mapper.STEPS_PER_MM_Z
+            self.current_position.z += distance_mm
+            self.log(f"Z-axis moved UP {Z_TOGGLE_STEPS} steps ({distance_mm:.1f}mm)")
         elif direction == 'down':
-            distance = self.current_position.z - Z_DOWN_POSITION
-            if distance <= 0:
-                self.log("Z-axis already at bottom")
-                return
-            z_steps = int(distance * self.mapper.STEPS_PER_MM_Z)
-            self._move_z_safe(z_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-            self.current_position.z = Z_DOWN_POSITION
-            self.log(f"Z-axis moved DOWN to {Z_DOWN_POSITION}mm")
+            self._move_motor(3, Z_TOGGLE_STEPS, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED, check_limits=False)
+            distance_mm = Z_TOGGLE_STEPS / self.mapper.STEPS_PER_MM_Z
+            self.current_position.z -= distance_mm
+            self.log(f"Z-axis moved DOWN {Z_TOGGLE_STEPS} steps ({distance_mm:.1f}mm)")
         else:
             raise ValueError("Direction must be 'up' or 'down'")
 
@@ -1079,9 +1076,7 @@ class PipettingController:
                     return self.get_axis_positions()
 
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
-        if axis == 'z':
-            self._move_z_safe(steps, motor_direction, self.TRAVEL_SPEED)
-        elif axis == 'y':
+        if axis == 'y':
             self._move_y_safe(steps, motor_direction, self.TRAVEL_SPEED)
         else:
             self._move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
