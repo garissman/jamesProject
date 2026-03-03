@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import settings
-from pipetting_controller import PipettingController, PipettingStep
+from pipetting_controller import PipettingController, PipettingStep, CoordinateMapper
 
 # Global pipetting controller instance
 pipetting_controller: Optional[PipettingController] = None
@@ -43,6 +43,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not initialize pipetting controller: {e}")
         print("Running in simulation mode")
+
+    # Load stored per-layout coordinates into CoordinateMapper
+    cfg = settings.load()
+    CoordinateMapper.LAYOUT_COORDINATES = cfg.get("LAYOUT_COORDINATES", {})
+    print(f"Loaded LAYOUT_COORDINATES for layouts: {list(CoordinateMapper.LAYOUT_COORDINATES.keys())}")
 
     yield
 
@@ -408,6 +413,7 @@ async def set_layout_type(request: SetLayoutTypeRequest):
 
     try:
         pipetting_controller.layout_type = request.layoutType
+        CoordinateMapper.CURRENT_LAYOUT = request.layoutType
         pipetting_controller.save_position()
         return {
             "status": "success",
@@ -437,8 +443,22 @@ async def set_layout(request: SetLayoutRequest):
 
     try:
         pipetting_controller.layout_type = request.layoutType
+        CoordinateMapper.CURRENT_LAYOUT = request.layoutType
         pipetting_controller.save_position()
-        return {"status": "success", "layout_type": request.layoutType}
+
+        # Find first mapped well for auto-move
+        layout_coords = CoordinateMapper.LAYOUT_COORDINATES.get(request.layoutType, {})
+        first_mapped_well = None
+        for well_id, coords in layout_coords.items():
+            if coords is not None:
+                first_mapped_well = well_id
+                break
+
+        return {
+            "status": "success",
+            "layout_type": request.layoutType,
+            "first_mapped_well": first_mapped_well,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error setting layout: {str(e)}")
 
@@ -1158,6 +1178,92 @@ async def clear_drift_test_results():
 
 # Configuration management endpoints
 
+class CaptureCoordinateRequest(BaseModel):
+    """Request to capture current motor position as a well coordinate"""
+    layout: str = Field(..., description="Layout name: 'microchip', 'vial', or 'wellplate'")
+    wellId: str = Field(..., description="Well identifier (e.g., 'A2', 'MC1', 'VA2', 'SA2')")
+
+
+@app.post("/api/coordinates/capture")
+async def capture_coordinate(request: CaptureCoordinateRequest):
+    """Capture current motor X,Y position and save as coordinate for a well/layout"""
+    if pipetting_controller is None:
+        raise HTTPException(status_code=503, detail="Pipetting controller not initialized")
+
+    try:
+        # Read current motor position in mm
+        positions = pipetting_controller.stepper_controller.get_positions()
+        x_mm = positions.get("x", 0.0)
+        y_mm = positions.get("y", 0.0)
+
+        # Load current config, update the coordinate, and save
+        cfg = settings.load()
+        layout_coords = cfg.setdefault("LAYOUT_COORDINATES", {})
+        layout_wells = layout_coords.setdefault(request.layout, {})
+        layout_wells[request.wellId] = {"x": x_mm, "y": y_mm}
+        settings.save(cfg)
+
+        # Update in-memory CoordinateMapper
+        CoordinateMapper.LAYOUT_COORDINATES = cfg["LAYOUT_COORDINATES"]
+
+        return {
+            "status": "success",
+            "message": f"Captured position for {request.wellId} in {request.layout}: X={x_mm:.2f}, Y={y_mm:.2f}",
+            "well": request.wellId,
+            "layout": request.layout,
+            "x": x_mm,
+            "y": y_mm,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error capturing coordinate: {str(e)}")
+
+
+class SaveCoordinateRequest(BaseModel):
+    """Request to manually save or clear a coordinate for a well"""
+    layout: str = Field(..., description="Layout name")
+    wellId: str = Field(..., description="Well identifier")
+    x: Optional[float] = Field(None, description="X position in mm (null to clear)")
+    y: Optional[float] = Field(None, description="Y position in mm (null to clear)")
+
+
+@app.post("/api/coordinates/save")
+async def save_coordinate(request: SaveCoordinateRequest):
+    """Manually save or clear X,Y coordinate for a well in a layout"""
+    try:
+        cfg = settings.load()
+        layout_coords = cfg.setdefault("LAYOUT_COORDINATES", {})
+        layout_wells = layout_coords.setdefault(request.layout, {})
+
+        if request.x is None or request.y is None:
+            layout_wells[request.wellId] = None
+            msg = f"Cleared coordinate for {request.wellId}"
+        else:
+            layout_wells[request.wellId] = {"x": request.x, "y": request.y}
+            msg = f"Saved coordinate for {request.wellId}: X={request.x:.2f}, Y={request.y:.2f}"
+
+        settings.save(cfg)
+        CoordinateMapper.LAYOUT_COORDINATES = cfg["LAYOUT_COORDINATES"]
+
+        return {
+            "status": "success",
+            "message": msg,
+            "well": request.wellId,
+            "layout": request.layout,
+            "x": request.x,
+            "y": request.y,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving coordinate: {str(e)}")
+
+
+@app.get("/api/coordinates/{layout}")
+async def get_coordinates(layout: str):
+    """Get all stored coordinates for a layout"""
+    cfg = settings.load()
+    layout_coords = cfg.get("LAYOUT_COORDINATES", {}).get(layout, {})
+    return {"status": "success", "layout": layout, "coordinates": layout_coords}
+
+
 class ConfigurationModel(BaseModel):
     """Configuration settings model"""
     # Bed Offset
@@ -1234,13 +1340,17 @@ async def update_configuration(config: ConfigurationModel):
     global pipetting_controller
 
     try:
-        # Persist new values to config.json
+        # Persist new values to config.json, preserving LAYOUT_COORDINATES
         cfg = config.model_dump()
+        existing = settings.load()
+        cfg["LAYOUT_COORDINATES"] = existing.get("LAYOUT_COORDINATES", {})
         settings.save(cfg)
+
+        # Patch CoordinateMapper stored coordinates
+        CoordinateMapper.LAYOUT_COORDINATES = cfg["LAYOUT_COORDINATES"]
 
         # Patch CoordinateMapper class-level attributes so they reflect new values
         # without requiring a full process restart (class attrs are set at import time)
-        from pipetting_controller import CoordinateMapper
         CoordinateMapper.BED_OFFSET_X       = cfg['BED_OFFSET_X']
         CoordinateMapper.BED_OFFSET_Y       = cfg['BED_OFFSET_Y']
         CoordinateMapper.WELL_SPACING       = cfg['WELL_SPACING']

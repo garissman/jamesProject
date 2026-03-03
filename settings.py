@@ -41,16 +41,57 @@ DEFAULTS: dict[str, Any] = {
     "INVERT_Z":               False,
     "INVERT_PIPETTE":         False,
     "CONTROLLER_TYPE":        "raspberry_pi",
+    "LAYOUT_COORDINATES": {
+        "microchip": {
+            "A2": None, "B2": None, "C2": None, "D2": None,
+            "E2": None, "F2": None, "G2": None, "H2": None,
+            "MC1": None,
+            "A5": None, "B5": None, "C5": None, "D5": None,
+            "E5": None, "F5": None, "G5": None, "H5": None,
+            "MC2": None,
+            "A8": None, "B8": None, "C8": None, "D8": None,
+            "E8": None, "F8": None, "G8": None, "H8": None,
+            "MC3": None,
+            "A11": None, "B11": None, "C11": None, "D11": None,
+            "E11": None, "F11": None, "G11": None, "H11": None,
+            "MC4": None,
+            "A14": None, "B14": None, "C14": None, "D14": None,
+            "E14": None, "F14": None, "G14": None, "H14": None,
+            "MC5": None,
+        },
+        "vial": {
+            "VA2": None, "VB2": None, "VC2": None, "VD2": None, "VE2": None,
+        },
+        "wellplate": {
+            "SA2": None, "SB2": None, "SC2": None, "SD2": None,
+            "SE2": None, "SF2": None, "SG2": None, "SH2": None,
+            "SI2": None, "SJ2": None, "SK2": None, "SL2": None,
+            "SA5": None, "SB5": None, "SC5": None, "SD5": None,
+            "SE5": None, "SF5": None, "SG5": None, "SH5": None,
+            "SI5": None, "SJ5": None, "SK5": None, "SL5": None,
+        },
+    },
 }
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into *base* so new default keys aren't lost."""
+    merged = dict(base)
+    for key, val in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(val, dict):
+            merged[key] = _deep_merge(merged[key], val)
+        else:
+            merged[key] = val
+    return merged
+
+
 def load() -> dict[str, Any]:
-    """Load all settings, merging saved values over defaults."""
+    """Load all settings, merging saved values over defaults (deep for nested dicts)."""
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE) as f:
                 saved = json.load(f)
-            return {**DEFAULTS, **saved}
+            return _deep_merge(DEFAULTS, saved)
         except Exception as e:
             print(f"Warning: could not read {CONFIG_FILE}: {e}")
     return dict(DEFAULTS)

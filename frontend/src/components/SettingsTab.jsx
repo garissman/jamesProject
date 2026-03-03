@@ -1,4 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+const REFERENCE_WELLS = {
+    microchip: [
+        'A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2', 'MC1',
+        'A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5', 'MC2',
+        'A8', 'B8', 'C8', 'D8', 'E8', 'F8', 'G8', 'H8', 'MC3',
+        'A11', 'B11', 'C11', 'D11', 'E11', 'F11', 'G11', 'H11', 'MC4',
+        'A14', 'B14', 'C14', 'D14', 'E14', 'F14', 'G14', 'H14', 'MC5',
+    ],
+    vial: ['VA2', 'VB2', 'VC2', 'VD2', 'VE2'],
+    wellplate: [
+        'SA2', 'SB2', 'SC2', 'SD2', 'SE2', 'SF2', 'SG2', 'SH2', 'SI2', 'SJ2', 'SK2', 'SL2',
+        'SA5', 'SB5', 'SC5', 'SD5', 'SE5', 'SF5', 'SG5', 'SH5', 'SI5', 'SJ5', 'SK5', 'SL5',
+    ],
+}
 
 export default function SettingsTab({
     config,
@@ -7,6 +22,7 @@ export default function SettingsTab({
     controllerType,
     fetchCurrentPosition,
     handleAxisMove,
+    axisPositions,
 }) {
     const [settingsSubTab, setSettingsSubTab] = useState('layout')
     const [calibration, setCalibration] = useState({
@@ -17,6 +33,75 @@ export default function SettingsTab({
     })
     const [configLoading, setConfigLoading] = useState(false)
     const [configMessage, setConfigMessage] = useState('')
+    const [coordLayout, setCoordLayout] = useState('microchip')
+    const [coordData, setCoordData] = useState({})
+    const [capturingWell, setCapturingWell] = useState(null)
+
+    // Fetch coordinates when layout changes
+    useEffect(() => {
+        if (settingsSubTab === 'layout') {
+            fetch(`/api/coordinates/${coordLayout}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') setCoordData(data.coordinates || {})
+                })
+                .catch(err => console.error('Failed to fetch coordinates:', err))
+        }
+    }, [coordLayout, settingsSubTab])
+
+    const handleCapture = async (wellId) => {
+        setCapturingWell(wellId)
+        try {
+            const res = await fetch('/api/coordinates/capture', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ layout: coordLayout, wellId }),
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setCoordData(prev => ({ ...prev, [wellId]: { x: data.x, y: data.y } }))
+            } else {
+                console.error(data.detail || 'Capture failed')
+            }
+        } catch (err) {
+            console.error('Capture error:', err.message)
+        } finally {
+            setCapturingWell(null)
+        }
+    }
+
+    const handleCoordEdit = async (wellId, axis, value) => {
+        const numVal = parseFloat(value)
+        if (isNaN(numVal)) return
+        const existing = coordData[wellId] || { x: 0, y: 0 }
+        const updated = { ...existing, [axis]: numVal }
+        setCoordData(prev => ({ ...prev, [wellId]: updated }))
+
+        try {
+            await fetch('/api/coordinates/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ layout: coordLayout, wellId, x: updated.x, y: updated.y }),
+            })
+        } catch (err) {
+            console.error('Save error:', err.message)
+        }
+    }
+
+    const handleClearCoord = async (wellId) => {
+        const newData = { ...coordData }
+        delete newData[wellId]
+        setCoordData(newData)
+        try {
+            await fetch('/api/coordinates/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ layout: coordLayout, wellId, x: null, y: null }),
+            })
+        } catch (err) {
+            console.error('Clear error:', err.message)
+        }
+    }
 
     return (
         <div className="p-5 max-w-[1200px] mx-auto">
@@ -201,6 +286,115 @@ export default function SettingsTab({
                                         className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Well Coordinate Mapping */}
+                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
+                            <h3 className="m-0 mb-3 text-[var(--text-primary)] text-[1.1em] font-semibold">Well Coordinate Mapping</h3>
+                            <p className="text-[var(--text-tertiary)] text-sm mb-4">
+                                Store explicit X,Y positions for reference wells. Use "Capture" to save the current motor position, or edit values manually.
+                            </p>
+
+                            {/* Current position display */}
+                            {axisPositions && (
+                                <div className="mb-4 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)] text-sm">
+                                    <span className="font-semibold text-[var(--text-primary)]">Current Position: </span>
+                                    <span className="text-[var(--text-secondary)]">
+                                        X={axisPositions.x?.toFixed(2) ?? '0.00'} mm, Y={axisPositions.y?.toFixed(2) ?? '0.00'} mm
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Layout selector */}
+                            <div className="flex items-center gap-3 mb-4">
+                                <label className="text-sm font-semibold text-[var(--text-primary)]">Layout:</label>
+                                <select
+                                    value={coordLayout}
+                                    onChange={(e) => setCoordLayout(e.target.value)}
+                                    className="p-2 px-3 text-sm border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] cursor-pointer"
+                                >
+                                    <option value="microchip">MicroChip</option>
+                                    <option value="vial">Vial</option>
+                                    <option value="wellplate">Wellplate</option>
+                                </select>
+                            </div>
+
+                            {/* Reference wells table */}
+                            <div className="max-h-[400px] overflow-y-auto border border-[var(--border-color)] rounded-lg">
+                                <table className="w-full border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-[var(--bg-secondary)]">
+                                        <tr>
+                                            <th className="text-left p-2 px-3 border-b border-[var(--border-color)] text-[var(--text-primary)] font-semibold">Well</th>
+                                            <th className="text-left p-2 px-3 border-b border-[var(--border-color)] text-[var(--text-primary)] font-semibold">X (mm)</th>
+                                            <th className="text-left p-2 px-3 border-b border-[var(--border-color)] text-[var(--text-primary)] font-semibold">Y (mm)</th>
+                                            <th className="text-center p-2 px-3 border-b border-[var(--border-color)] text-[var(--text-primary)] font-semibold">Status</th>
+                                            <th className="text-center p-2 px-3 border-b border-[var(--border-color)] text-[var(--text-primary)] font-semibold">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(REFERENCE_WELLS[coordLayout] || []).map((wellId) => {
+                                            const coord = coordData[wellId]
+                                            const isSet = coord !== null && coord !== undefined
+                                            return (
+                                                <tr key={wellId} className="hover:bg-[var(--nav-hover)] transition-colors">
+                                                    <td className="p-2 px-3 border-b border-[var(--border-color)] font-mono font-semibold text-[var(--text-primary)]">
+                                                        {wellId}
+                                                    </td>
+                                                    <td className="p-1 px-2 border-b border-[var(--border-color)]">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={isSet ? coord.x : ''}
+                                                            placeholder="—"
+                                                            onChange={(e) => handleCoordEdit(wellId, 'x', e.target.value)}
+                                                            className="w-20 p-1.5 px-2 text-sm border border-[var(--input-border)] rounded bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-hover)]"
+                                                        />
+                                                    </td>
+                                                    <td className="p-1 px-2 border-b border-[var(--border-color)]">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={isSet ? coord.y : ''}
+                                                            placeholder="—"
+                                                            onChange={(e) => handleCoordEdit(wellId, 'y', e.target.value)}
+                                                            className="w-20 p-1.5 px-2 text-sm border border-[var(--input-border)] rounded bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-hover)]"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 px-3 border-b border-[var(--border-color)] text-center">
+                                                        <span
+                                                            className={`inline-block w-2.5 h-2.5 rounded-full ${
+                                                                isSet ? 'bg-green-500' : 'bg-gray-400'
+                                                            }`}
+                                                            title={isSet ? `Set: X=${coord.x}, Y=${coord.y}` : 'Not set'}
+                                                        />
+                                                    </td>
+                                                    <td className="p-1.5 px-2 border-b border-[var(--border-color)] text-center">
+                                                        <div className="flex gap-1 justify-center">
+                                                            <button
+                                                                onClick={() => handleCapture(wellId)}
+                                                                disabled={capturingWell === wellId}
+                                                                className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer disabled:cursor-wait transition-colors"
+                                                                title="Capture current motor position"
+                                                            >
+                                                                {capturingWell === wellId ? '...' : 'Capture'}
+                                                            </button>
+                                                            {isSet && (
+                                                                <button
+                                                                    onClick={() => handleClearCoord(wellId)}
+                                                                    className="px-2 py-1 text-xs font-semibold rounded bg-red-600/80 text-white hover:bg-red-700 cursor-pointer transition-colors"
+                                                                    title="Clear coordinate"
+                                                                >
+                                                                    Clear
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </>

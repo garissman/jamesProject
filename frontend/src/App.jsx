@@ -378,8 +378,24 @@ function App() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({layoutType: mode})
             })
-            if (res.ok) setLayoutType(mode)
-            else {
+            if (res.ok) {
+                const data = await res.json()
+                setLayoutType(mode)
+
+                // Auto-move to first mapped well if available
+                if (data.first_mapped_well) {
+                    try {
+                        await fetch('/api/pipetting/move-to-well', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({wellId: data.first_mapped_well})
+                        })
+                        fetchCurrentPosition()
+                    } catch (moveErr) {
+                        console.error('Auto-move failed:', moveErr.message)
+                    }
+                }
+            } else {
                 const data = await res.json()
                 console.error(`Error: ${data.detail || 'Failed to set layout'}`)
             }
@@ -627,8 +643,10 @@ function App() {
 
     const saveConfig = async () => {
         const stringKeys = ['CONTROLLER_TYPE']
+        const excludeKeys = ['LAYOUT_COORDINATES']
         const parsed = {}
         for (const [key, value] of Object.entries(config)) {
+            if (excludeKeys.includes(key)) continue
             if (stringKeys.includes(key)) {
                 parsed[key] = value
             } else if (typeof value === 'string' && !['true', 'false'].includes(value)) {
@@ -637,7 +655,7 @@ function App() {
                 parsed[key] = value
             }
         }
-        setConfig(parsed)
+        setConfig(prev => ({...parsed, LAYOUT_COORDINATES: prev.LAYOUT_COORDINATES}))
 
         try {
             const response = await fetch('/api/config', {
@@ -787,6 +805,7 @@ function App() {
                         controllerType={controllerType}
                         fetchCurrentPosition={fetchCurrentPosition}
                         handleAxisMove={handleAxisMove}
+                        axisPositions={axisPositions}
                     />
                 ) : (
                     <PlateLayout

@@ -66,7 +66,9 @@
       "Bash(bash:*)",
       "Bash(./deploy.sh:*)",
       "Bash(mkdir:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "mcp__plugin_playwright_playwright__browser_network_requests",
+      "mcp__plugin_playwright_playwright__browser_evaluate"
     ],
     "deny": [],
     "ask": []

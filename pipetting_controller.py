@@ -82,6 +82,10 @@ class CoordinateMapper:
     VIAL_WELL_DIAMETER = settings.get('VIAL_WELL_DIAMETER')  # mm
     VIAL_WELL_HEIGHT   = settings.get('VIAL_WELL_HEIGHT')    # mm
 
+    # Per-layout stored coordinates (loaded from config.json LAYOUT_COORDINATES)
+    LAYOUT_COORDINATES: dict = {}
+    CURRENT_LAYOUT: str = "microchip"
+
     # Layout-specific coordinate mappings
     # MicroChip Layout coordinates (non-WS entries only; WS computed dynamically)
     MICROCHIP_COORDS = {
@@ -221,6 +225,14 @@ class CoordinateMapper:
         Returns:
             WellCoordinates with x, y, z positions
         """
+        # Check stored coordinates first (per-layout mapping from config.json)
+        layout_coords = CoordinateMapper.LAYOUT_COORDINATES.get(
+            CoordinateMapper.CURRENT_LAYOUT, {}
+        )
+        stored = layout_coords.get(well_id)
+        if stored is not None:
+            return WellCoordinates(x=stored["x"], y=stored["y"], z=0.0)
+
         # Washing stations — computed dynamically from config
         if well_id in ('WS1', 'WS2'):
             return CoordinateMapper._ws_coordinates(well_id)
@@ -335,7 +347,8 @@ class PipettingController:
     INVERT_Z       = settings.get('INVERT_Z')
     INVERT_PIPETTE = settings.get('INVERT_PIPETTE')
 
-    # Z-axis software travel limit (steps from home/min to max)
+    # Axis software travel limits (steps from home/min to max)
+    Y_MAX_STEPS = 67400
     Z_MAX_STEPS = 9990
 
     # Position persistence
@@ -353,10 +366,12 @@ class PipettingController:
         self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
         self.operation_well = None  # Well where current operation is happening
         self.layout_type = "microchip"  # Current layout type: microchip or wellplate
+        CoordinateMapper.CURRENT_LAYOUT = self.layout_type
         self.pipette_ml = 0.0  # Current pipette volume in mL
 
         # Load last known position or default to home (WS1 - Washing Station 1)
         self.current_position, self.current_pipette_count, self.layout_type = self.load_position()
+        CoordinateMapper.CURRENT_LAYOUT = self.layout_type
         # Load pipette_ml from saved position file
         try:
             if self.POSITION_FILE.exists():
@@ -425,6 +440,32 @@ class PipettingController:
             self.log(f"Z-axis: clamped {steps} -> {clamped} steps (limit: {self.Z_MAX_STEPS})")
         if clamped > 0:
             self._move_motor(3, clamped, direction, speed)
+        return clamped
+
+    def _move_y_safe(self, steps: int, direction: Direction, speed: float) -> int:
+        """Move Y-axis motor with software step limit enforcement.
+
+        Clamps the requested steps so the motor position stays within
+        [0, Y_MAX_STEPS].  Returns the number of steps actually commanded.
+        """
+        if self.controller_type == 'arduino_uno_q':
+            if steps > 0:
+                self._move_motor(2, steps, direction, speed, check_limits=False)
+            return steps
+
+        motor = self.stepper_controller.get_motor(2)
+        pos = motor.current_position
+
+        if direction == Direction.CLOCKWISE:
+            max_allowed = max(0, self.Y_MAX_STEPS - pos)
+        else:
+            max_allowed = max(0, pos)
+
+        clamped = min(steps, max_allowed)
+        if clamped < steps:
+            self.log(f"Y-axis: clamped {steps} -> {clamped} steps (limit: {self.Y_MAX_STEPS})")
+        if clamped > 0:
+            self._move_motor(2, clamped, direction, speed, check_limits=False)
         return clamped
 
     def log(self, message: str):
@@ -530,11 +571,11 @@ class PipettingController:
             self._move_z_safe(z_up_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
             self.current_position.z = Z_UP_POSITION
 
-        # Step 2: Move Y (check_limits=False to avoid false triggers from EMI)
+        # Step 2: Move Y (with software limit enforcement)
         if y_delta != 0:
             self.log(f"  Step 2: Moving Y ({y_delta} steps)")
             direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
-            self._move_motor(2, abs(y_delta), direction, self.TRAVEL_SPEED, check_limits=False)
+            self._move_y_safe(abs(y_delta), direction, self.TRAVEL_SPEED)
 
         # Step 3: Move X (check_limits=False to avoid false triggers from EMI)
         if x_delta != 0:
@@ -1040,6 +1081,8 @@ class PipettingController:
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
         if axis == 'z':
             self._move_z_safe(steps, motor_direction, self.TRAVEL_SPEED)
+        elif axis == 'y':
+            self._move_y_safe(steps, motor_direction, self.TRAVEL_SPEED)
         else:
             self._move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
 
