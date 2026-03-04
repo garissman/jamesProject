@@ -243,7 +243,7 @@ class StepperMotor:
             else:
                 # Simulation mode: faster delay for testing, update simulated position
                 time.sleep(current_delay * 0.01)  # Much faster in simulation mode
-                if direction == Direction.CLOCKWISE:
+                if direction.value == Direction.CLOCKWISE.value:
                     self.simulated_position += 1
                 else:
                     self.simulated_position -= 1
@@ -258,7 +258,7 @@ class StepperMotor:
         self.ignore_limits = False
 
         # Update position tracking
-        position_delta = steps_completed if direction == Direction.CLOCKWISE else -steps_completed
+        position_delta = steps_completed if direction.value == Direction.CLOCKWISE.value else -steps_completed
         self.current_position += position_delta
 
         return steps_completed, limit_state
@@ -320,7 +320,7 @@ class StepperMotor:
                         time.sleep(actual_delay)
                     else:
                         time.sleep(actual_delay * 0.01)
-                        if direction == Direction.CLOCKWISE:
+                        if direction.value == Direction.CLOCKWISE.value:
                             self.simulated_position += 1
                         else:
                             self.simulated_position -= 1
