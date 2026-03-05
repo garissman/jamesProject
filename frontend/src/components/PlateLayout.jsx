@@ -23,6 +23,8 @@ export default function PlateLayout({
                                         controllerType,
                                         fetchCurrentPosition,
                                         fetchAxisPositions,
+                                        wellSelectionMode,
+                                        setWellSelectionMode,
                                     }) {
     const [quickOpMode, setQuickOpMode] = useState(false)
     const [quickOpWells, setQuickOpWells] = useState({pickup: null, dropoff: null, rinse: null})
@@ -136,6 +138,20 @@ export default function PlateLayout({
 
     return (
         <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-[15px] flex flex-col">
+            {/* Well Selection Mode Banner */}
+            {wellSelectionMode && (
+                <div className="bg-[#3b82f6] text-white px-5 py-3 rounded-xl mb-4 flex items-center justify-between animate-fade-in">
+                    <span className="font-semibold">
+                        Selecting well for: {wellSelectionMode.field === 'pickup' ? 'Pickup Well' : wellSelectionMode.field === 'dropoff' ? 'Dropoff Well' : 'Rinse Well'} — click a well to select
+                    </span>
+                    <button
+                        onClick={() => setWellSelectionMode(null)}
+                        className="bg-white/20 hover:bg-white/30 text-white border-none px-4 py-1.5 rounded-lg cursor-pointer font-semibold transition-colors"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
             {/* Plate Header */}
             <div className="flex justify-between items-center mb-[15px]">
                 <h2 className="text-[1.3rem] m-0 font-semibold text-[var(--text-primary)]">Plate layout</h2>

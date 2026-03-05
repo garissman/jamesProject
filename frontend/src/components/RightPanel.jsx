@@ -30,55 +30,6 @@ export default function RightPanel({
         </div>
       </div>
 
-      {/* Concentration Section - only on program tab */}
-      {activeTab === 'program' && (
-        <div className="bg-[var(--bg-secondary)] rounded-[15px] p-5 flex-1">
-          <h3 className="m-0 mb-[15px] text-[1.2rem] font-semibold text-[var(--text-primary)]">Cycles</h3>
-          <div className="flex flex-col gap-[15px] max-h-[400px] overflow-y-auto">
-            {steps.map((step, stepIndex) => {
-              const totalReps = step.repetitionMode === 'timeFrequency' && step.repetitionInterval && step.repetitionDuration
-                ? Math.floor(step.repetitionDuration / step.repetitionInterval)
-                : step.repetitionQuantity || 1;
-              return (
-                <div key={step.id} className="bg-[var(--bg-overlay)] p-[15px] rounded-[10px] mb-2.5">
-                  <h4 className="m-0 mb-2.5 text-[1.1rem] text-[var(--text-primary)] border-b border-[var(--border-color)] pb-2">
-                    Step {stepIndex + 1}
-                  </h4>
-                  <div className="mb-2 py-2 px-3 bg-[var(--bg-tertiary)] rounded-md border-l-[3px] border-l-[#8b5cf6]">
-                    <div className="text-[0.95rem] font-semibold text-[var(--text-primary)]">
-                      {'\uD83D\uDD27'} {step.pipetteCount || 3} Pipette{(step.pipetteCount || 3) > 1 ? 's' : ''}
-                    </div>
-                  </div>
-                  <div className="mb-2.5 py-2 px-3 bg-[var(--bg-tertiary)] rounded-md border-l-[3px] border-l-[#3b82f6]">
-                    {step.repetitionMode === 'quantity' ? (
-                      <div className="text-[0.95rem] font-semibold text-[var(--text-primary)]">
-                        {'\u21BB'} Repeat {step.repetitionQuantity} time(s)
-                      </div>
-                    ) : (
-                      <div className="text-[0.95rem] font-semibold text-[var(--text-primary)]">
-                        {'\u23F1'} Every {step.repetitionInterval}s for {step.repetitionDuration}s ({totalReps} times)
-                      </div>
-                    )}
-                  </div>
-                  {[...Array(step.cycles)].map((_, cycleIndex) => (
-                    <div key={cycleIndex} className="bg-[var(--bg-tertiary)] p-3 rounded-lg border-l-[3px] border-l-[var(--border-color)]">
-                      {step.pickupWell && <div className="py-1 text-[0.95rem] text-[var(--text-tertiary)]">{'\u2022'} Pickup from well: {step.pickupWell}</div>}
-                      {step.sampleVolume && <div className="py-1 text-[0.95rem] text-[var(--text-tertiary)]">{'\u2022'} Sample volume: {step.sampleVolume} mL</div>}
-                      {step.dropoffWell && <div className="py-1 text-[0.95rem] text-[var(--text-tertiary)]">{'\u2022'} Dropoff to well: {step.dropoffWell}</div>}
-                      {step.rinseWell && <div className="py-1 text-[0.95rem] text-[var(--text-tertiary)]">{'\u2022'} Rinse at well: {step.rinseWell}</div>}
-                      {step.waitTime && <div className="py-1 text-[0.95rem] text-[var(--text-tertiary)]">{'\u2022'} Wait: {step.waitTime}s</div>}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-            {steps.length === 0 && (
-              <div className="text-[var(--text-tertiary)] italic text-center p-5">Add steps to see program</div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Action Buttons */}
       <div className="flex flex-col gap-[15px] max-lg:flex-row max-lg:flex-wrap">
         {targetWell && (
