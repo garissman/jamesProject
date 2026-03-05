@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import NavBar from './components/NavBar'
 import PlateLayout from './components/PlateLayout'
 import ProgramTab from './components/ProgramTab'
@@ -7,8 +7,39 @@ import DriftTestTab from './components/DriftTestTab'
 import SettingsTab from './components/SettingsTab'
 import RightPanel from './components/RightPanel'
 
+const TAB_TO_PATH = {
+    'protocol': '/',
+    'program': '/program',
+    'manual': '/manual',
+    'drift-test': '/drift-test',
+    'settings': '/settings',
+}
+
+const PATH_TO_TAB = Object.fromEntries(
+    Object.entries(TAB_TO_PATH).map(([tab, path]) => [path, tab])
+)
+
+function getTabFromPath() {
+    return PATH_TO_TAB[window.location.pathname] || 'protocol'
+}
+
 function App() {
-    const [activeTab, setActiveTab] = useState('protocol')
+    const [activeTab, setActiveTabState] = useState(getTabFromPath)
+
+    const setActiveTab = useCallback((tab) => {
+        setActiveTabState(tab)
+        const path = TAB_TO_PATH[tab] || '/'
+        if (window.location.pathname !== path) {
+            window.history.pushState({ tab }, '', path)
+        }
+    }, [])
+
+    // Handle browser back/forward
+    useEffect(() => {
+        const onPopState = () => setActiveTabState(getTabFromPath())
+        window.addEventListener('popstate', onPopState)
+        return () => window.removeEventListener('popstate', onPopState)
+    }, [])
     const [selectedWell, setSelectedWell] = useState('WS1')
     const [targetWell, setTargetWell] = useState(null)
     const [currentPipetteCount, setCurrentPipetteCount] = useState(3)
@@ -757,22 +788,26 @@ function App() {
                 toggleTheme={toggleTheme}
             />
             <div className="flex gap-5 px-5 py-[15px] flex-1 max-w-full overflow-hidden max-lg:flex-col max-lg:gap-[15px] max-lg:px-2.5">
-                {activeTab === 'program' ? (
-                    <ProgramTab
-                        steps={steps}
-                        layoutType={layoutType}
-                        handleAddStep={handleAddStep}
-                        handleUpdateStep={handleUpdateStep}
-                        handleDuplicateStep={handleDuplicateStep}
-                        handleDeleteStep={handleDeleteStep}
-                        handleReorderSteps={handleReorderSteps}
-                        handleSaveProgram={handleSaveProgram}
-                        handleLoadProgram={handleLoadProgram}
-                        validateWellId={validateWellId}
-                        setActiveTab={setActiveTab}
-                        setWellSelectionMode={setWellSelectionMode}
-                    />
-                ) : activeTab === 'manual' ? (
+                {/* ProgramTab: keep mounted (hidden) during well selection so wizard state survives */}
+                <div style={{ display: activeTab === 'program' ? undefined : 'none' }}>
+                    {(activeTab === 'program' || wellSelectionMode) && (
+                        <ProgramTab
+                            steps={steps}
+                            layoutType={layoutType}
+                            handleAddStep={handleAddStep}
+                            handleUpdateStep={handleUpdateStep}
+                            handleDuplicateStep={handleDuplicateStep}
+                            handleDeleteStep={handleDeleteStep}
+                            handleReorderSteps={handleReorderSteps}
+                            handleSaveProgram={handleSaveProgram}
+                            handleLoadProgram={handleLoadProgram}
+                            validateWellId={validateWellId}
+                            setActiveTab={setActiveTab}
+                            setWellSelectionMode={setWellSelectionMode}
+                        />
+                    )}
+                </div>
+                {activeTab === 'manual' ? (
                     <ManualTab
                         axisPositions={axisPositions}
                         isExecuting={isExecuting}
@@ -793,7 +828,7 @@ function App() {
                         handleAxisMove={handleAxisMove}
                         axisPositions={axisPositions}
                     />
-                ) : (
+                ) : activeTab !== 'program' ? (
                     <PlateLayout
                         layoutType={layoutType}
                         layouts={layouts}
@@ -822,7 +857,7 @@ function App() {
                         wellSelectionMode={wellSelectionMode}
                         setWellSelectionMode={setWellSelectionMode}
                     />
-                )}
+                ) : null}
                 <RightPanel
                     activeTab={activeTab}
                     steps={steps}

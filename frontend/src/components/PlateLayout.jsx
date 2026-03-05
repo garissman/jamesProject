@@ -142,7 +142,7 @@ export default function PlateLayout({
             {wellSelectionMode && (
                 <div className="bg-[#3b82f6] text-white px-5 py-3 rounded-xl mb-4 flex items-center justify-between animate-fade-in">
                     <span className="font-semibold">
-                        Selecting well for: {wellSelectionMode.field === 'pickup' ? 'Pickup Well' : wellSelectionMode.field === 'dropoff' ? 'Dropoff Well' : 'Rinse Well'} — click a well to select
+                        Selecting well for: {wellSelectionMode.field === 'pickupWell' ? 'Pickup Well' : wellSelectionMode.field === 'dropoffWell' ? 'Dropoff Well' : 'Rinse Well'} — click a well to select
                     </span>
                     <button
                         onClick={() => setWellSelectionMode(null)}
