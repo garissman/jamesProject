@@ -47,28 +47,16 @@ function App() {
     })
 
     // Program tab state
-    const [cycles, setCycles] = useState(1)
-    const [pickupWell, setPickupWell] = useState('')
-    const [dropoffWell, setDropoffWell] = useState('')
-    const [rinseWell, setRinseWell] = useState('')
-    const [waitTime, setWaitTime] = useState('')
-    const [sampleVolume, setSampleVolume] = useState('')
     const [steps, setSteps] = useState([])
     const [isExecuting, setIsExecuting] = useState(false)
     const [systemStatus, setSystemStatus] = useState('Connecting...')
     const [logs, setLogs] = useState([])
 
-    // Repetition mode state
-    const [repetitionMode, setRepetitionMode] = useState('quantity')
-    const [repetitionQuantity, setRepetitionQuantity] = useState(1)
-    const [repetitionInterval, setRepetitionInterval] = useState('')
-    const [repetitionDuration, setRepetitionDuration] = useState('')
-
-    // Pipette configuration state
-    const [pipetteCount, setPipetteCount] = useState(3)
-
     // Layout type state
     const [layoutType, setLayoutType] = useState('microchip')
+
+    // Well selection mode for picking wells from the plate
+    const [wellSelectionMode, setWellSelectionMode] = useState(null)
 
     // Controller type
     const [controllerType, setControllerType] = useState('raspberry_pi')
@@ -164,56 +152,63 @@ function App() {
 
     // ── Handler functions ──
 
-    const handleAddStep = () => {
-        if (!pickupWell || pickupWell.trim() === '') {
-            console.error('Pickup well is required')
-            return
-        }
-        if (!validateWellId(pickupWell)) {
-            console.error('Invalid pickup well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
-            return
-        }
-        if (dropoffWell && !validateWellId(dropoffWell)) {
-            console.error('Invalid dropoff well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
-            return
-        }
-        if (rinseWell && !validateWellId(rinseWell)) {
-            console.error('Invalid rinse well ID. Must be in format: Row (A-H) + Column (1-12). Example: A1, B5, H12')
-            return
-        }
-        if (sampleVolume && (Number(sampleVolume) <= 0 || Number(sampleVolume) > 10)) {
-            console.error('Sample volume must be between 0 and 10 mL')
-            return
-        }
-
+    const handleAddStep = (stepData) => {
         const newStep = {
             id: Date.now(),
-            cycles: Number(cycles),
-            pickupWell: pickupWell.trim().toUpperCase(),
-            dropoffWell: dropoffWell ? dropoffWell.trim().toUpperCase() : '',
-            rinseWell: rinseWell ? rinseWell.trim().toUpperCase() : '',
-            waitTime,
-            sampleVolume,
-            repetitionMode,
-            repetitionQuantity: repetitionMode === 'quantity' ? Number(repetitionQuantity) : 1,
-            repetitionInterval: repetitionMode === 'timeFrequency' ? Number(repetitionInterval) : null,
-            repetitionDuration: repetitionMode === 'timeFrequency' ? Number(repetitionDuration) : null,
-            pipetteCount: Number(pipetteCount)
+            cycles: Number(stepData.cycles) || 1,
+            pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
+            dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),
+            rinseWell: (stepData.rinseWell || '').trim().toUpperCase(),
+            waitTime: stepData.waitTime || '',
+            sampleVolume: stepData.sampleVolume || '',
+            repetitionMode: stepData.repetitionMode || 'quantity',
+            repetitionQuantity: stepData.repetitionMode === 'quantity' ? Number(stepData.repetitionQuantity) || 1 : 1,
+            repetitionInterval: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionInterval) || null : null,
+            repetitionDuration: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionDuration) || null : null,
+            pipetteCount: Number(stepData.pipetteCount) || 3,
         }
-        setSteps([...steps, newStep])
+        setSteps(prev => [...prev, newStep])
+    }
 
-        // Reset form
-        setCycles(1)
-        setPickupWell('')
-        setDropoffWell('')
-        setRinseWell('')
-        setWaitTime('')
-        setSampleVolume('')
-        setRepetitionMode('quantity')
-        setRepetitionQuantity(1)
-        setRepetitionInterval('')
-        setRepetitionDuration('')
-        setPipetteCount(3)
+    const handleUpdateStep = (stepId, stepData) => {
+        setSteps(prev => prev.map(s => s.id === stepId ? {
+            ...s,
+            cycles: Number(stepData.cycles) || 1,
+            pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
+            dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),
+            rinseWell: (stepData.rinseWell || '').trim().toUpperCase(),
+            waitTime: stepData.waitTime || '',
+            sampleVolume: stepData.sampleVolume || '',
+            repetitionMode: stepData.repetitionMode || 'quantity',
+            repetitionQuantity: stepData.repetitionMode === 'quantity' ? Number(stepData.repetitionQuantity) || 1 : 1,
+            repetitionInterval: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionInterval) || null : null,
+            repetitionDuration: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionDuration) || null : null,
+            pipetteCount: Number(stepData.pipetteCount) || 3,
+        } : s))
+    }
+
+    const handleDuplicateStep = (stepId) => {
+        setSteps(prev => {
+            const idx = prev.findIndex(s => s.id === stepId)
+            if (idx === -1) return prev
+            const copy = { ...prev[idx], id: Date.now() }
+            const next = [...prev]
+            next.splice(idx + 1, 0, copy)
+            return next
+        })
+    }
+
+    const handleDeleteStep = (stepId) => {
+        setSteps(prev => prev.filter(s => s.id !== stepId))
+    }
+
+    const handleReorderSteps = (fromIndex, toIndex) => {
+        setSteps(prev => {
+            const next = [...prev]
+            const [moved] = next.splice(fromIndex, 1)
+            next.splice(toIndex, 0, moved)
+            return next
+        })
     }
 
     const handleDeleteAll = () => {
@@ -405,6 +400,12 @@ function App() {
     }
 
     const handleWellClick = (wellId) => {
+        if (wellSelectionMode) {
+            wellSelectionMode.callback(wellId)
+            setWellSelectionMode(null)
+            setActiveTab('program')
+            return
+        }
         setTargetWell(wellId)
     }
 
@@ -758,33 +759,18 @@ function App() {
             <div className="flex gap-5 px-5 py-[15px] flex-1 max-w-full overflow-hidden max-lg:flex-col max-lg:gap-[15px] max-lg:px-2.5">
                 {activeTab === 'program' ? (
                     <ProgramTab
-                        cycles={cycles}
-                        setCycles={setCycles}
-                        pickupWell={pickupWell}
-                        setPickupWell={setPickupWell}
-                        dropoffWell={dropoffWell}
-                        setDropoffWell={setDropoffWell}
-                        rinseWell={rinseWell}
-                        setRinseWell={setRinseWell}
-                        waitTime={waitTime}
-                        setWaitTime={setWaitTime}
-                        sampleVolume={sampleVolume}
-                        setSampleVolume={setSampleVolume}
-                        repetitionMode={repetitionMode}
-                        setRepetitionMode={setRepetitionMode}
-                        repetitionQuantity={repetitionQuantity}
-                        setRepetitionQuantity={setRepetitionQuantity}
-                        repetitionInterval={repetitionInterval}
-                        setRepetitionInterval={setRepetitionInterval}
-                        repetitionDuration={repetitionDuration}
-                        setRepetitionDuration={setRepetitionDuration}
-                        pipetteCount={pipetteCount}
-                        setPipetteCount={setPipetteCount}
-                        layoutType={layoutType}
                         steps={steps}
+                        layoutType={layoutType}
                         handleAddStep={handleAddStep}
+                        handleUpdateStep={handleUpdateStep}
+                        handleDuplicateStep={handleDuplicateStep}
+                        handleDeleteStep={handleDeleteStep}
+                        handleReorderSteps={handleReorderSteps}
                         handleSaveProgram={handleSaveProgram}
                         handleLoadProgram={handleLoadProgram}
+                        validateWellId={validateWellId}
+                        setActiveTab={setActiveTab}
+                        setWellSelectionMode={setWellSelectionMode}
                     />
                 ) : activeTab === 'manual' ? (
                     <ManualTab
@@ -833,6 +819,8 @@ function App() {
                         setIsExecuting={setIsExecuting}
                         fetchCurrentPosition={fetchCurrentPosition}
                         getPipetteWells={getPipetteWells}
+                        wellSelectionMode={wellSelectionMode}
+                        setWellSelectionMode={setWellSelectionMode}
                     />
                 )}
                 <RightPanel
