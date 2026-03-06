@@ -11,10 +11,9 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
   const fmtTime = (s) => {
     const n = Number(s)
     if (!n || isNaN(n)) return '?'
-    if (n >= 86400 && n % 86400 === 0) return `${n / 86400}d`
-    if (n >= 3600 && n % 3600 === 0) return `${n / 3600}h`
-    if (n >= 60 && n % 60 === 0) return `${n / 60}m`
-    return `${n}s`
+    if (n >= 3600) { const v = n / 3600; return `${Number.isInteger(v) ? v : v.toFixed(1)} hr` }
+    if (n >= 60) { const v = n / 60; return `${Number.isInteger(v) ? v : v.toFixed(1)} min` }
+    return `${n} sec`
   }
 
   let title, details
@@ -49,9 +48,9 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
   return (
     <div
       draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+      onDrop={(e) => { e.preventDefault(); onDrop() }}
       className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-all duration-200 cursor-grab active:cursor-grabbing"
     >
       {/* Drag handle */}
@@ -667,37 +666,51 @@ export default function ProgramTab({
       </div>
 
       {/* Wait time input overlay */}
-      {waitInput === 'wait' && (
-        <div className="flex items-center gap-2 mb-2 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
-          <span className="text-sm font-semibold text-[var(--text-primary)]">Wait seconds:</span>
-          <input
-            type="number"
-            min="1"
-            autoFocus
-            defaultValue={editingStep?.waitTime || 5}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAddWait(Number(e.target.value) || 5)
-              if (e.key === 'Escape') { setWaitInput(null); setEditingStep(null) }
-            }}
-            className={`${inputClass} w-24`}
-          />
-          <button
-            onClick={(e) => {
-              const input = e.target.parentElement.querySelector('input')
-              handleAddWait(Number(input.value) || 5)
-            }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#f59e0b] text-white hover:bg-[#d97706] transition-colors"
-          >
-            {editingStep ? 'Update' : 'Add'}
-          </button>
-          <button
-            onClick={() => { setWaitInput(null); setEditingStep(null) }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      {waitInput === 'wait' && (() => {
+        const existing = editingStep?.waitTime || 0
+        const defUnit = existing >= 3600 && existing % 3600 === 0 ? 'hours' : existing >= 60 && existing % 60 === 0 ? 'minutes' : 'seconds'
+        const defVal = defUnit === 'hours' ? existing / 3600 : defUnit === 'minutes' ? existing / 60 : (existing || 5)
+        const multipliers = { seconds: 1, minutes: 60, hours: 3600 }
+        const submitWait = (container) => {
+          const val = Number(container.querySelector('#wait-value').value) || 1
+          const unit = container.querySelector('#wait-unit').value
+          handleAddWait(Math.round(val * multipliers[unit]))
+        }
+        return (
+          <div className="flex items-center gap-2 mb-2 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+            <span className="text-sm font-semibold text-[var(--text-primary)]">Wait:</span>
+            <input
+              type="number"
+              min="1"
+              id="wait-value"
+              autoFocus
+              defaultValue={defVal}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitWait(e.target.closest('div'))
+                if (e.key === 'Escape') { setWaitInput(null); setEditingStep(null) }
+              }}
+              className={`${inputClass} w-20`}
+            />
+            <select id="wait-unit" defaultValue={defUnit} className={`${selectClass} w-28`}>
+              <option value="seconds">Seconds</option>
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+            </select>
+            <button
+              onClick={(e) => submitWait(e.target.closest('div'))}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#f59e0b] text-white hover:bg-[#d97706] transition-colors"
+            >
+              {editingStep ? 'Update' : 'Add'}
+            </button>
+            <button
+              onClick={() => { setWaitInput(null); setEditingStep(null) }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Add Step buttons */}
       <div className="flex gap-2">
