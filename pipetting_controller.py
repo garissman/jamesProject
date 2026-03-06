@@ -244,8 +244,13 @@ class CoordinateMapper:
         if stored is not None:
             return WellCoordinates(x=stored["x"], y=stored["y"], z=0.0)
 
-        # Washing stations — computed dynamically from config
+        # WS1/WS2 are shared across layouts — check all layouts if not in current
         if well_id in ('WS1', 'WS2'):
+            for lname, lcoords in CoordinateMapper.LAYOUT_COORDINATES.items():
+                ws_stored = lcoords.get(well_id)
+                if ws_stored is not None:
+                    return WellCoordinates(x=ws_stored["x"], y=ws_stored["y"], z=0.0)
+            # Fall back to computed coordinates from config
             return CoordinateMapper._ws_coordinates(well_id)
 
         # Check for MicroChip layout special wells

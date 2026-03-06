@@ -9,9 +9,9 @@ const REFERENCE_WELLS = {
         'A11', 'B11', 'C11', 'D11', 'E11', 'F11', 'G11', 'H11', 'MC4',
         'A14', 'B14', 'C14', 'D14', 'E14', 'F14', 'G14', 'H14', 'MC5',
     ],
-    vial: ['WS1', 'WS2', 'VA2', 'VB2', 'VC2', 'VD2', 'VE2'],
-    wellplate: [
+    vial: [
         'WS1', 'WS2',
+        'VA2', 'VB2', 'VC2', 'VD2', 'VE2',
         'SA2', 'SB2', 'SC2', 'SD2', 'SE2', 'SF2', 'SG2', 'SH2', 'SI2', 'SJ2', 'SK2', 'SL2',
         'SA5', 'SB5', 'SC5', 'SD5', 'SE5', 'SF5', 'SG5', 'SH5', 'SI5', 'SJ5', 'SK5', 'SL5',
     ],
@@ -318,7 +318,6 @@ export default function SettingsTab({
                                 >
                                     <option value="microchip">MicroChip</option>
                                     <option value="vial">Vial</option>
-                                    <option value="wellplate">Wellplate</option>
                                 </select>
                             </div>
 

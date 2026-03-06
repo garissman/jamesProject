@@ -1194,9 +1194,8 @@ async def capture_coordinate(request: CaptureCoordinateRequest):
 
     try:
         # Read current motor position in mm
-        positions = pipetting_controller.stepper_controller.get_positions()
-        x_mm = positions.get("x", 0.0)
-        y_mm = positions.get("y", 0.0)
+        x_mm = pipetting_controller.current_position.x
+        y_mm = pipetting_controller.current_position.y
 
         # Load current config, update the coordinate, and save
         cfg = settings.load()
