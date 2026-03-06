@@ -355,7 +355,7 @@ export default function PlateLayout({
             {/* Layout Grid */}
             {layoutType === 'microchip' ? (
                 /* MicroChip Layout */
-                <div className="layout-grid">
+                <div className="grid grid-cols-[repeat(21,34px)] grid-rows-[repeat(8,34px)_4px_repeat(2,34px)] gap-[3px] p-3 bg-[var(--bg-tertiary)] rounded-lg overflow-auto mt-2.5 max-[1100px]:grid-cols-[repeat(21,26px)] max-[1100px]:grid-rows-[repeat(8,26px)_4px_repeat(2,26px)] max-[800px]:grid-cols-[repeat(21,20px)] max-[800px]:grid-rows-[repeat(8,20px)_4px_repeat(2,20px)]">
                     {/* WS1 -- row 1, cols 1-6 */}
                     <div
                         className={`flex items-center justify-center rounded text-[0.65rem] font-semibold text-[var(--text-primary)] bg-[var(--well-bg)] border-2 border-[var(--border-color)] transition-all duration-200 relative cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-overlay)] ${
@@ -381,13 +381,13 @@ export default function PlateLayout({
                     {/* Disabled area -- rows 3-12, cols 1-6 */}
                     <div
                         className="bg-[var(--bg-tertiary)] opacity-20 pointer-events-none border border-dashed border-[var(--border-color)] cursor-default"
-                        style={{gridColumn: '1/7', gridRow: '3/13'}}
+                        style={{gridColumn: '1/7', gridRow: '3/12'}}
                     />
 
                     {/* Well grid -- rows 1-8, cols 7-21 */}
                     {currentPipetteCount === 3 ? (
                         /* Grouped mode: 5 groups × 8 rows, each group = 3 adjacent wells */
-                        <div className="mc-well-grid-grouped" style={{gridColumn: '7/22', gridRow: '1/9'}}>
+                        <div className="grid grid-cols-5 grid-rows-[repeat(8,1fr)] gap-[3px] overflow-hidden" style={{gridColumn: '7/22', gridRow: '1/9'}}>
                             {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].flatMap(row =>
                                 [0, 1, 2, 3, 4].map(groupIdx => {
                                     const cols = [groupIdx * 3 + 1, groupIdx * 3 + 2, groupIdx * 3 + 3]
@@ -450,7 +450,7 @@ export default function PlateLayout({
                         </div>
                     ) : (
                         /* Individual mode: 15 cols × 8 rows */
-                        <div className="mc-well-grid" style={{gridColumn: '7/22', gridRow: '1/9'}}>
+                        <div className="grid grid-cols-[repeat(15,1fr)] grid-rows-[repeat(8,1fr)] gap-[2px] overflow-hidden" style={{gridColumn: '7/22', gridRow: '1/9'}}>
                             {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].flatMap(row =>
                                 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(col => {
                                     const wellId = `${row}${col}`
@@ -514,7 +514,7 @@ export default function PlateLayout({
                                 } ${isQRinse ? '!border-2 !border-[#FF9800] !bg-[rgba(255,152,0,0.2)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
                                 } ${isQWash ? '!border-2 !border-[#9C27B0] !bg-[rgba(156,39,176,0.2)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                 }`}
-                                style={{gridColumn: `${colStart}/${colStart + 3}`, gridRow: '9/13'}}
+                                style={{gridColumn: `${colStart}/${colStart + 3}`, gridRow: '10/12'}}
                                 onClick={() => onWellClick(mcId)}
                             >
                                 {mcId}
