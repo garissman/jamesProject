@@ -69,7 +69,10 @@
       "Bash(ping:*)",
       "mcp__plugin_playwright_playwright__browser_network_requests",
       "mcp__plugin_playwright_playwright__browser_evaluate",
-      "mcp__plugin_playwright_playwright__browser_resize"
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "Bash(git pull:*)",
+      "Bash(git:*)",
+      "Bash(kill 6486:*)"
     ],
     "deny": [],
     "ask": []

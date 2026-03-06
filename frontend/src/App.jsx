@@ -175,8 +175,10 @@ function App() {
     // ── Handler functions ──
 
     const handleAddStep = (stepData) => {
+        const stepType = stepData.stepType || 'pipette'
         const newStep = {
             id: Date.now(),
+            stepType,
             cycles: Number(stepData.cycles) || 1,
             pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
             dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),
@@ -196,6 +198,7 @@ function App() {
     const handleUpdateStep = (stepId, stepData) => {
         setSteps(prev => prev.map(s => s.id === stepId ? {
             ...s,
+            stepType: stepData.stepType || s.stepType || 'pipette',
             cycles: Number(stepData.cycles) || 1,
             pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
             dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),

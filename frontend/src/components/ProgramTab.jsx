@@ -6,13 +6,7 @@ const selectClass = inputClass + ' cursor-pointer'
 // ─── StepCard ────────────────────────────────────────────────────────────────
 
 function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onDragOver, onDrop }) {
-  const pickup = step.pickupWell || '—'
-  const dropoff = step.dropoffWell || '—'
-  const rinse = step.rinseWell ? `Rinse: ${step.rinseWell}` : null
-  const wash = step.washWell ? `Wash: ${step.washWell}` : null
-  const volume = step.sampleVolume ? `${step.sampleVolume} mL` : null
-  const wait = step.waitTime ? `Wait: ${step.waitTime}s` : null
-  const cycles = step.cycles > 1 ? `${step.cycles} cycles` : null
+  const stepType = step.stepType || 'pipette'
 
   const fmtTime = (s) => {
     const n = Number(s)
@@ -23,14 +17,34 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
     return `${n}s`
   }
 
-  let repInfo = null
-  if (step.repetitionMode === 'quantity' && step.repetitionQuantity > 1) {
-    repInfo = `x${step.repetitionQuantity}`
-  } else if (step.repetitionMode === 'timeFrequency' && step.repetitionInterval) {
-    repInfo = `every ${fmtTime(step.repetitionInterval)} / ${fmtTime(step.repetitionDuration)}`
+  let title, details
+  if (stepType === 'home') {
+    title = 'Go Home'
+    details = step.waitTime ? `Wait: ${step.waitTime}s after` : null
+  } else if (stepType === 'wait') {
+    title = `Wait ${step.waitTime ? fmtTime(step.waitTime) : '0s'}`
+    details = null
+  } else {
+    const pickup = step.pickupWell || '—'
+    const dropoff = step.dropoffWell || '—'
+    title = `${pickup} \u2192 ${dropoff}`
+    const rinse = step.rinseWell ? `Rinse: ${step.rinseWell}` : null
+    const wash = step.washWell ? `Wash: ${step.washWell}` : null
+    const volume = step.sampleVolume ? `${step.sampleVolume} mL` : null
+    const wait = step.waitTime ? `Wait: ${step.waitTime}s` : null
+    const cycles = step.cycles > 1 ? `${step.cycles} cycles` : null
+
+    let repInfo = null
+    if (step.repetitionMode === 'quantity' && step.repetitionQuantity > 1) {
+      repInfo = `x${step.repetitionQuantity}`
+    } else if (step.repetitionMode === 'timeFrequency' && step.repetitionInterval) {
+      repInfo = `every ${fmtTime(step.repetitionInterval)} / ${fmtTime(step.repetitionDuration)}`
+    }
+
+    details = [volume, rinse, wash, wait, cycles, repInfo].filter(Boolean).join(' | ')
   }
 
-  const details = [volume, rinse, wash, wait, cycles, repInfo].filter(Boolean).join(' | ')
+  const badgeColor = stepType === 'home' ? '#059669' : stepType === 'wait' ? '#f59e0b' : '#3b82f6'
 
   return (
     <div
@@ -58,7 +72,7 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
 
       {/* Badges */}
       <div className="flex flex-col items-center gap-1 min-w-[36px]">
-        <span className="text-xs font-bold text-white bg-[#3b82f6] rounded-full w-6 h-6 flex items-center justify-center">
+        <span className="text-xs font-bold text-white rounded-full w-6 h-6 flex items-center justify-center" style={{ backgroundColor: badgeColor }}>
           {index + 1}
         </span>
       </div>
@@ -66,7 +80,7 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
-          {pickup} &rarr; {dropoff}
+          {title}
         </div>
         {details && (
           <div className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
@@ -512,6 +526,8 @@ export default function ProgramTab({
   const [editingStep, setEditingStep] = useState(null)
   const dragIndexRef = useRef(null)
 
+  const [waitInput, setWaitInput] = useState(null) // null = hidden, 'home' or 'wait' = which type
+
   const openAddWizard = () => {
     setEditingStep(null)
     setWizardOpen(true)
@@ -519,6 +535,15 @@ export default function ProgramTab({
 
   const openEditWizard = (step) => {
     setEditingStep(step)
+    if (step.stepType === 'wait') {
+      setWaitInput('wait')
+      return
+    }
+    if (step.stepType === 'home') {
+      // Home steps have no editable fields, skip
+      setEditingStep(null)
+      return
+    }
     setWizardOpen(true)
   }
 
@@ -530,6 +555,20 @@ export default function ProgramTab({
     }
     setWizardOpen(false)
     setEditingStep(null)
+  }
+
+  const handleAddHome = () => {
+    handleAddStep({ stepType: 'home', pickupWell: '', dropoffWell: '', sampleVolume: 0, waitTime: 0 })
+  }
+
+  const handleAddWait = (seconds) => {
+    if (editingStep) {
+      handleUpdateStep(editingStep.id, { ...editingStep, waitTime: seconds })
+      setEditingStep(null)
+    } else {
+      handleAddStep({ stepType: 'wait', pickupWell: '', dropoffWell: '', sampleVolume: 0, waitTime: seconds })
+    }
+    setWaitInput(null)
   }
 
   const handleWizardCancel = () => {
@@ -627,13 +666,60 @@ export default function ProgramTab({
         )}
       </div>
 
-      {/* Add Step button */}
-      <button
-        onClick={openAddWizard}
-        className="w-full py-3.5 rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-semibold text-sm hover:border-[#3b82f6] hover:text-[#3b82f6] hover:bg-[#3b82f6]/5 transition-all duration-200"
-      >
-        + Add Step
-      </button>
+      {/* Wait time input overlay */}
+      {waitInput === 'wait' && (
+        <div className="flex items-center gap-2 mb-2 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Wait seconds:</span>
+          <input
+            type="number"
+            min="1"
+            autoFocus
+            defaultValue={editingStep?.waitTime || 5}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddWait(Number(e.target.value) || 5)
+              if (e.key === 'Escape') { setWaitInput(null); setEditingStep(null) }
+            }}
+            className={`${inputClass} w-24`}
+          />
+          <button
+            onClick={(e) => {
+              const input = e.target.parentElement.querySelector('input')
+              handleAddWait(Number(input.value) || 5)
+            }}
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#f59e0b] text-white hover:bg-[#d97706] transition-colors"
+          >
+            {editingStep ? 'Update' : 'Add'}
+          </button>
+          <button
+            onClick={() => { setWaitInput(null); setEditingStep(null) }}
+            className="px-4 py-2 text-sm font-semibold rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Add Step buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={openAddWizard}
+          className="flex-1 py-3.5 rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-semibold text-sm hover:border-[#3b82f6] hover:text-[#3b82f6] hover:bg-[#3b82f6]/5 transition-all duration-200"
+        >
+          + Add Step
+        </button>
+        <button
+          onClick={handleAddHome}
+          className="py-3.5 px-5 rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-semibold text-sm hover:border-[#059669] hover:text-[#059669] hover:bg-[#059669]/5 transition-all duration-200"
+        >
+          + Home
+        </button>
+        <button
+          onClick={() => { setEditingStep(null); setWaitInput('wait') }}
+          className="py-3.5 px-5 rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-semibold text-sm hover:border-[#f59e0b] hover:text-[#f59e0b] hover:bg-[#f59e0b]/5 transition-all duration-200"
+        >
+          + Wait
+        </button>
+      </div>
     </div>
   )
 }

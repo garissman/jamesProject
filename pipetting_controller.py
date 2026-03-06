@@ -52,6 +52,7 @@ class PipettingStep:
     repetition_interval: Optional[int] = None  # seconds
     repetition_duration: Optional[int] = None  # seconds
     pipette_count: int = 3  # 1 or 3 pipettes (default: 3)
+    step_type: str = 'pipette'  # 'pipette', 'home', or 'wait'
 
 
 class CoordinateMapper:
@@ -858,6 +859,23 @@ class PipettingController:
                 return
 
             self.log(f"--- Step {step_num}/{len(steps)} ---")
+
+            # Handle special step types
+            if step.step_type == 'home':
+                self.log("Action: Go Home")
+                self.home()
+                if step.wait_time > 0:
+                    self.log(f"  Waiting {step.wait_time} seconds...")
+                    time.sleep(step.wait_time)
+                continue
+
+            if step.step_type == 'wait':
+                wait_secs = step.wait_time if step.wait_time > 0 else 0
+                self.log(f"Action: Wait {wait_secs} seconds")
+                if wait_secs > 0:
+                    time.sleep(wait_secs)
+                continue
+
             self.log(f"Pipette Configuration: {step.pipette_count} pipette(s)")
 
             # Update current pipette configuration

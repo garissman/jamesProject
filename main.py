@@ -75,11 +75,12 @@ FRONTEND_DEV_DIR = Path(__file__).parent / "frontend"
 # Pydantic models for pipetting operations
 class PipettingStepRequest(BaseModel):
     """Single pipetting step from frontend"""
-    pickupWell: str = Field(..., description="Source well (e.g., 'A12')")
-    dropoffWell: str = Field(..., description="Destination well (e.g., 'A15')")
+    stepType: str = Field('pipette', description="Step type: 'pipette', 'home', or 'wait'")
+    pickupWell: Optional[str] = Field(None, description="Source well (e.g., 'A12')")
+    dropoffWell: Optional[str] = Field(None, description="Destination well (e.g., 'A15')")
     rinseWell: Optional[str] = Field(None, description="Rinse well (optional)")
     washWell: Optional[str] = Field(None, description="Wash well (optional)")
-    sampleVolume: float = Field(..., gt=0, description="Volume in mL")
+    sampleVolume: Optional[float] = Field(None, gt=0, description="Volume in mL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
     repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
@@ -173,11 +174,12 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
         pipetting_steps = []
         for step in sequence.steps:
             pipetting_steps.append(PipettingStep(
-                pickup_well=step.pickupWell,
-                dropoff_well=step.dropoffWell,
+                step_type=step.stepType,
+                pickup_well=step.pickupWell or '',
+                dropoff_well=step.dropoffWell or '',
                 rinse_well=step.rinseWell,
                 wash_well=step.washWell,
-                volume_ml=step.sampleVolume,
+                volume_ml=step.sampleVolume or 0,
                 wait_time=step.waitTime,
                 cycles=step.cycles,
                 repetition_mode=step.repetitionMode,
