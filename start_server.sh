@@ -3,4 +3,4 @@
 git pull
 /home/james/.nvm/versions/node/v24.13.1/bin/npm --prefix /home/james/jamesProject/frontend install
 /home/james/.nvm/versions/node/v24.13.1/bin/npm --prefix /home/james/jamesProject/frontend run build
-/home/james/jamesProject/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+/home/james/jamesProject/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
