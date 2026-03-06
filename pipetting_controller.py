@@ -364,7 +364,8 @@ class PipettingController:
     INVERT_PIPETTE = settings.get('INVERT_PIPETTE')
 
     # Axis software travel limits (steps from home/min to max)
-    Y_MAX_STEPS = 67400
+    X_MAX_STEPS = 104000
+    Y_MAX_STEPS = 674000
     Z_MAX_STEPS = 14000
 
     # Position persistence
@@ -440,6 +441,38 @@ class PipettingController:
             return result
         else:
             return self.stepper_controller.move_motor(motor_id, steps, direction, converted_speed, check_limits=check_limits)
+
+    def _move_x_safe(self, steps: int, direction: Direction, speed: float) -> int:
+        """Move X-axis motor with software step limit enforcement.
+
+        Clamps the requested steps so the motor position stays within
+        [0, X_MAX_STEPS] (or [-X_MAX_STEPS, 0] when INVERT_X is True).
+        Returns the number of steps actually commanded.
+        """
+        if self.controller_type == 'arduino_uno_q':
+            if steps > 0:
+                self._move_motor(1, steps, direction, speed, check_limits=False)
+            return steps
+
+        motor = self.stepper_controller.get_motor(1)
+        pos = motor.current_position
+        travel = abs(pos)
+
+        # When inverted, CW/CCW swap meaning relative to home.
+        # XOR determines if we're moving away from home or toward it.
+        moving_away = (direction == Direction.CLOCKWISE) != self.INVERT_X
+
+        if moving_away:
+            max_allowed = max(0, self.X_MAX_STEPS - travel)
+        else:
+            max_allowed = max(0, travel)
+
+        clamped = min(steps, max_allowed)
+        if clamped < steps:
+            self.log(f"X-axis: clamped {steps} -> {clamped} steps (limit: {self.X_MAX_STEPS})")
+        if clamped > 0:
+            self._move_motor(1, clamped, direction, speed, check_limits=False)
+        return clamped
 
     def _move_z_safe(self, steps: int, direction: Direction, speed: float) -> int:
         """Move Z-axis motor with software step limit enforcement.
@@ -614,8 +647,7 @@ class PipettingController:
                 threads.append(t_y)
             if x_delta != 0:
                 x_dir = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
-                t_x = threading.Thread(target=self._move_motor, args=(1, abs(x_delta), x_dir, self.TRAVEL_SPEED),
-                                       kwargs={'check_limits': False})
+                t_x = threading.Thread(target=self._move_x_safe, args=(abs(x_delta), x_dir, self.TRAVEL_SPEED))
                 threads.append(t_x)
             for t in threads:
                 t.start()
@@ -1077,11 +1109,13 @@ class PipettingController:
                 self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
                 self.log(f"Z-axis at {z_motor.current_position} steps")
 
-        # Home X axis to MIN limit switch (CW goes toward MIN on X)
-        self._home_axis_to_min(1, "X", Direction.CLOCKWISE)
-
-        # Home Y axis to MIN limit switch (CCW goes toward MIN on Y)
-        self._home_axis_to_min(2, "Y", Direction.COUNTERCLOCKWISE)
+        # Home X and Y axes simultaneously to MIN limit switches
+        t_x = threading.Thread(target=self._home_axis_to_min, args=(1, "X", Direction.CLOCKWISE))
+        t_y = threading.Thread(target=self._home_axis_to_min, args=(2, "Y", Direction.COUNTERCLOCKWISE))
+        t_x.start()
+        t_y.start()
+        t_x.join()
+        t_y.join()
 
         # Position is now at origin (X/Y at MIN limits, Z at 75mm)
         self.current_position = WellCoordinates(x=0.0, y=0.0, z=z_target_mm)
@@ -1187,7 +1221,9 @@ class PipettingController:
                     return self.get_axis_positions()
 
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")
-        if axis == 'y':
+        if axis == 'x':
+            self._move_x_safe(steps, motor_direction, self.TRAVEL_SPEED)
+        elif axis == 'y':
             self._move_y_safe(steps, motor_direction, self.TRAVEL_SPEED)
         else:
             self._move_motor(motor_id, steps, motor_direction, self.TRAVEL_SPEED, check_limits=False)
