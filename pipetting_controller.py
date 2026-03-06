@@ -44,6 +44,7 @@ class PipettingStep:
     rinse_well: Optional[str]
     volume_ml: float
     wait_time: int
+    wash_well: Optional[str] = None
     cycles: int = 1
     repetition_mode: str = 'quantity'  # 'quantity' or 'timeFrequency'
     repetition_quantity: int = 1
@@ -730,7 +731,8 @@ class PipettingController:
         self.save_position()
 
     def execute_transfer(self, pickup_well: str, dropoff_well: str,
-                         volume_ml: float, rinse_well: Optional[str] = None):
+                         volume_ml: float, rinse_well: Optional[str] = None,
+                         wash_well: Optional[str] = None):
         """
         Execute a single liquid transfer
 
@@ -739,6 +741,7 @@ class PipettingController:
             dropoff_well: Destination well ID
             volume_ml: Volume to transfer in mL
             rinse_well: Optional well for rinsing after transfer
+            wash_well: Optional well for washing after rinse
         """
         Z_UP = 70.0
         self.log(f"Transfer: {pickup_well} -> {dropoff_well} ({volume_ml} mL)")
@@ -788,6 +791,23 @@ class PipettingController:
             # 12. Z up
             self._z_to(Z_UP)
 
+        # 13-16. Wash if specified
+        if wash_well:
+            # 13. Move to wash well (X/Y only)
+            self.move_to_well(wash_well)
+
+            # 14. Z down
+            self._z_to(0.0)
+
+            # 15. Wash cycles
+            for i in range(self.RINSE_CYCLES):
+                self.log(f"  Wash cycle {i + 1}/{self.RINSE_CYCLES}")
+                self.aspirate(volume_ml)
+                self.dispense(volume_ml)
+
+            # 16. Z up
+            self._z_to(Z_UP)
+
     def execute_step_with_cycles(self, step: PipettingStep):
         """
         Execute a single step with its cycles
@@ -808,7 +828,8 @@ class PipettingController:
                 step.pickup_well,
                 step.dropoff_well,
                 step.volume_ml,
-                step.rinse_well
+                step.rinse_well,
+                step.wash_well
             )
 
             # Wait between cycles

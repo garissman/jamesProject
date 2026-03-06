@@ -78,6 +78,7 @@ class PipettingStepRequest(BaseModel):
     pickupWell: str = Field(..., description="Source well (e.g., 'A12')")
     dropoffWell: str = Field(..., description="Destination well (e.g., 'A15')")
     rinseWell: Optional[str] = Field(None, description="Rinse well (optional)")
+    washWell: Optional[str] = Field(None, description="Wash well (optional)")
     sampleVolume: float = Field(..., gt=0, description="Volume in mL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
@@ -175,6 +176,7 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
                 pickup_well=step.pickupWell,
                 dropoff_well=step.dropoffWell,
                 rinse_well=step.rinseWell,
+                wash_well=step.washWell,
                 volume_ml=step.sampleVolume,
                 wait_time=step.waitTime,
                 cycles=step.cycles,

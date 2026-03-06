@@ -27,28 +27,28 @@ export default function PlateLayout({
                                         setWellSelectionMode,
                                     }) {
     const [quickOpMode, setQuickOpMode] = useState(false)
-    const [quickOpWells, setQuickOpWells] = useState({pickup: null, dropoff: null, rinse: null})
+    const [quickOpWells, setQuickOpWells] = useState({pickup: null, dropoff: null, rinse: 'WS2', wash: 'WS1'})
     const [quickOpStep, setQuickOpStep] = useState(0)
-    const [quickOpVolume, setQuickOpVolume] = useState('1.0')
-    const [pipetteVolume, setPipetteVolume] = useState('1.0')
+    const [quickOpVolume, setQuickOpVolume] = useState('40')
+    const [pipetteVolume, setPipetteVolume] = useState('40')
 
     const handleEnableQuickOp = () => {
         setQuickOpMode(true)
         setQuickOpStep(0)
-        setQuickOpWells({pickup: null, dropoff: null, rinse: null})
+        setQuickOpWells({pickup: null, dropoff: null, rinse: 'WS2', wash: 'WS1'})
     }
 
     const handleCancelQuickOp = () => {
         setQuickOpMode(false)
         setQuickOpStep(0)
-        setQuickOpWells({pickup: null, dropoff: null, rinse: null})
+        setQuickOpWells({pickup: null, dropoff: null, rinse: 'WS2', wash: 'WS1'})
     }
 
     const handleExecuteQuickOp = async () => {
-        const {pickup, dropoff, rinse} = quickOpWells
+        const {pickup, dropoff, rinse, wash} = quickOpWells
 
-        if (!pickup || !dropoff || !rinse) {
-            console.error('Please select all three wells (pickup, dropoff, and rinse)')
+        if (!pickup || !dropoff || !rinse || !wash) {
+            console.error('Please select all four wells (pickup, dropoff, rinse, and wash)')
             return
         }
 
@@ -65,6 +65,7 @@ export default function PlateLayout({
             pickupWell: pickup,
             dropoffWell: dropoff,
             rinseWell: rinse,
+            washWell: wash,
             waitTime: 0,
             sampleVolume: volume,
             repetitionMode: 'quantity',
@@ -105,6 +106,9 @@ export default function PlateLayout({
                 setQuickOpStep(2)
             } else if (quickOpStep === 2) {
                 setQuickOpWells(prev => ({...prev, rinse: wellId}))
+                setQuickOpStep(3)
+            } else if (quickOpStep === 3) {
+                setQuickOpWells(prev => ({...prev, wash: wellId}))
             }
         } else {
             handleWellClick(wellId)
@@ -118,6 +122,7 @@ export default function PlateLayout({
         if (quickOpWells.pickup === wellId) classes.push('quick-op-pickup')
         if (quickOpWells.dropoff === wellId) classes.push('quick-op-dropoff')
         if (quickOpWells.rinse === wellId) classes.push('quick-op-rinse')
+        if (quickOpWells.wash === wellId) classes.push('quick-op-wash')
         return classes.join(' ')
     }
 
@@ -132,6 +137,8 @@ export default function PlateLayout({
                     className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                 {quickOpWells.rinse === wellId && <span
                     className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                {quickOpWells.wash === wellId && <span
+                    className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
             </>
         )
     }
@@ -215,18 +222,6 @@ export default function PlateLayout({
             <div className="flex flex-col gap-2 mb-2.5 p-3 bg-[var(--bg-secondary)] rounded-[10px]">
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <label
-                            className="text-[0.85rem] font-medium text-[var(--text-secondary)] whitespace-nowrap shrink-0">Pipette
-                            Configuration:</label>
-                        <select
-                            value={currentPipetteCount}
-                            onChange={(e) => handleSetPipetteCount(Number(e.target.value))}
-                            className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)] cursor-pointer"
-                            disabled={isExecuting}
-                        >
-                            <option value={1}>1 Pipette</option>
-                            <option value={3}>3 Pipettes</option>
-                        </select>
                     </div>
                     <button
                         className={`py-2 px-4 text-[0.9rem] font-semibold border-2 rounded-lg cursor-pointer transition-all duration-300 whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -324,6 +319,13 @@ export default function PlateLayout({
                                 }`}>
                                 3. Click rinse well {quickOpWells.rinse && `(${quickOpWells.rinse})`}
                             </div>
+                            <div
+                                className={`p-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded text-[13px] text-[var(--text-secondary)] transition-all duration-300 ${
+                                    quickOpStep === 3 ? 'bg-[rgba(33,150,243,0.1)] border-[#2196F3] text-[#2196F3] font-semibold animate-quick-op-pulse' :
+                                        quickOpWells.wash ? 'bg-[rgba(76,175,80,0.1)] border-[#4CAF50] text-[#4CAF50]' : ''
+                                }`}>
+                                4. Click wash well {quickOpWells.wash && `(${quickOpWells.wash})`}
+                            </div>
                         </div>
                         <div className="flex items-center gap-2.5">
                             <label className="text-[13px] font-semibold text-[var(--text-primary)] min-w-[80px]">Volume
@@ -342,7 +344,7 @@ export default function PlateLayout({
                         <button
                             className="p-3 bg-gradient-to-br from-[#2196F3] to-[#1976D2] text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-300 hover:enabled:-translate-y-0.5 hover:enabled:shadow-[0_4px_12px_rgba(33,150,243,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={handleExecuteQuickOp}
-                            disabled={isExecuting || !quickOpWells.pickup || !quickOpWells.dropoff || !quickOpWells.rinse}
+                            disabled={isExecuting || !quickOpWells.pickup || !quickOpWells.dropoff || !quickOpWells.rinse || !quickOpWells.wash}
                         >
                             {isExecuting ? 'Executing...' : 'Execute Operation'}
                         </button>
@@ -399,6 +401,7 @@ export default function PlateLayout({
                                     const isQPickup = quickOpMode && wellIds.some(w => quickOpWells.pickup === w)
                                     const isQDropoff = quickOpMode && wellIds.some(w => quickOpWells.dropoff === w)
                                     const isQRinse = quickOpMode && wellIds.some(w => quickOpWells.rinse === w)
+                                    const isQWash = quickOpMode && wellIds.some(w => quickOpWells.wash === w)
                                     const isTarget = wellIds.some(w => targetWell === w)
 
                                     return (
@@ -416,6 +419,7 @@ export default function PlateLayout({
                                             } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                             } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                             } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                            } ${isQWash ? '!border-[#9C27B0] !bg-[rgba(156,39,176,0.15)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                             }`}
                                             onClick={() => onWellClick(middleWell)}
                                         >
@@ -437,6 +441,8 @@ export default function PlateLayout({
                                                 className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                             {isQRinse && <span
                                                 className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                            {isQWash && <span
+                                                className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                                         </div>
                                     )
                                 })
@@ -456,6 +462,7 @@ export default function PlateLayout({
                                     const isQPickup = quickOpMode && quickOpWells.pickup === wellId
                                     const isQDropoff = quickOpMode && quickOpWells.dropoff === wellId
                                     const isQRinse = quickOpMode && quickOpWells.rinse === wellId
+                                    const isQWash = quickOpMode && quickOpWells.wash === wellId
                                     return (
                                         <div
                                             key={wellId}
@@ -469,6 +476,7 @@ export default function PlateLayout({
                                             } ${isQPickup ? '!border-2 !border-[#2196F3] !bg-[rgba(33,150,243,0.2)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                             } ${isQDropoff ? '!border-2 !border-[#4CAF50] !bg-[rgba(76,175,80,0.2)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                             } ${isQRinse ? '!border-2 !border-[#FF9800] !bg-[rgba(255,152,0,0.2)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                            } ${isQWash ? '!border-2 !border-[#9C27B0] !bg-[rgba(156,39,176,0.2)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                             }`}
                                             onClick={() => onWellClick(wellId)}
                                         >
@@ -478,6 +486,8 @@ export default function PlateLayout({
                                                 className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                             {isQRinse && <span
                                                 className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                            {isQWash && <span
+                                                className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                                         </div>
                                     )
                                 })
@@ -492,6 +502,7 @@ export default function PlateLayout({
                         const isQPickup = quickOpMode && quickOpWells.pickup === mcId
                         const isQDropoff = quickOpMode && quickOpWells.dropoff === mcId
                         const isQRinse = quickOpMode && quickOpWells.rinse === mcId
+                        const isQWash = quickOpMode && quickOpWells.wash === mcId
                         return (
                             <div
                                 key={mcId}
@@ -501,6 +512,7 @@ export default function PlateLayout({
                                 } ${isQPickup ? '!border-2 !border-[#2196F3] !bg-[rgba(33,150,243,0.2)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                 } ${isQDropoff ? '!border-2 !border-[#4CAF50] !bg-[rgba(76,175,80,0.2)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                 } ${isQRinse ? '!border-2 !border-[#FF9800] !bg-[rgba(255,152,0,0.2)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                } ${isQWash ? '!border-2 !border-[#9C27B0] !bg-[rgba(156,39,176,0.2)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                 }`}
                                 style={{gridColumn: `${colStart}/${colStart + 3}`, gridRow: '9/13'}}
                                 onClick={() => onWellClick(mcId)}
@@ -512,6 +524,8 @@ export default function PlateLayout({
                                     className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                 {isQRinse && <span
                                     className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                {isQWash && <span
+                                    className="absolute top-0.5 right-0.5 bg-black/80 text-white text-[10px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                             </div>
                         )
                     })}
@@ -550,6 +564,7 @@ export default function PlateLayout({
                             const isQPickup = quickOpMode && vialIds.some(v => quickOpWells.pickup === v)
                             const isQDropoff = quickOpMode && vialIds.some(v => quickOpWells.dropoff === v)
                             const isQRinse = quickOpMode && vialIds.some(v => quickOpWells.rinse === v)
+                            const isQWash = quickOpMode && vialIds.some(v => quickOpWells.wash === v)
                             return (
                                 <div
                                     key={middleVial}
@@ -564,6 +579,7 @@ export default function PlateLayout({
                                     } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                     } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                     } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                    } ${isQWash ? '!border-[#9C27B0] !bg-[rgba(156,39,176,0.15)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                     }`}
                                     onClick={() => onWellClick(middleVial)}
                                 >
@@ -585,6 +601,8 @@ export default function PlateLayout({
                                         className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                     {isQRinse && <span
                                         className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                    {isQWash && <span
+                                        className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                                 </div>
                             )
                         })}
@@ -602,6 +620,7 @@ export default function PlateLayout({
                                 const isQPickup = quickOpMode && wellIds.some(w => quickOpWells.pickup === w)
                                 const isQDropoff = quickOpMode && wellIds.some(w => quickOpWells.dropoff === w)
                                 const isQRinse = quickOpMode && wellIds.some(w => quickOpWells.rinse === w)
+                                const isQWash = quickOpMode && wellIds.some(w => quickOpWells.wash === w)
                                 return (
                                     <div
                                         key={middleWell}
@@ -616,6 +635,7 @@ export default function PlateLayout({
                                         } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                         } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                         } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                        } ${isQWash ? '!border-[#9C27B0] !bg-[rgba(156,39,176,0.15)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                         }`}
                                         onClick={() => onWellClick(middleWell)}
                                     >
@@ -635,6 +655,8 @@ export default function PlateLayout({
                                             className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                         {isQRinse && <span
                                             className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                        {isQWash && <span
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                                     </div>
                                 )
                             })
@@ -653,6 +675,7 @@ export default function PlateLayout({
                                 const isQPickup = quickOpMode && wellIds.some(w => quickOpWells.pickup === w)
                                 const isQDropoff = quickOpMode && wellIds.some(w => quickOpWells.dropoff === w)
                                 const isQRinse = quickOpMode && wellIds.some(w => quickOpWells.rinse === w)
+                                const isQWash = quickOpMode && wellIds.some(w => quickOpWells.wash === w)
                                 return (
                                     <div
                                         key={middleWell}
@@ -667,6 +690,7 @@ export default function PlateLayout({
                                         } ${isQPickup ? '!border-[#2196F3] !bg-[rgba(33,150,243,0.15)] shadow-[0_0_10px_rgba(33,150,243,0.4)]' : ''
                                         } ${isQDropoff ? '!border-[#4CAF50] !bg-[rgba(76,175,80,0.15)] shadow-[0_0_10px_rgba(76,175,80,0.4)]' : ''
                                         } ${isQRinse ? '!border-[#FF9800] !bg-[rgba(255,152,0,0.15)] shadow-[0_0_10px_rgba(255,152,0,0.4)]' : ''
+                                        } ${isQWash ? '!border-[#9C27B0] !bg-[rgba(156,39,176,0.15)] shadow-[0_0_10px_rgba(156,39,176,0.4)]' : ''
                                         }`}
                                         onClick={() => onWellClick(middleWell)}
                                     >
@@ -686,6 +710,8 @@ export default function PlateLayout({
                                             className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">D</span>}
                                         {isQRinse && <span
                                             className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">R</span>}
+                                        {isQWash && <span
+                                            className="absolute top-0 right-0.5 bg-black/80 text-white text-[9px] font-bold py-0.5 px-1 rounded-sm leading-none">W</span>}
                                     </div>
                                 )
                             })

@@ -190,13 +190,14 @@ function App() {
             pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
             dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),
             rinseWell: (stepData.rinseWell || '').trim().toUpperCase(),
+            washWell: (stepData.washWell || '').trim().toUpperCase(),
             waitTime: stepData.waitTime || '',
             sampleVolume: stepData.sampleVolume || '',
             repetitionMode: stepData.repetitionMode || 'quantity',
             repetitionQuantity: stepData.repetitionMode === 'quantity' ? Number(stepData.repetitionQuantity) || 1 : 1,
             repetitionInterval: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionInterval) || null : null,
             repetitionDuration: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionDuration) || null : null,
-            pipetteCount: Number(stepData.pipetteCount) || 3,
+            pipetteCount: 3,
         }
         setSteps(prev => [...prev, newStep])
     }
@@ -208,13 +209,14 @@ function App() {
             pickupWell: (stepData.pickupWell || '').trim().toUpperCase(),
             dropoffWell: (stepData.dropoffWell || '').trim().toUpperCase(),
             rinseWell: (stepData.rinseWell || '').trim().toUpperCase(),
+            washWell: (stepData.washWell || '').trim().toUpperCase(),
             waitTime: stepData.waitTime || '',
             sampleVolume: stepData.sampleVolume || '',
             repetitionMode: stepData.repetitionMode || 'quantity',
             repetitionQuantity: stepData.repetitionMode === 'quantity' ? Number(stepData.repetitionQuantity) || 1 : 1,
             repetitionInterval: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionInterval) || null : null,
             repetitionDuration: stepData.repetitionMode === 'timeFrequency' ? Number(stepData.repetitionDuration) || null : null,
-            pipetteCount: Number(stepData.pipetteCount) || 3,
+            pipetteCount: 3,
         } : s))
     }
 

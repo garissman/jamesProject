@@ -9,18 +9,28 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
   const pickup = step.pickupWell || '—'
   const dropoff = step.dropoffWell || '—'
   const rinse = step.rinseWell ? `Rinse: ${step.rinseWell}` : null
+  const wash = step.washWell ? `Wash: ${step.washWell}` : null
   const volume = step.sampleVolume ? `${step.sampleVolume} mL` : null
   const wait = step.waitTime ? `Wait: ${step.waitTime}s` : null
   const cycles = step.cycles > 1 ? `${step.cycles} cycles` : null
+
+  const fmtTime = (s) => {
+    const n = Number(s)
+    if (!n || isNaN(n)) return '?'
+    if (n >= 86400 && n % 86400 === 0) return `${n / 86400}d`
+    if (n >= 3600 && n % 3600 === 0) return `${n / 3600}h`
+    if (n >= 60 && n % 60 === 0) return `${n / 60}m`
+    return `${n}s`
+  }
 
   let repInfo = null
   if (step.repetitionMode === 'quantity' && step.repetitionQuantity > 1) {
     repInfo = `x${step.repetitionQuantity}`
   } else if (step.repetitionMode === 'timeFrequency' && step.repetitionInterval) {
-    repInfo = `every ${step.repetitionInterval}s / ${step.repetitionDuration || '?'}s`
+    repInfo = `every ${fmtTime(step.repetitionInterval)} / ${fmtTime(step.repetitionDuration)}`
   }
 
-  const details = [volume, rinse, wait, cycles, repInfo].filter(Boolean).join(' | ')
+  const details = [volume, rinse, wash, wait, cycles, repInfo].filter(Boolean).join(' | ')
 
   return (
     <div
@@ -50,9 +60,6 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
       <div className="flex flex-col items-center gap-1 min-w-[36px]">
         <span className="text-xs font-bold text-white bg-[#3b82f6] rounded-full w-6 h-6 flex items-center justify-center">
           {index + 1}
-        </span>
-        <span className="text-[10px] font-semibold text-[#059669] bg-[#059669]/15 rounded px-1">
-          {step.pipetteCount || 3}P
         </span>
       </div>
 
@@ -105,9 +112,10 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
   const [form, setForm] = useState({
     pickupWell: initial?.pickupWell || '',
     dropoffWell: initial?.dropoffWell || '',
-    rinseWell: initial?.rinseWell || '',
-    sampleVolume: initial?.sampleVolume || '',
-    pipetteCount: initial?.pipetteCount || 3,
+    rinseWell: initial?.rinseWell || 'WS2',
+    washWell: initial?.washWell || 'WS1',
+    sampleVolume: initial?.sampleVolume || '40',
+    pipetteCount: 3,
     cycles: initial?.cycles || 1,
     waitTime: initial?.waitTime || '',
     repetitionMode: initial?.repetitionMode || 'quantity',
@@ -115,7 +123,26 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
     repetitionInterval: initial?.repetitionInterval || '',
     repetitionDuration: initial?.repetitionDuration || '',
   })
+  const [intervalUnit, setIntervalUnit] = useState('seconds')
+  const [durationUnit, setDurationUnit] = useState('seconds')
   const [errors, setErrors] = useState({})
+
+  const unitMultipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 }
+
+  const toSeconds = (value, unit) => {
+    const num = parseFloat(value)
+    if (isNaN(num)) return ''
+    return Math.round(num * unitMultipliers[unit])
+  }
+
+  const formatSeconds = (totalSeconds) => {
+    const s = Number(totalSeconds)
+    if (!s || isNaN(s)) return ''
+    if (s >= 86400 && s % 86400 === 0) return `${s / 86400}d`
+    if (s >= 3600 && s % 3600 === 0) return `${s / 3600}h`
+    if (s >= 60 && s % 60 === 0) return `${s / 60}m`
+    return `${s}s`
+  }
 
   const wellPlaceholder = layoutType === 'microchip' ? 'e.g., A1, WS1, MC3' : 'e.g., SA1, VA1, WS2'
 
@@ -147,25 +174,32 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
     if (form.rinseWell.trim() && !validateWellId(form.rinseWell)) {
       newErrors.rinseWell = 'Invalid well ID'
     }
+    if (form.washWell.trim() && !validateWellId(form.washWell)) {
+      newErrors.washWell = 'Invalid well ID'
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const goNext = () => {
     if (stage === 1 && !validateStage1()) return
-    setStage(s => Math.min(s + 1, 3))
+    setStage(s => Math.min(s + 1, 2))
   }
 
   const goBack = () => setStage(s => Math.max(s - 1, 1))
 
   const handleSave = () => {
-    onSave(form)
+    const savedForm = { ...form }
+    if (form.repetitionMode === 'timeFrequency') {
+      savedForm.repetitionInterval = toSeconds(form.repetitionInterval, intervalUnit)
+      savedForm.repetitionDuration = toSeconds(form.repetitionDuration, durationUnit)
+    }
+    onSave(savedForm)
   }
 
   const stages = [
-    { num: 1, label: 'Wells' },
-    { num: 2, label: 'Volume & Pipette' },
-    { num: 3, label: 'Timing & Repetition' },
+    { num: 1, label: 'Wells & Volume' },
+    { num: 2, label: 'Timing & Repetition' },
   ]
 
   return (
@@ -273,54 +307,49 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
             </div>
             {errors.rinseWell && <span className="text-xs text-[#dc2626]">{errors.rinseWell}</span>}
           </div>
-        </div>
-      )}
 
-      {/* Stage 2: Volume & Pipette */}
-      {stage === 2 && (
-        <div className="flex flex-col gap-5 max-w-[500px] mx-auto">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Volume & Pipette</h3>
+          {/* Wash Well */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-[var(--text-primary)]">
+              Wash Well <span className="text-xs text-[var(--text-tertiary)] font-normal">(optional)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={wellPlaceholder}
+                value={form.washWell}
+                onChange={(e) => set('washWell', e.target.value)}
+                className={`${inputClass} flex-1 ${errors.washWell ? 'border-[#dc2626]' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => handleSelectFromPlate('washWell')}
+                className="px-3 py-2 text-sm font-medium rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
+              >
+                Select from plate
+              </button>
+            </div>
+            {errors.washWell && <span className="text-xs text-[#dc2626]">{errors.washWell}</span>}
+          </div>
 
+          {/* Volume */}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-[var(--text-primary)]">Sample Volume (mL)</label>
             <input
               type="number"
               min="0"
               step="0.001"
-              placeholder="e.g., 0.5"
+              placeholder="e.g., 40"
               value={form.sampleVolume}
               onChange={(e) => set('sampleVolume', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-[var(--text-primary)]">Pipette Configuration</label>
-            <select
-              value={form.pipetteCount}
-              onChange={(e) => set('pipetteCount', Number(e.target.value))}
-              className={selectClass}
-            >
-              <option value={1}>1 Pipette</option>
-              <option value={3}>3 Pipettes</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-[var(--text-primary)]">Cycles</label>
-            <input
-              type="number"
-              min="1"
-              value={form.cycles}
-              onChange={(e) => set('cycles', e.target.value)}
               className={inputClass}
             />
           </div>
         </div>
       )}
 
-      {/* Stage 3: Timing & Repetition */}
-      {stage === 3 && (
+      {/* Stage 2: Timing & Repetition */}
+      {stage === 2 && (
         <div className="flex flex-col gap-5 max-w-[500px] mx-auto">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Timing & Repetition</h3>
 
@@ -363,28 +392,62 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
           ) : (
             <>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[var(--text-primary)]">Interval (seconds)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="e.g., 30"
-                  value={form.repetitionInterval}
-                  onChange={(e) => set('repetitionInterval', e.target.value)}
-                  className={inputClass}
-                />
+                <label className="text-sm font-semibold text-[var(--text-primary)]">Interval</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g., 30"
+                    value={form.repetitionInterval}
+                    onChange={(e) => set('repetitionInterval', e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  />
+                  <select
+                    value={intervalUnit}
+                    onChange={(e) => setIntervalUnit(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="seconds">Seconds</option>
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                {form.repetitionInterval && intervalUnit !== 'seconds' && (
+                  <span className="text-xs text-[var(--text-tertiary)]">
+                    = {toSeconds(form.repetitionInterval, intervalUnit)} seconds
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[var(--text-primary)]">Total Duration (seconds)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="e.g., 300"
-                  value={form.repetitionDuration}
-                  onChange={(e) => set('repetitionDuration', e.target.value)}
-                  className={inputClass}
-                />
+                <label className="text-sm font-semibold text-[var(--text-primary)]">Total Duration</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g., 5"
+                    value={form.repetitionDuration}
+                    onChange={(e) => set('repetitionDuration', e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  />
+                  <select
+                    value={durationUnit}
+                    onChange={(e) => setDurationUnit(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="seconds">Seconds</option>
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                {form.repetitionDuration && durationUnit !== 'seconds' && (
+                  <span className="text-xs text-[var(--text-tertiary)]">
+                    = {toSeconds(form.repetitionDuration, durationUnit)} seconds
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -408,7 +471,7 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
               Back
             </button>
           )}
-          {stage < 3 ? (
+          {stage < 2 ? (
             <button
               onClick={goNext}
               className="px-6 py-2.5 text-sm font-semibold rounded-lg bg-[#3b82f6] text-white hover:bg-[#2563eb] transition-colors"
