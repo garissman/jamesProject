@@ -1469,6 +1469,11 @@ else:
         }
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    parser = argparse.ArgumentParser(description="AutoSampler Backend Server")
+    parser.add_argument("--port", type=int, default=8000, help="Port to run the server on (default: 80)")
+    args = parser.parse_args()
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
