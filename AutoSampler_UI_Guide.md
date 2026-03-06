@@ -22,13 +22,33 @@ The **Plate Layout** tab is the main operational view of the system. From here, 
 
 - **Collect and Dispense**: Enter a volume in mL (default: 40 mL) and use the **Collect** (aspirate) or **Dispense** buttons to operate the pipette. The progress bar shows the current pipette volume.
 
-- **Quick Operation Mode**: Click the green **Quick Operation Mode** button to perform a single pickup-dropoff-rinse-wash cycle by clicking wells directly on the plate. The system guides you through selecting: Pickup well, Dropoff well, then automatically rinses at WS2 and washes at WS1.
-
 - **Select wells**: Click any well on the plate grid to select it as a target. Washing stations (WS1, WS2) are shown on the left side. MicroChip slots (MC1-MC5) are shown at the bottom.
 
 - **Action buttons** (right panel): **Execute** runs the programmed steps, **Stop** halts execution, **Home** returns all axes to the home position, and **Delete all** clears all program steps.
 
 - **System Logs**: The right panel shows real-time system logs for monitoring operations.
+
+### Quick Operation Mode
+
+![Quick Operation Mode](screenshots/08_quick_operation.png)
+
+The **Quick Operation Mode** allows users to perform a single pipetting cycle (pickup, dropoff, rinse, wash) by clicking wells directly on the plate, without needing to create a full program. It is activated by clicking the green **Quick Operation Mode** button.
+
+Once activated, the panel expands into a guided 4-step workflow. The current active step pulses with a blue highlight to indicate which well the user should click next:
+
+1. **Click pickup well** -- Click any well on the plate to set it as the source. The selected well gets a **"P"** badge overlay on the plate. The step turns green with the well ID shown (e.g., "A2").
+
+2. **Click dropoff well** -- Click a well to set it as the destination. The selected well gets a **"D"** badge. In the screenshot, MC2 is selected as the dropoff.
+
+3. **Click rinse well** -- Defaults to **WS2** (pre-selected, shown with an **"R"** badge on the plate). The user can click a different well to override this default.
+
+4. **Click wash well** -- Defaults to **WS1** (pre-selected, shown with a **"W"** badge on the plate). The user can click a different well to override this default.
+
+Below the 4 steps, a **Volume (mL)** field allows adjusting the transfer volume (default: 40 mL).
+
+Once all four wells are selected, the **Execute Operation** button becomes enabled (blue). Clicking it immediately runs the full cycle: the system moves to the pickup well, aspirates the specified volume, moves to the dropoff well, dispenses, then rinses at WS2 and washes at WS1. After completion, the system returns home automatically.
+
+A **Cancel** button in the top-right corner of the panel exits Quick Operation Mode and returns to normal well selection.
 
 ---
 

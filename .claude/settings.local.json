@@ -75,7 +75,8 @@
       "Bash(kill 6486:*)",
       "mcp__playwright__browser_select_option",
       "mcp__playwright__browser_drag",
-      "mcp__playwright__browser_evaluate"
+      "mcp__playwright__browser_evaluate",
+      "Bash(pandoc:*)"
     ],
     "deny": [],
     "ask": []
