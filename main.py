@@ -1267,20 +1267,6 @@ async def get_coordinates(layout: str):
 
 class ConfigurationModel(BaseModel):
     """Configuration settings model"""
-    # Bed Offset
-    BED_OFFSET_X: float = Field(..., description="Bed X offset from home in mm")
-    BED_OFFSET_Y: float = Field(..., description="Bed Y offset from home in mm")
-
-    # Well Plate Physical Dimensions
-    WELL_SPACING: float = Field(..., gt=0, description="Spacing between well centers in mm")
-    WELL_DIAMETER: float = Field(..., gt=0, description="Diameter of each well in mm")
-    WELL_HEIGHT: float = Field(..., gt=0, description="Height of each well in mm")
-
-    # Vial Layout Physical Dimensions
-    VIAL_WELL_SPACING:  float = Field(..., gt=0, description="Vial/small well spacing in mm")
-    VIAL_WELL_DIAMETER: float = Field(..., gt=0, description="Vial/small well diameter in mm")
-    VIAL_WELL_HEIGHT:   float = Field(..., gt=0, description="Vial/small well height in mm")
-
     # Motor Configuration
     STEPS_PER_MM_X: int = Field(..., gt=0, description="X-axis steps per mm")
     STEPS_PER_MM_Y: int = Field(..., gt=0, description="Y-axis steps per mm")
@@ -1352,14 +1338,6 @@ async def update_configuration(config: ConfigurationModel):
 
         # Patch CoordinateMapper class-level attributes so they reflect new values
         # without requiring a full process restart (class attrs are set at import time)
-        CoordinateMapper.BED_OFFSET_X       = cfg['BED_OFFSET_X']
-        CoordinateMapper.BED_OFFSET_Y       = cfg['BED_OFFSET_Y']
-        CoordinateMapper.WELL_SPACING       = cfg['WELL_SPACING']
-        CoordinateMapper.WELL_DIAMETER      = cfg['WELL_DIAMETER']
-        CoordinateMapper.WELL_HEIGHT        = cfg['WELL_HEIGHT']
-        CoordinateMapper.SMALL_WELL_SPACING = cfg['VIAL_WELL_SPACING']
-        CoordinateMapper.VIAL_WELL_DIAMETER = cfg['VIAL_WELL_DIAMETER']
-        CoordinateMapper.VIAL_WELL_HEIGHT   = cfg['VIAL_WELL_HEIGHT']
         CoordinateMapper.STEPS_PER_MM_X     = cfg['STEPS_PER_MM_X']
         CoordinateMapper.STEPS_PER_MM_Y     = cfg['STEPS_PER_MM_Y']
         CoordinateMapper.STEPS_PER_MM_Z     = cfg['STEPS_PER_MM_Z']

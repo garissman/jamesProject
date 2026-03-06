@@ -12,8 +12,8 @@ const REFERENCE_WELLS = {
     vial: [
         'WS1', 'WS2',
         'VA2', 'VB2', 'VC2', 'VD2', 'VE2',
-        'SA2', 'SB2', 'SC2', 'SD2', 'SE2', 'SF2', 'SG2', 'SH2', 'SI2', 'SJ2', 'SK2', 'SL2',
-        'SA5', 'SB5', 'SC5', 'SD5', 'SE5', 'SF5', 'SG5', 'SH5', 'SI5', 'SJ5', 'SK5', 'SL5',
+        'A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2', 'I2', 'J2', 'K2', 'L2',
+        'A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5', 'I5', 'J5', 'K5', 'L5',
     ],
 }
 
@@ -123,7 +123,7 @@ export default function SettingsTab({
                     }`}
                     onClick={() => setSettingsSubTab('layout')}
                 >
-                    Layout Settings
+                    Coordinate Mapping
                 </button>
                 <button
                     className={`bg-transparent border-none border-b-[3px] -mb-[2px] py-2.5 px-7 text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 tracking-wide hover:text-[var(--text-primary)] hover:bg-[var(--nav-hover)] ${
@@ -150,150 +150,9 @@ export default function SettingsTab({
             <div className="flex flex-col gap-[30px]">
                 {settingsSubTab === 'layout' ? (
                     <>
+                        {/* Location Coordinate Mapping */}
                         <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
-                            <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Bed Offset</h3>
-                            <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Bed X Offset (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.BED_OFFSET_X}
-                                        onChange={(e) => handleConfigChange('BED_OFFSET_X', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Bed Y Offset (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.BED_OFFSET_Y}
-                                        onChange={(e) => handleConfigChange('BED_OFFSET_Y', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
-                            <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">MicroChip Layout Well Dimensions</h3>
-                            <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Well Spacing (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WELL_SPACING}
-                                        onChange={(e) => handleConfigChange('WELL_SPACING', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Well Diameter (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WELL_DIAMETER}
-                                        onChange={(e) => handleConfigChange('WELL_DIAMETER', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Well Height (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WELL_HEIGHT}
-                                        onChange={(e) => handleConfigChange('WELL_HEIGHT', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
-                            <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Washing Station Dimensions</h3>
-                            <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">X Position (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WS_POSITION_X}
-                                        onChange={(e) => handleConfigChange('WS_POSITION_X', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Y Position (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WS_POSITION_Y}
-                                        onChange={(e) => handleConfigChange('WS_POSITION_Y', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Height (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WS_HEIGHT}
-                                        onChange={(e) => handleConfigChange('WS_HEIGHT', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Width (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WS_WIDTH}
-                                        onChange={(e) => handleConfigChange('WS_WIDTH', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Gap Between WS1 & WS2 (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.WS_GAP}
-                                        onChange={(e) => handleConfigChange('WS_GAP', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
-                            <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Vial Layout Well Dimensions</h3>
-                            <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Vial Well Spacing (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.VIAL_WELL_SPACING}
-                                        onChange={(e) => handleConfigChange('VIAL_WELL_SPACING', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Vial Well Diameter (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.VIAL_WELL_DIAMETER}
-                                        onChange={(e) => handleConfigChange('VIAL_WELL_DIAMETER', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Vial Well Height (mm):</label>
-                                    <input
-                                        type="text"
-                                        value={config.VIAL_WELL_HEIGHT}
-                                        onChange={(e) => handleConfigChange('VIAL_WELL_HEIGHT', e.target.value)}
-                                        className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Well Coordinate Mapping */}
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 backdrop-blur-[10px]">
-                            <h3 className="m-0 mb-3 text-[var(--text-primary)] text-[1.1em] font-semibold">Well Coordinate Mapping</h3>
+                            <h3 className="m-0 mb-3 text-[var(--text-primary)] text-[1.1em] font-semibold">Location Coordinate Mapping</h3>
                             <p className="text-[var(--text-tertiary)] text-sm mb-4">
                                 Store explicit X,Y positions for reference wells. Use "Capture" to save the current motor position, or edit values manually.
                             </p>

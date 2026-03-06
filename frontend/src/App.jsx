@@ -51,11 +51,6 @@ function App() {
 
     // Configuration state
     const [config, setConfig] = useState({
-        BED_OFFSET_X: 70.0,
-        BED_OFFSET_Y: 15.0,
-        WELL_SPACING: 4.0,
-        WELL_DIAMETER: 8.0,
-        WELL_HEIGHT: 14.0,
         STEPS_PER_MM_X: 100,
         STEPS_PER_MM_Y: 100,
         STEPS_PER_MM_Z: 100,
@@ -67,9 +62,6 @@ function App() {
         RINSE_CYCLES: 3,
         TRAVEL_SPEED: 0.001,
         PIPETTE_SPEED: 0.002,
-        VIAL_WELL_SPACING: 45.0,
-        VIAL_WELL_DIAMETER: 8.0,
-        VIAL_WELL_HEIGHT: 14.0,
         INVERT_X: false,
         INVERT_Y: false,
         INVERT_Z: false,
@@ -138,8 +130,7 @@ function App() {
             },
             smallWellGrid: {
                 rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
-                columns: [1, 2, 3, 4, 5, 6],
-                prefix: 'S'
+                columns: [1, 2, 3, 4, 5, 6]
             }
         }
     }
@@ -157,7 +148,7 @@ function App() {
         const vialPattern = /^V[A-E][1-3]$/
         if (vialPattern.test(wellIdUpper)) return true
 
-        const smallWellPattern = /^S[A-L][1-6]$/
+        const smallWellPattern = /^[A-L][1-6]$/
         if (smallWellPattern.test(wellIdUpper)) return true
 
         const wellPattern = /^[A-H]([1-9]|1[0-5])$/
@@ -409,20 +400,6 @@ function App() {
             if (res.ok) {
                 const data = await res.json()
                 setLayoutType(mode)
-
-                // Auto-move to first mapped well if available
-                if (data.first_mapped_well) {
-                    try {
-                        await fetch('/api/pipetting/move-to-well', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({wellId: data.first_mapped_well})
-                        })
-                        fetchCurrentPosition()
-                    } catch (moveErr) {
-                        console.error('Auto-move failed:', moveErr.message)
-                    }
-                }
             } else {
                 const data = await res.json()
                 console.error(`Error: ${data.detail || 'Failed to set layout'}`)

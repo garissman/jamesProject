@@ -61,46 +61,14 @@ class CoordinateMapper:
     ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     COLUMNS = list(range(1, 16))  # 1-15 (extended for MicroChip layout)
 
-    # Physical dimensions - read from config.json at import time
-    WELL_SPACING = settings.get('WELL_SPACING')   # mm between wells
-    WELL_DIAMETER = settings.get('WELL_DIAMETER')  # mm
-    WELL_HEIGHT = settings.get('WELL_HEIGHT')      # mm
-
     # Motor configuration (steps per mm - adjust based on your stepper setup)
-    STEPS_PER_MM_X = settings.get('STEPS_PER_MM_X')  # Adjust based on calibration
-    STEPS_PER_MM_Y = settings.get('STEPS_PER_MM_Y')  # Adjust based on calibration
-    STEPS_PER_MM_Z = settings.get('STEPS_PER_MM_Z')  # Adjust based on calibration
-
-    # Bed offset (position of well A1 relative to home)
-    BED_OFFSET_X = settings.get('BED_OFFSET_X')  # mm
-    BED_OFFSET_Y = settings.get('BED_OFFSET_Y')  # mm
-
-    # Origin offset
-    ORIGIN_X = 0.0  # mm
-    ORIGIN_Y = 0.0  # mm
-
-    # Vial Layout physical dimensions - read from config.json at import time
-    SMALL_WELL_SPACING = settings.get('VIAL_WELL_SPACING')   # mm between small wells
-    VIAL_WELL_DIAMETER = settings.get('VIAL_WELL_DIAMETER')  # mm
-    VIAL_WELL_HEIGHT   = settings.get('VIAL_WELL_HEIGHT')    # mm
+    STEPS_PER_MM_X = settings.get('STEPS_PER_MM_X')
+    STEPS_PER_MM_Y = settings.get('STEPS_PER_MM_Y')
+    STEPS_PER_MM_Z = settings.get('STEPS_PER_MM_Z')
 
     # Per-layout stored coordinates (loaded from config.json LAYOUT_COORDINATES)
     LAYOUT_COORDINATES: dict = {}
     CURRENT_LAYOUT: str = "microchip"
-
-    # Layout-specific coordinate mappings
-    # MicroChip Layout coordinates (non-WS entries only; WS computed dynamically)
-    MICROCHIP_COORDS = {
-        # MicroChips (bottom)
-        'MC1': (80, 300, 0),
-        'MC2': (140, 300, 0),
-        'MC3': (200, 300, 0),
-        'MC4': (260, 300, 0),
-        'MC5': (320, 300, 0),
-    }
-
-    # Vial Layout coordinates (non-WS entries only)
-    WELLPLATE_COORDS = {}
 
     @staticmethod
     def _ws_coordinates(station: str) -> WellCoordinates:
@@ -132,9 +100,12 @@ class CoordinateMapper:
             Well ID (e.g., 'A1') or None if not at a well position
         """
         # Check stored layout coordinates first (per-layout mapping from config.json)
-        layout_coords = CoordinateMapper.LAYOUT_COORDINATES.get(
-            CoordinateMapper.CURRENT_LAYOUT, {}
-        )
+        layout_keys = [CoordinateMapper.CURRENT_LAYOUT]
+        if CoordinateMapper.CURRENT_LAYOUT == 'wellplate':
+            layout_keys.append('vial')
+        layout_coords = {}
+        for key in layout_keys:
+            layout_coords.update(CoordinateMapper.LAYOUT_COORDINATES.get(key, {}))
         for well_id, stored in layout_coords.items():
             if stored is not None:
                 if abs(coords.x - stored["x"]) < 1.0 and abs(coords.y - stored["y"]) < 1.0:
@@ -145,55 +116,6 @@ class CoordinateMapper:
             ws_coords = CoordinateMapper._ws_coordinates(ws_id)
             if abs(coords.x - ws_coords.x) < 1.0 and abs(coords.y - ws_coords.y) < 1.0:
                 return ws_id
-
-        # Check if at a MicroChip or WellPlate special position
-        for mc_id, mc_raw in CoordinateMapper.MICROCHIP_COORDS.items():
-            mc_x = CoordinateMapper.BED_OFFSET_X + mc_raw[0]
-            mc_y = CoordinateMapper.BED_OFFSET_Y + mc_raw[1]
-            if abs(coords.x - mc_x) < 1.0 and abs(coords.y - mc_y) < 1.0:
-                return mc_id
-
-        for wp_id, wp_raw in CoordinateMapper.WELLPLATE_COORDS.items():
-            wp_x = CoordinateMapper.BED_OFFSET_X + wp_raw[0]
-            wp_y = CoordinateMapper.BED_OFFSET_Y + wp_raw[1]
-            if abs(coords.x - wp_x) < 1.0 and abs(coords.y - wp_y) < 1.0:
-                return wp_id
-
-        # Check if at a Vial position (VA1-VE3)
-        vial_rows = ['A', 'B', 'C', 'D', 'E']
-        vial_spacing_y = 2 * CoordinateMapper.SMALL_WELL_SPACING
-        for row_idx, row_char in enumerate(vial_rows):
-            for col_num in range(1, 4):
-                col_idx = col_num - 1
-                vx = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 20 + (col_idx * vial_spacing_y)
-                vy = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_idx * vial_spacing_y)
-                if abs(coords.x - vx) < 1.0 and abs(coords.y - vy) < 1.0:
-                    return f"V{row_char}{col_num}"
-
-        # Check if at a Small well position (SA1-SL6)
-        small_well_rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
-        for row_idx, row_char in enumerate(small_well_rows):
-            for col_num in range(1, 7):
-                col_idx = col_num - 1
-                sx = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 280 + (col_idx * CoordinateMapper.SMALL_WELL_SPACING)
-                sy = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_idx * CoordinateMapper.SMALL_WELL_SPACING)
-                if abs(coords.x - sx) < 1.0 and abs(coords.y - sy) < 1.0:
-                    return f"S{row_char}{col_num}"
-
-        # Calculate which column based on X coordinate
-        # Must subtract BED_OFFSET to match well_to_coordinates
-        x_offset = coords.x - CoordinateMapper.ORIGIN_X - CoordinateMapper.BED_OFFSET_X
-        column_index = round(x_offset / CoordinateMapper.WELL_SPACING)
-
-        # Calculate which row based on Y coordinate
-        y_offset = coords.y - CoordinateMapper.ORIGIN_Y - CoordinateMapper.BED_OFFSET_Y
-        row_index = round(y_offset / CoordinateMapper.WELL_SPACING)
-
-        # Validate indices are within bounds
-        if 0 <= row_index < len(CoordinateMapper.ROWS) and 0 <= column_index < len(CoordinateMapper.COLUMNS):
-            row = CoordinateMapper.ROWS[row_index]
-            column = CoordinateMapper.COLUMNS[column_index]
-            return f"{row}{column}"
 
         return None
 
@@ -226,6 +148,71 @@ class CoordinateMapper:
         return row, column
 
     @staticmethod
+    def _interpolate_from_refs(row: str, column: int, layout_coords: dict) -> Optional[WellCoordinates]:
+        """Interpolate well coordinates from calibrated reference points.
+
+        Finds the two nearest calibrated columns for the same row and
+        linearly interpolates X.  Y is taken from the nearest reference.
+        Returns None if fewer than 2 reference columns exist for this row.
+        """
+        # Collect calibrated columns for this row
+        refs = {}  # col -> {x, y}
+        for wid, coord in layout_coords.items():
+            try:
+                r, c = CoordinateMapper.parse_well(wid)
+            except (ValueError, IndexError):
+                continue
+            if r == row:
+                refs[c] = coord
+
+        if len(refs) < 2:
+            return None
+
+        sorted_cols = sorted(refs.keys())
+
+        # Exact match
+        if column in refs:
+            return WellCoordinates(x=refs[column]["x"], y=refs[column]["y"], z=0.0)
+
+        # Find surrounding reference columns
+        lower = None
+        upper = None
+        for c in sorted_cols:
+            if c < column:
+                lower = c
+            elif c > column and upper is None:
+                upper = c
+
+        if lower is not None and upper is not None:
+            # Interpolate between lower and upper
+            t = (column - lower) / (upper - lower)
+            x = refs[lower]["x"] + t * (refs[upper]["x"] - refs[lower]["x"])
+            y = refs[lower]["y"] + t * (refs[upper]["y"] - refs[lower]["y"])
+        elif lower is not None:
+            # Extrapolate from last two refs below
+            prev = sorted_cols[sorted_cols.index(lower) - 1] if sorted_cols.index(lower) > 0 else None
+            if prev is not None:
+                spacing_x = (refs[lower]["x"] - refs[prev]["x"]) / (lower - prev)
+                x = refs[lower]["x"] + spacing_x * (column - lower)
+            else:
+                x = refs[lower]["x"]
+            y = refs[lower]["y"]
+        elif upper is not None:
+            # Extrapolate from first two refs above
+            nxt_idx = sorted_cols.index(upper) + 1
+            nxt = sorted_cols[nxt_idx] if nxt_idx < len(sorted_cols) else None
+            if nxt is not None:
+                spacing_x = (refs[nxt]["x"] - refs[upper]["x"]) / (nxt - upper)
+                x = refs[upper]["x"] + spacing_x * (column - upper)
+            else:
+                x = refs[upper]["x"]
+            y = refs[upper]["y"]
+        else:
+            return None
+
+        return WellCoordinates(x=x, y=y, z=0.0)
+
+    @staticmethod
     def well_to_coordinates(well_id: str) -> WellCoordinates:
         """
         Convert well ID to physical coordinates - supports multiple layout types
@@ -237,9 +224,13 @@ class CoordinateMapper:
             WellCoordinates with x, y, z positions
         """
         # Check stored coordinates first (per-layout mapping from config.json)
-        layout_coords = CoordinateMapper.LAYOUT_COORDINATES.get(
-            CoordinateMapper.CURRENT_LAYOUT, {}
-        )
+        # "wellplate" layout includes both "wellplate" and "vial" coordinate sections
+        layout_keys = [CoordinateMapper.CURRENT_LAYOUT]
+        if CoordinateMapper.CURRENT_LAYOUT == 'wellplate':
+            layout_keys.append('vial')
+        layout_coords = {}
+        for key in layout_keys:
+            layout_coords.update(CoordinateMapper.LAYOUT_COORDINATES.get(key, {}))
         stored = layout_coords.get(well_id)
         if stored is not None:
             return WellCoordinates(x=stored["x"], y=stored["y"], z=0.0)
@@ -253,76 +244,16 @@ class CoordinateMapper:
             # Fall back to computed coordinates from config
             return CoordinateMapper._ws_coordinates(well_id)
 
-        # Check for MicroChip layout special wells
-        if well_id in CoordinateMapper.MICROCHIP_COORDS:
-            coords = CoordinateMapper.MICROCHIP_COORDS[well_id]
-            return WellCoordinates(x=CoordinateMapper.BED_OFFSET_X + coords[0], y=CoordinateMapper.BED_OFFSET_Y + coords[1], z=coords[2])
-
-        # Check for WellPlate layout special wells
-        if well_id in CoordinateMapper.WELLPLATE_COORDS:
-            coords = CoordinateMapper.WELLPLATE_COORDS[well_id]
-            return WellCoordinates(x=CoordinateMapper.BED_OFFSET_X + coords[0], y=CoordinateMapper.BED_OFFSET_Y + coords[1], z=coords[2])
-
-        # Handle Vial Layout vials (VA1, VA2, etc.)
-        if well_id.startswith('V') and len(well_id) >= 3:
-            row_char = well_id[1]
-            col_num = int(well_id[2:])
-            # Vials: 5 rows (A-E) x 3 columns
-            vial_rows = ['A', 'B', 'C', 'D', 'E']
-            if row_char in vial_rows and 1 <= col_num <= 3:
-                row_index = vial_rows.index(row_char)
-                col_index = col_num - 1
-                # Vials positioned on left side, aligned with small well grid
-                # 1 vial = 2 small wells in height
-                vial_spacing_y = 2 * CoordinateMapper.SMALL_WELL_SPACING  # 2 * 45 = 90mm
-                x = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 20 + (col_index * vial_spacing_y)
-                y = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_index * vial_spacing_y)
-                return WellCoordinates(x=x, y=y, z=0.0)
-
-        # Handle WellPlate small wells (SA1, SA2, etc.)
-        if well_id.startswith('S') and len(well_id) >= 3:
-            row_char = well_id[1]
-            col_num = int(well_id[2:])
-            # Small wells: 12 rows (A-L) x 6 columns
-            small_well_rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
-            if row_char in small_well_rows and 1 <= col_num <= 6:
-                row_index = small_well_rows.index(row_char)
-                col_index = col_num - 1
-                # Small wells positioned on right side
-                x = CoordinateMapper.ORIGIN_X + CoordinateMapper.BED_OFFSET_X + 280 + (col_index * CoordinateMapper.SMALL_WELL_SPACING)
-                y = CoordinateMapper.ORIGIN_Y + CoordinateMapper.BED_OFFSET_Y + 60 + (row_index * CoordinateMapper.SMALL_WELL_SPACING)
-                return WellCoordinates(x=x, y=y, z=0.0)
-
-        # Standard well format (A1-H15 for MicroChip, A1-H12 for legacy)
+        # Standard well format (A1-H15) — try interpolation from calibrated refs
         try:
             row, column = CoordinateMapper.parse_well(well_id)
-
-            # Calculate row index (A=0, B=1, etc.)
-            row_index = CoordinateMapper.ROWS.index(row)
-
-            # Calculate column index (1=0, 2=1, etc.)
-            column_index = column - 1
-
-            # For MicroChip layout (8x15), wells start at offset
-            # For legacy layout (8x12), use standard spacing
-            well_offset_x = CoordinateMapper.BED_OFFSET_X
-            well_offset_y = CoordinateMapper.BED_OFFSET_Y
-
-            # Calculate physical coordinates
-            # X increases with column number
-            x = CoordinateMapper.ORIGIN_X + well_offset_x + (
-                    column_index * CoordinateMapper.WELL_SPACING)
-
-            # Y increases with row letter (A to H)
-            y = CoordinateMapper.ORIGIN_Y + well_offset_y + (
-                row_index * CoordinateMapper.WELL_SPACING)
-
-            # Z is at top of well (0), adjust during pipetting
-            z = 0.0
-
-            return WellCoordinates(x=x, y=y, z=z)
+            ref = CoordinateMapper._interpolate_from_refs(row, column, layout_coords)
+            if ref is not None:
+                return ref
         except (ValueError, IndexError):
-            raise ValueError(f"Invalid well ID: {well_id}")
+            pass
+
+        raise ValueError(f"Well '{well_id}' not found in config coordinates. Please calibrate this location.")
 
     @staticmethod
     def coordinates_to_steps(coords: WellCoordinates) -> Tuple[int, int, int]:
@@ -401,11 +332,16 @@ class PipettingController:
                 self.pipette_ml = saved.get('pipette_ml', 0.0)
         except Exception:
             pass
-        # Sync Z motor step counter with persisted position so _move_z_safe
+        # Sync motor step counters with persisted position so _move_*_safe
         # allows movement in both directions after a restart.
         if self.controller_type != 'arduino_uno_q':
-            z_motor = self.stepper_controller.get_motor(3)
-            z_motor.current_position = int(self.current_position.z * self.mapper.STEPS_PER_MM_Z)
+            x_steps = int(self.current_position.x * self.mapper.STEPS_PER_MM_X)
+            y_steps = int(self.current_position.y * self.mapper.STEPS_PER_MM_Y)
+            z_steps = int(self.current_position.z * self.mapper.STEPS_PER_MM_Z)
+            # When inverted, motor position counts in the negative direction
+            self.stepper_controller.get_motor(1).current_position = -x_steps if self.INVERT_X else x_steps
+            self.stepper_controller.get_motor(2).current_position = -y_steps if self.INVERT_Y else y_steps
+            self.stepper_controller.get_motor(3).current_position = z_steps
 
         self.log(f"Pipetting controller initialized at position: {self.get_current_well() or 'Unknown'}")
         self.log(f"Pipette configuration: {self.current_pipette_count} pipette(s)")
@@ -611,7 +547,13 @@ class PipettingController:
 
         # Get target coordinates
         Z_UP_POSITION = 70.0
-        target_coords = self.mapper.well_to_coordinates(well_id)
+        try:
+            target_coords = self.mapper.well_to_coordinates(well_id)
+        except ValueError:
+            self.log(f"Well '{well_id}' not found in config coordinates. Please calibrate this location.")
+            self.current_operation = "idle"
+            self.operation_well = None
+            return
         # z_offset is negative for depth (e.g., -40 = go 40mm below travel height)
         # Wells return z=0 as placeholder; actual Z target = travel height + offset
         if z_offset != 0.0:
