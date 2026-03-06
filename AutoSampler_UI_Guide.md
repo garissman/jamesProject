@@ -60,7 +60,7 @@ The **Program** tab allows users to create automated multi-step pipetting sequen
 
 - **View program steps**: All added steps are displayed as draggable cards showing pickup/dropoff wells, volume, timing, and repetition info.
 
-- **Add steps**: Click **+ Add Step** to open the step wizard. You can also add **+ Home** (return to home position) and **+ Wait** (pause) steps.
+- **Add steps**: Use the three buttons at the bottom of the step list to add different step types: **+ Add Cycle**, **+ Home**, and **+ Wait**.
 
 - **Reorder steps**: Drag and drop step cards to change their execution order.
 
@@ -68,11 +68,23 @@ The **Program** tab allows users to create automated multi-step pipetting sequen
 
 - **Save/Load programs**: Use **Save Program** to export the current sequence as a JSON file, or **Load Program** to import a previously saved sequence.
 
+### Step Types
+
+![Program with Steps](screenshots/09_program_with_steps.png)
+
+There are three types of steps that can be added to a program:
+
+1. **Home Step** (green badge) -- Returns all axes to their home position. This is useful at the start or end of a program, or between operations that require a known starting point. Added by clicking **+ Home**.
+
+2. **Cycle Step** (blue badge) -- A full pipetting cycle consisting of pickup, dropoff, rinse, and wash. The step card displays the pickup and dropoff wells (e.g., "A2 → MC1"), the transfer volume, and the rinse/wash wells. In the screenshot, Step 2 shows "A2 → MC1" with "40 mL | Rinse: WS2 | Wash: WS1". Added by clicking **+ Add Cycle**, which opens the step wizard.
+
+3. **Wait Step** (orange badge) -- Pauses execution for a specified duration. The step card shows the wait time (e.g., "Wait 5 sec"). Added by clicking **+ Wait**.
+
 ### Step Wizard - Stage 1: Wells & Volume
 
 ![Step Wizard](screenshots/04_add_step_wizard.png)
 
-The step creation wizard guides users through a 2-stage process:
+The step creation wizard guides users through a 2-stage process when adding a Cycle step:
 
 **Stage 1 - Wells & Volume:**
 - **Pickup Well** (required): Enter the source well ID (e.g., A2, WS1, MC3) or click "Select from plate" to pick it visually from the plate layout.
