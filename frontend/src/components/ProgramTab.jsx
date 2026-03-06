@@ -718,7 +718,7 @@ export default function ProgramTab({
           onClick={openAddWizard}
           className="flex-1 py-3.5 rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-secondary)] font-semibold text-sm hover:border-[#3b82f6] hover:text-[#3b82f6] hover:bg-[#3b82f6]/5 transition-all duration-200"
         >
-          + Add Step
+          + Add Cycle
         </button>
         <button
           onClick={handleAddHome}
