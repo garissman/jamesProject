@@ -4,6 +4,7 @@ Handles coordinate mapping and pipetting workflows
 """
 
 import json
+import threading
 import time
 from dataclasses import dataclass
 from enum import IntEnum
@@ -598,26 +599,32 @@ class PipettingController:
         else:
             self.log(f"  Step 1: Z already up ({self.current_position.z:.1f}mm), skipping")
 
-        # Step 2: Move Y (with software limit enforcement)
-        if y_delta != 0:
-            self.log(f"  Step 2: Moving Y ({y_delta} steps)")
-            direction = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
-            self._move_y_safe(abs(y_delta), direction, self.TRAVEL_SPEED)
+        # Step 2: Move X and Y simultaneously
+        if x_delta != 0 or y_delta != 0:
+            self.log(f"  Step 2: Moving X ({x_delta} steps) and Y ({y_delta} steps) simultaneously")
+            threads = []
+            if y_delta != 0:
+                y_dir = self._inv(Direction.CLOCKWISE if y_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_Y)
+                t_y = threading.Thread(target=self._move_y_safe, args=(abs(y_delta), y_dir, self.TRAVEL_SPEED))
+                threads.append(t_y)
+            if x_delta != 0:
+                x_dir = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
+                t_x = threading.Thread(target=self._move_motor, args=(1, abs(x_delta), x_dir, self.TRAVEL_SPEED),
+                                       kwargs={'check_limits': False})
+                threads.append(t_x)
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
 
-        # Step 3: Move X (check_limits=False to avoid false triggers from EMI)
-        if x_delta != 0:
-            self.log(f"  Step 3: Moving X ({x_delta} steps)")
-            direction = self._inv(Direction.CLOCKWISE if x_delta > 0 else Direction.COUNTERCLOCKWISE, self.INVERT_X)
-            self._move_motor(1, abs(x_delta), direction, self.TRAVEL_SPEED, check_limits=False)
-
-        # Step 4: Move Z down only if a real Z target was specified (z_offset != 0)
+        # Step 3: Move Z down only if a real Z target was specified (z_offset != 0)
         # Well coordinates return z=0.0 as a placeholder — keep Z up when just
         # moving between wells so it doesn't plunge down unnecessarily.
         if z_offset != 0.0:
             z_down_distance = Z_UP_POSITION - target_coords.z
             if z_down_distance > 0:
                 z_down_steps = int(z_down_distance * self.mapper.STEPS_PER_MM_Z)
-                self.log(f"  Step 4: Z down to {target_coords.z}mm ({z_down_steps} steps)")
+                self.log(f"  Step 3: Z down to {target_coords.z}mm ({z_down_steps} steps)")
                 self._move_z_safe(z_down_steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
 
         # Update current position — keep Z at travel height when no z_offset
@@ -638,6 +645,10 @@ class PipettingController:
         Args:
             volume_ml: Volume to aspirate in mL
         """
+        # Ensure Z is down before aspirating
+        if self.current_position.z > 1.0:
+            self.log(f"  Z is up ({self.current_position.z:.1f}mm), moving down before aspirate")
+            self._z_to(0.0)
         self.current_operation = "aspirating"
         self.operation_well = self.get_current_well()
         # Clamp to max pipette capacity
@@ -667,6 +678,10 @@ class PipettingController:
         Args:
             volume_ml: Volume to dispense in mL
         """
+        # Ensure Z is down before dispensing
+        if self.current_position.z > 1.0:
+            self.log(f"  Z is up ({self.current_position.z:.1f}mm), moving down before dispense")
+            self._z_to(0.0)
         self.current_operation = "dispensing"
         self.operation_well = self.get_current_well()
         # Clamp to what's actually in the pipette
