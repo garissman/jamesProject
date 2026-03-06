@@ -95,5 +95,6 @@ The application uses a single-page component architecture in `frontend/src/App.j
 - the motion to move from one location to other location it will be always move Z up(if down) -> Move X and Y to Coordinate -> Move Z down
 - The Volume to Collect and Dispense will be always 40 mL
 - let hide the Pipettes Qty, and It'll be always 3
-- a Circle will be A Pickup Location, a Drop-off Location, then a rinse (preset always in WS2) and wash(preset always in WS1)
+- A Circle will be A Pickup Location, a Drop-off Location, then a rinse (preset always in WS2) and wash(preset always in WS1)
 - when Pipette is aspiring or dispensing, make sure Z is down
+- After a Quick operation and a Program Finish, ALWAYS go Home.
