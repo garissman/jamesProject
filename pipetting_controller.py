@@ -961,8 +961,9 @@ class PipettingController:
                 time.sleep(step.wait_time)
 
         self.log("=" * 60)
-        self.log("SEQUENCE COMPLETE")
+        self.log("SEQUENCE COMPLETE — returning home")
         self.log("=" * 60)
+        self.home()
 
     def stop(self):
         """Request to stop the current execution"""
