@@ -224,6 +224,8 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
 
 # --- Scheduled program file path ---
 SCHEDULED_PROGRAM_FILE = Path(__file__).parent / "scheduled_program.json"
+PROGRAMS_DIR = Path(__file__).parent / "programs"
+PROGRAMS_DIR.mkdir(exist_ok=True)
 
 
 @app.post("/api/program/save")
@@ -269,6 +271,104 @@ async def program_execution_status():
         return {"status": "success", "execution": data.get("execution", {"status": "idle"})}
     except Exception as e:
         return {"status": "success", "execution": {"status": "idle"}}
+
+
+# --- Saved programs (multiple files) ---
+
+def _sanitize_program_name(name: str) -> str:
+    """Sanitize program name for use as filename."""
+    import re
+    name = re.sub(r'[^\w\s\-]', '', name).strip()
+    return name or "untitled"
+
+
+@app.get("/api/programs/list")
+async def list_programs():
+    """List all saved programs."""
+    programs = []
+    for f in sorted(PROGRAMS_DIR.glob("*.json")):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            programs.append({
+                "name": f.stem,
+                "filename": f.name,
+                "stepCount": len(data.get("steps", [])),
+                "created": data.get("created", ""),
+                "modified": data.get("modified", data.get("created", "")),
+            })
+        except Exception:
+            continue
+    return {"status": "success", "programs": programs}
+
+
+class ProgramSaveAsRequest(BaseModel):
+    name: str = Field(..., min_length=1, description="Program name")
+    steps: List[PipettingStepRequest] = Field(..., min_length=1)
+    schedule: Optional[ScheduleConfig] = None
+
+
+@app.post("/api/programs/save")
+async def save_program_as(request: ProgramSaveAsRequest):
+    """Save program with a given name."""
+    from datetime import datetime
+    name = _sanitize_program_name(request.name)
+    filepath = PROGRAMS_DIR / f"{name}.json"
+    existing = {}
+    if filepath.exists():
+        try:
+            with open(filepath) as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    program_data = {
+        "version": "1.0",
+        "created": existing.get("created", datetime.now().isoformat()),
+        "modified": datetime.now().isoformat(),
+        "steps": [step.model_dump() for step in request.steps],
+        "schedule": request.schedule.model_dump() if request.schedule else {"cronExpression": "", "enabled": False},
+    }
+    with open(filepath, "w") as f:
+        json.dump(program_data, f, indent=2)
+    return {"status": "success", "message": f"Program '{name}' saved with {len(request.steps)} step(s)", "name": name}
+
+
+@app.get("/api/programs/load/{name}")
+async def load_program_by_name(name: str):
+    """Load a saved program by name."""
+    filepath = PROGRAMS_DIR / f"{name}.json"
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail=f"Program '{name}' not found")
+    try:
+        with open(filepath) as f:
+            data = json.load(f)
+        return {
+            "status": "success",
+            "name": name,
+            "steps": data.get("steps", []),
+            "schedule": data.get("schedule", {"cronExpression": "", "enabled": False}),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/programs/{name}")
+async def delete_program(name: str):
+    """Delete a saved program."""
+    filepath = PROGRAMS_DIR / f"{name}.json"
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail=f"Program '{name}' not found")
+    filepath.unlink()
+    return {"status": "success", "message": f"Program '{name}' deleted"}
+
+
+@app.get("/api/programs/download/{name}")
+async def download_program(name: str):
+    """Download a saved program as JSON file."""
+    filepath = PROGRAMS_DIR / f"{name}.json"
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail=f"Program '{name}' not found")
+    return FileResponse(filepath, filename=f"{name}.json", media_type="application/json")
 
 
 @app.post("/api/pipetting/stop")
@@ -388,6 +488,8 @@ async def get_pipetting_status():
             "is_executing": is_executing,
             "current_operation": current_operation,
             "operation_well": operation_well,
+            "current_step_index": pipetting_controller.current_step_index,
+            "total_steps": pipetting_controller.total_steps,
             "message": "Executing" if is_executing else "System ready"
         }
     except Exception as e:

@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const inputClass = 'p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]'
 const selectClass = inputClass + ' cursor-pointer'
 
 // ─── StepCard ────────────────────────────────────────────────────────────────
 
-function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onDragOver, onDrop }) {
+function StepCard({ step, index, isActive, onEdit, onDuplicate, onDelete, onDragStart, onDragOver, onDrop }) {
   const stepType = step.stepType || 'pipette'
 
   const fmtTime = (s) => {
@@ -51,7 +51,11 @@ function StepCard({ step, index, onEdit, onDuplicate, onDelete, onDragStart, onD
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
       onDrop={(e) => { e.preventDefault(); onDrop() }}
-      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-all duration-200 cursor-grab active:cursor-grabbing"
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing ${
+        isActive
+          ? 'bg-[rgba(245,158,11,0.12)] border-2 border-[#f59e0b] animate-step-active'
+          : 'bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--border-hover)]'
+      }`}
     >
       {/* Drag handle */}
       <div className="flex flex-col gap-[3px] opacity-40 select-none px-1">
@@ -723,12 +727,80 @@ export default function ProgramTab({
   onScheduleChange,
   config,
   programExecution,
+  isExecuting,
+  currentStepIndex,
+  totalSteps,
 }) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingStep, setEditingStep] = useState(null)
   const dragIndexRef = useRef(null)
 
   const [waitInput, setWaitInput] = useState(null) // null = hidden, 'home' or 'wait' = which type
+
+  // Program manager state
+  const [programName, setProgramName] = useState('')
+  const [savedPrograms, setSavedPrograms] = useState([])
+  const [showProgramList, setShowProgramList] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+
+  const fetchPrograms = async () => {
+    try {
+      const res = await fetch('/api/programs/list')
+      const data = await res.json()
+      if (data.programs) setSavedPrograms(data.programs)
+    } catch (e) { console.error('Failed to list programs', e) }
+  }
+
+  useEffect(() => { fetchPrograms() }, [])
+
+  const handleSaveAs = async () => {
+    const name = programName.trim()
+    if (!name || steps.length === 0) return
+    try {
+      const res = await fetch('/api/programs/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, steps, schedule })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setProgramName(data.name || name)
+        setShowSaveDialog(false)
+        fetchPrograms()
+        // Also save as the scheduled program so the scheduler stays in sync
+        handleSaveProgram()
+      }
+    } catch (e) { console.error('Failed to save program', e) }
+  }
+
+  const handleLoadFromList = async (name) => {
+    try {
+      const res = await fetch(`/api/programs/load/${encodeURIComponent(name)}`)
+      const data = await res.json()
+      if (res.ok && data.steps) {
+        handleLoadProgram(data.steps, data.schedule)
+        setProgramName(name)
+        setShowProgramList(false)
+      }
+    } catch (e) { console.error('Failed to load program', e) }
+  }
+
+  const handleDeleteProgram = async (name) => {
+    try {
+      const res = await fetch(`/api/programs/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      if (res.ok) {
+        fetchPrograms()
+        if (programName === name) setProgramName('')
+      }
+    } catch (e) { console.error('Failed to delete program', e) }
+  }
+
+  const handleDownloadProgram = (name) => {
+    const a = document.createElement('a')
+    a.href = `/api/programs/download/${encodeURIComponent(name)}`
+    a.download = `${name}.json`
+    a.click()
+  }
 
   const openAddWizard = () => {
     setEditingStep(null)
@@ -815,7 +887,7 @@ export default function ProgramTab({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <h2 className="m-0 text-[1.5rem] font-semibold text-[var(--text-primary)]">
-            Program Steps
+            {programName || 'Program Steps'}
           </h2>
           {steps.length > 0 && (
             <span className="px-3 py-1 text-xs font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-color)]">
@@ -826,19 +898,89 @@ export default function ProgramTab({
         <div className="flex gap-2.5">
           <button
             className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed] disabled:bg-[#6b7280] disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleSaveProgram}
+            onClick={() => {
+              if (programName) {
+                // Quick save to existing name
+                handleSaveAs()
+              } else {
+                setShowSaveDialog(true)
+              }
+            }}
             disabled={steps.length === 0}
           >
-            Save Program
+            Save
+          </button>
+          <button
+            className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed] disabled:bg-[#6b7280] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setShowSaveDialog(true)}
+            disabled={steps.length === 0}
+          >
+            Save As
           </button>
           <button
             className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed]"
-            onClick={handleLoadProgram}
+            onClick={() => { fetchPrograms(); setShowProgramList(true) }}
           >
-            Load Program
+            Load
           </button>
         </div>
       </div>
+
+      {/* Save dialog */}
+      {showSaveDialog && (
+        <div className="mb-4 p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center gap-3">
+          <label className="text-sm font-semibold text-[var(--text-primary)] whitespace-nowrap">Program Name:</label>
+          <input
+            type="text"
+            autoFocus
+            value={programName}
+            onChange={(e) => setProgramName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAs(); if (e.key === 'Escape') setShowSaveDialog(false) }}
+            placeholder="Enter program name..."
+            className={inputClass + ' flex-1'}
+          />
+          <button onClick={handleSaveAs} disabled={!programName.trim()} className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed] disabled:bg-[#6b7280] disabled:cursor-not-allowed transition-colors">
+            Save
+          </button>
+          <button onClick={() => setShowSaveDialog(false)} className="px-4 py-2 text-sm font-semibold rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Load program list */}
+      {showProgramList && (
+        <div className="mb-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-[var(--border-color)]">
+            <h3 className="m-0 text-sm font-semibold text-[var(--text-primary)]">Saved Programs</h3>
+            <button onClick={() => setShowProgramList(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors text-lg leading-none">&times;</button>
+          </div>
+          {savedPrograms.length === 0 ? (
+            <div className="p-6 text-center text-sm text-[var(--text-tertiary)]">No saved programs</div>
+          ) : (
+            <div className="max-h-60 overflow-y-auto">
+              {savedPrograms.map((prog) => (
+                <div key={prog.name} className={`flex items-center gap-3 px-4 py-3 border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--bg-secondary)] transition-colors ${prog.name === programName ? 'bg-[rgba(139,92,246,0.08)]' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{prog.name}</div>
+                    <div className="text-xs text-[var(--text-tertiary)]">
+                      {prog.stepCount} step{prog.stepCount !== 1 ? 's' : ''}
+                      {prog.modified && ` · ${new Date(prog.modified).toLocaleDateString()}`}
+                    </div>
+                  </div>
+                  <button onClick={() => handleLoadFromList(prog.name)} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#3b82f6] text-white hover:bg-[#2563eb] transition-colors">Load</button>
+                  <button onClick={() => handleDownloadProgram(prog.name)} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] transition-colors" title="Download JSON">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </button>
+                  <button onClick={() => handleDeleteProgram(prog.name)} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[#dc2626]/30 text-[#dc2626] hover:bg-[#dc2626]/10 transition-colors" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Step list */}
       <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto mb-4">
@@ -861,6 +1003,7 @@ export default function ProgramTab({
               key={step.id}
               step={step}
               index={index}
+              isActive={isExecuting && currentStepIndex === index}
               onEdit={() => openEditWizard(step)}
               onDuplicate={() => handleDuplicateStep(step.id)}
               onDelete={() => handleDeleteStep(step.id)}
@@ -1003,15 +1146,20 @@ export default function ProgramTab({
           <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
             <div className="flex items-center gap-3">
               <div className={`w-2.5 h-2.5 rounded-full ${
-                programExecution.status === 'running'
+                isExecuting || programExecution.status === 'running'
                   ? 'bg-[#f59e0b] animate-pulse'
                   : programExecution.lastResult === 'error'
                     ? 'bg-[#dc2626]'
                     : 'bg-[#059669]'
               }`} />
               <span className="text-sm font-semibold text-[var(--text-primary)]">
-                {programExecution.status === 'running' ? 'Program Running' : 'Idle'}
+                {isExecuting ? 'Program Running' : programExecution.status === 'running' ? 'Program Running' : 'Idle'}
               </span>
+              {isExecuting && currentStepIndex !== null && totalSteps !== null && (
+                <span className="text-xs font-medium text-[#f59e0b]">
+                  Step {currentStepIndex + 1} of {totalSteps}
+                </span>
+              )}
               {programExecution.status === 'running' && programExecution.startedAt && (
                 <span className="text-xs text-[var(--text-tertiary)]">
                   since {new Date(programExecution.startedAt).toLocaleTimeString()}

@@ -319,6 +319,8 @@ class PipettingController:
         self.current_pipette_count = 1  # Current pipette configuration (default: 1)
         self.current_operation = "idle"  # Current operation: idle, moving, aspirating, dispensing
         self.operation_well = None  # Well where current operation is happening
+        self.current_step_index = None  # 0-based index of step currently executing
+        self.total_steps = None  # Total number of steps in current sequence
         self.layout_type = "microchip"  # Current layout type: microchip or wellplate
         CoordinateMapper.CURRENT_LAYOUT = self.layout_type
         self.pipette_ml = 0.0  # Current pipette volume in mL
@@ -864,11 +866,15 @@ class PipettingController:
         CoordinateMapper.STEPS_PER_MM_Y = cfg.get('STEPS_PER_MM_Y', 100)
         CoordinateMapper.STEPS_PER_MM_Z = cfg.get('STEPS_PER_MM_Z', 100)
 
+        self.total_steps = len(steps)
+        self.current_step_index = 0
+
         self.log("=" * 60)
         self.log(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
         self.log("=" * 60)
 
         for step_num, step in enumerate(steps, 1):
+            self.current_step_index = step_num - 1
             # Check for stop request
             if self.stop_requested:
                 self.log("=" * 60)
@@ -876,6 +882,8 @@ class PipettingController:
                 self.log(f"Completed {step_num - 1} of {len(steps)} steps")
                 self.log("=" * 60)
                 self.stop_requested = False
+                self.current_step_index = None
+                self.total_steps = None
                 return
 
             self.log(f"--- Step {step_num}/{len(steps)} ---")
@@ -970,6 +978,8 @@ class PipettingController:
                 self.log(f"Completed {step_num} of {len(steps)} steps")
                 self.log("=" * 60)
                 self.stop_requested = False
+                self.current_step_index = None
+                self.total_steps = None
                 return
 
             # Wait before next step (if not the last step)
@@ -977,6 +987,8 @@ class PipettingController:
                 self.log(f"  Waiting {step.wait_time} seconds before next step...")
                 time.sleep(step.wait_time)
 
+        self.current_step_index = None
+        self.total_steps = None
         self.log("=" * 60)
         self.log("SEQUENCE COMPLETE — returning home")
         self.log("=" * 60)

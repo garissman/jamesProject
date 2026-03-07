@@ -72,6 +72,8 @@ function App() {
     // Program tab state
     const [steps, setSteps] = useState([])
     const [isExecuting, setIsExecuting] = useState(false)
+    const [currentStepIndex, setCurrentStepIndex] = useState(null)
+    const [totalSteps, setTotalSteps] = useState(null)
     const [systemStatus, setSystemStatus] = useState('Connecting...')
     const [logs, setLogs] = useState([])
 
@@ -275,20 +277,10 @@ function App() {
         }
     }
 
-    const handleLoadProgram = async () => {
-        try {
-            const response = await fetch('/api/program/load')
-            const data = await response.json()
-
-            if (response.ok && data.steps) {
-                setSteps(data.steps)
-                if (data.schedule) setSchedule(data.schedule)
-                console.log(`Program loaded with ${data.steps.length} step(s)`)
-            } else {
-                console.error(`Error: ${data.detail || 'Failed to load program'}`)
-            }
-        } catch (error) {
-            console.error(`Error: Unable to load program. ${error.message}`)
+    const handleLoadProgram = (loadedSteps, loadedSchedule) => {
+        if (loadedSteps) {
+            setSteps(loadedSteps)
+            if (loadedSchedule) setSchedule(loadedSchedule)
         }
     }
 
@@ -591,6 +583,8 @@ function App() {
                 if (data.pipette_count !== undefined) setCurrentPipetteCount(data.pipette_count)
                 if (data.layout_type !== undefined) setLayoutType(data.layout_type)
                 if (data.is_executing !== undefined) setIsExecuting(data.is_executing)
+                setCurrentStepIndex(data.current_step_index ?? null)
+                setTotalSteps(data.total_steps ?? null)
                 if (data.controller_type !== undefined) setControllerType(data.controller_type)
                 if (data.current_operation !== undefined) setCurrentOperation(data.current_operation)
                 if (data.operation_well !== undefined) setOperationWell(data.operation_well)
@@ -799,6 +793,9 @@ function App() {
                             onScheduleChange={setSchedule}
                             config={config}
                             programExecution={programExecution}
+                            isExecuting={isExecuting}
+                            currentStepIndex={currentStepIndex}
+                            totalSteps={totalSteps}
                         />
                     )}
                 </div>
