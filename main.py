@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 from contextlib import asynccontextmanager
 from functools import partial
@@ -95,6 +96,18 @@ class PipettingStepRequest(BaseModel):
 class PipettingSequenceRequest(BaseModel):
     """Complete pipetting sequence"""
     steps: List[PipettingStepRequest] = Field(..., min_length=1, description="List of pipetting steps")
+
+
+class ScheduleConfig(BaseModel):
+    """Schedule configuration for automated program execution"""
+    cronExpression: str = Field("", description="Cron expression (5 fields: min hour dom month dow)")
+    enabled: bool = Field(False, description="Whether scheduling is active")
+
+
+class ProgramSaveRequest(BaseModel):
+    """Program save request with steps and optional schedule"""
+    steps: List[PipettingStepRequest] = Field(..., min_length=1, description="List of pipetting steps")
+    schedule: Optional[ScheduleConfig] = None
 
 
 class PipettingResponse(BaseModel):
@@ -207,6 +220,55 @@ async def execute_pipetting_sequence(sequence: PipettingSequenceRequest):
             status_code=500,
             detail=f"Error executing pipetting sequence: {str(e)}"
         )
+
+
+# --- Scheduled program file path ---
+SCHEDULED_PROGRAM_FILE = Path(__file__).parent / "scheduled_program.json"
+
+
+@app.post("/api/program/save")
+async def save_program(request: ProgramSaveRequest):
+    """Save program steps and schedule to scheduled_program.json on disk"""
+    program_data = {
+        "version": "1.0",
+        "created": __import__("datetime").datetime.now().isoformat(),
+        "steps": [step.model_dump() for step in request.steps],
+        "schedule": request.schedule.model_dump() if request.schedule else {"cronExpression": "", "enabled": False}
+    }
+    with open(SCHEDULED_PROGRAM_FILE, "w") as f:
+        json.dump(program_data, f, indent=2)
+    return {"status": "success", "message": f"Program saved with {len(request.steps)} step(s)"}
+
+
+@app.get("/api/program/load")
+async def load_program():
+    """Load program steps and schedule from scheduled_program.json"""
+    if not SCHEDULED_PROGRAM_FILE.exists():
+        return {"status": "success", "steps": [], "schedule": {"cronExpression": "", "enabled": False}}
+    try:
+        with open(SCHEDULED_PROGRAM_FILE) as f:
+            data = json.load(f)
+        return {
+            "status": "success",
+            "steps": data.get("steps", []),
+            "schedule": data.get("schedule", {"cronExpression": "", "enabled": False}),
+            "execution": data.get("execution", {"status": "idle"})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading program file: {str(e)}")
+
+
+@app.get("/api/program/status")
+async def program_execution_status():
+    """Get the current execution status of the scheduled program"""
+    if not SCHEDULED_PROGRAM_FILE.exists():
+        return {"status": "success", "execution": {"status": "idle"}}
+    try:
+        with open(SCHEDULED_PROGRAM_FILE) as f:
+            data = json.load(f)
+        return {"status": "success", "execution": data.get("execution", {"status": "idle"})}
+    except Exception as e:
+        return {"status": "success", "execution": {"status": "idle"}}
 
 
 @app.post("/api/pipetting/stop")

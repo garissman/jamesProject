@@ -507,6 +507,205 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
 
 // ─── ProgramTab (main) ──────────────────────────────────────────────────────
 
+// ─── Estimate program duration ────────────────────────────────────────────────
+
+const Z_UP = 70.0
+const SETTLE_TIME = 0.5 // seconds after each aspirate/dispense
+
+function estimateProgramTime(steps, config, layoutType) {
+  if (!steps || steps.length === 0) return 0
+
+  const travelSpeed = config.TRAVEL_SPEED || 0.001
+  const pipetteSpeed = config.PIPETTE_SPEED || 0.002
+  const spmX = config.STEPS_PER_MM_X || 100
+  const spmY = config.STEPS_PER_MM_Y || 100
+  const spmZ = config.STEPS_PER_MM_Z || 100
+  const spmPipette = config.PIPETTE_STEPS_PER_ML || 1000
+  const rinseCycles = config.RINSE_CYCLES || 3
+  const coords = config.LAYOUT_COORDINATES?.[layoutType] || {}
+
+  // Time = steps * 2 * speed (HIGH pulse + LOW pulse)
+  const zMoveTime = (distMm) => Math.abs(distMm) * spmZ * 2 * travelSpeed
+  const pipetteTime = (volMl) => volMl * spmPipette * 2 * pipetteSpeed
+
+  // XY move simultaneously — time = max(x_time, y_time)
+  const xyMoveTime = (fromWell, toWell) => {
+    const a = coords[fromWell]
+    const b = coords[toWell]
+    if (!a || !b) {
+      // Unknown coordinates, estimate 100mm average
+      return 100 * spmX * 2 * travelSpeed
+    }
+    const xTime = Math.abs(b.x - a.x) * spmX * 2 * travelSpeed
+    const yTime = Math.abs(b.y - a.y) * spmY * 2 * travelSpeed
+    return Math.max(xTime, yTime)
+  }
+
+  // One transfer: pickup -> dropoff -> rinse -> wash
+  const transferTime = (fromWell, pickup, dropoff, rinse, wash, volume) => {
+    let t = 0
+    let prev = fromWell
+
+    // Z up to 70mm (from 0)
+    t += zMoveTime(Z_UP)
+
+    // Move to pickup, Z down, aspirate, Z up
+    if (pickup) {
+      t += xyMoveTime(prev, pickup)
+      t += zMoveTime(Z_UP)          // Z down to 0
+      t += pipetteTime(volume)
+      t += SETTLE_TIME
+      t += zMoveTime(Z_UP)          // Z up to 70
+      prev = pickup
+    }
+
+    // Move to dropoff, Z down, dispense, Z up
+    if (dropoff) {
+      t += xyMoveTime(prev, dropoff)
+      t += zMoveTime(Z_UP)          // Z down
+      t += pipetteTime(volume)
+      t += SETTLE_TIME
+      t += zMoveTime(Z_UP)          // Z up
+      prev = dropoff
+    }
+
+    // Rinse: move, Z down, N cycles of (aspirate + dispense), Z up
+    if (rinse) {
+      t += xyMoveTime(prev, rinse)
+      t += zMoveTime(Z_UP)          // Z down
+      for (let r = 0; r < rinseCycles; r++) {
+        t += pipetteTime(volume) + SETTLE_TIME  // aspirate
+        t += pipetteTime(volume) + SETTLE_TIME  // dispense
+      }
+      t += zMoveTime(Z_UP)          // Z up
+      prev = rinse
+    }
+
+    // Wash: same as rinse
+    if (wash) {
+      t += xyMoveTime(prev, wash)
+      t += zMoveTime(Z_UP)          // Z down
+      for (let r = 0; r < rinseCycles; r++) {
+        t += pipetteTime(volume) + SETTLE_TIME
+        t += pipetteTime(volume) + SETTLE_TIME
+      }
+      t += zMoveTime(Z_UP)          // Z up
+      prev = wash
+    }
+
+    return { time: t, lastWell: prev }
+  }
+
+  let total = 0
+  let prevWell = 'WS1'
+
+  for (const step of steps) {
+    const stepType = step.stepType || 'pipette'
+
+    if (stepType === 'wait') {
+      total += step.waitTime || 0
+      continue
+    }
+
+    if (stepType === 'home') {
+      // Estimate homing: Z up + XY travel to origin
+      total += zMoveTime(Z_UP)
+      total += Math.max(300 * spmX * 2 * travelSpeed, 300 * spmY * 2 * travelSpeed)
+      total += step.waitTime || 0
+      prevWell = 'WS1'
+      continue
+    }
+
+    // Pipette step
+    const cycles = step.cycles || 1
+    const volume = step.sampleVolume || 40
+    const pickup = step.pickupWell || ''
+    const dropoff = step.dropoffWell || ''
+    const rinse = step.rinseWell || ''
+    const wash = step.washWell || ''
+
+    if (step.repetitionMode === 'timeFrequency' && step.repetitionDuration) {
+      // Time-frequency mode: total time is the specified duration
+      total += step.repetitionDuration
+    } else {
+      const reps = (step.repetitionMode === 'quantity') ? (step.repetitionQuantity || 1) : 1
+
+      for (let rep = 0; rep < reps; rep++) {
+        for (let c = 0; c < cycles; c++) {
+          const result = transferTime(prevWell, pickup, dropoff, rinse, wash, volume)
+          total += result.time
+          prevWell = result.lastWell || prevWell
+
+          // Wait between cycles (except last)
+          if (step.waitTime && c < cycles - 1) {
+            total += step.waitTime
+          }
+        }
+        // Wait between repetitions (except last)
+        if (step.waitTime && rep < reps - 1) {
+          total += step.waitTime
+        }
+      }
+    }
+  }
+
+  // Final home
+  total += zMoveTime(Z_UP)
+  total += Math.max(300 * spmX * 2 * travelSpeed, 300 * spmY * 2 * travelSpeed)
+
+  return total
+}
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0s'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.round(seconds % 60)
+  const parts = []
+  if (h > 0) parts.push(`${h}h`)
+  if (m > 0) parts.push(`${m}m`)
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`)
+  return parts.join(' ')
+}
+
+// ─── Cron helpers ─────────────────────────────────────────────────────────────
+
+const CRON_PRESETS = [
+  { label: 'Every 5 minutes',  cron: '*/5 * * * *' },
+  { label: 'Every hour',       cron: '0 * * * *' },
+  { label: 'Every 2 hours',    cron: '0 */2 * * *' },
+  { label: 'Every 6 hours',    cron: '0 */6 * * *' },
+  { label: 'Every 12 hours',   cron: '0 */12 * * *' },
+  { label: 'Daily at 8:00 AM', cron: '0 8 * * *' },
+  { label: 'Daily at 6:00 PM', cron: '0 18 * * *' },
+  { label: 'Mon-Fri at 8 AM',  cron: '0 8 * * 1-5' },
+  { label: 'Every Monday 8 AM',cron: '0 8 * * 1' },
+]
+
+function describeCron(expr) {
+  if (!expr || !expr.trim()) return ''
+  const parts = expr.trim().split(/\s+/)
+  if (parts.length !== 5) return 'Invalid expression (need 5 fields: min hour dom month dow)'
+  const [min, hour, dom, month, dow] = parts
+
+  const dowNames = { '0': 'Sunday', '1': 'Monday', '2': 'Tuesday', '3': 'Wednesday', '4': 'Thursday', '5': 'Friday', '6': 'Saturday', '7': 'Sunday' }
+
+  if (min === '*' && hour === '*' && dom === '*' && month === '*' && dow === '*') return 'Every minute'
+  if (min.startsWith('*/') && hour === '*' && dom === '*' && month === '*' && dow === '*') return `Every ${min.slice(2)} minutes`
+  if (min === '0' && hour === '*' && dom === '*' && month === '*' && dow === '*') return 'Every hour'
+  if (hour.startsWith('*/') && min === '0' && dom === '*' && month === '*' && dow === '*') return `Every ${hour.slice(2)} hours`
+  if (min !== '*' && hour !== '*' && !hour.includes('/') && dom === '*' && month === '*') {
+    const time = `${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
+    if (dow === '*') return `Daily at ${time}`
+    if (dow === '1-5') return `Mon\u2013Fri at ${time}`
+    if (dowNames[dow]) return `Every ${dowNames[dow]} at ${time}`
+    return `At ${time} on day-of-week ${dow}`
+  }
+  return `Cron: ${expr}`
+}
+
+// ─── ProgramTab (main) ──────────────────────────────────────────────────────
+
 export default function ProgramTab({
   steps,
   layoutType,
@@ -520,6 +719,10 @@ export default function ProgramTab({
   validateWellId,
   setActiveTab,
   setWellSelectionMode,
+  schedule,
+  onScheduleChange,
+  config,
+  programExecution,
 }) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingStep, setEditingStep] = useState(null)
@@ -610,9 +813,16 @@ export default function ProgramTab({
     <div className="flex-1 bg-[var(--bg-secondary)] rounded-[15px] p-8 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="m-0 text-[1.5rem] font-semibold text-[var(--text-primary)]">
-          Program Steps
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="m-0 text-[1.5rem] font-semibold text-[var(--text-primary)]">
+            Program Steps
+          </h2>
+          {steps.length > 0 && (
+            <span className="px-3 py-1 text-xs font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-color)]">
+              Est. {formatDuration(estimateProgramTime(steps, config || {}, layoutType))}
+            </span>
+          )}
+        </div>
         <div className="flex gap-2.5">
           <button
             className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed] disabled:bg-[#6b7280] disabled:cursor-not-allowed disabled:opacity-50"
@@ -621,15 +831,12 @@ export default function ProgramTab({
           >
             Save Program
           </button>
-          <label className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed] text-center flex items-center">
+          <button
+            className="py-2.5 px-5 text-sm font-semibold border-none rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg bg-[#8b5cf6] text-white hover:bg-[#7c3aed]"
+            onClick={handleLoadProgram}
+          >
             Load Program
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleLoadProgram}
-              style={{ display: 'none' }}
-            />
-          </label>
+          </button>
         </div>
       </div>
 
@@ -732,6 +939,99 @@ export default function ProgramTab({
         >
           + Wait
         </button>
+      </div>
+
+      {/* Schedule section */}
+      <div className="mt-6 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="m-0 text-base font-semibold text-[var(--text-primary)]">Schedule</h3>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-sm text-[var(--text-secondary)]">{schedule?.enabled ? 'Enabled' : 'Disabled'}</span>
+            <div
+              className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${schedule?.enabled ? 'bg-[#059669]' : 'bg-[var(--border-color)]'}`}
+              onClick={() => onScheduleChange({ ...schedule, enabled: !schedule?.enabled })}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${schedule?.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </label>
+        </div>
+
+        <div className={`flex flex-col gap-4 ${!schedule?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          {/* Cron expression input */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-[var(--text-primary)]">Cron Expression</label>
+            <input
+              type="text"
+              placeholder="e.g., 0 8 * * *"
+              value={schedule?.cronExpression || ''}
+              onChange={(e) => onScheduleChange({ ...schedule, cronExpression: e.target.value })}
+              className={inputClass + ' font-mono'}
+            />
+            {schedule?.cronExpression && (
+              <span className="text-xs text-[var(--text-secondary)]">
+                {describeCron(schedule.cronExpression)}
+              </span>
+            )}
+            <span className="text-xs text-[var(--text-tertiary)]">
+              Format: minute hour day-of-month month day-of-week
+            </span>
+          </div>
+
+          {/* Presets */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-[var(--text-primary)]">Quick Presets</label>
+            <div className="flex flex-wrap gap-2">
+              {CRON_PRESETS.map((p) => (
+                <button
+                  key={p.cron}
+                  onClick={() => onScheduleChange({ ...schedule, cronExpression: p.cron })}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    schedule?.cronExpression === p.cron
+                      ? 'border-[#059669] bg-[#059669]/10 text-[#059669]'
+                      : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Execution status */}
+        {programExecution && (
+          <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+            <div className="flex items-center gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full ${
+                programExecution.status === 'running'
+                  ? 'bg-[#f59e0b] animate-pulse'
+                  : programExecution.lastResult === 'error'
+                    ? 'bg-[#dc2626]'
+                    : 'bg-[#059669]'
+              }`} />
+              <span className="text-sm font-semibold text-[var(--text-primary)]">
+                {programExecution.status === 'running' ? 'Program Running' : 'Idle'}
+              </span>
+              {programExecution.status === 'running' && programExecution.startedAt && (
+                <span className="text-xs text-[var(--text-tertiary)]">
+                  since {new Date(programExecution.startedAt).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+            {programExecution.status !== 'running' && programExecution.lastRunAt && (
+              <div className="mt-2 text-xs text-[var(--text-secondary)]">
+                Last run: {new Date(programExecution.lastRunAt).toLocaleString()}
+                {' \u2014 '}
+                <span className={programExecution.lastResult === 'error' ? 'text-[#dc2626]' : 'text-[#059669]'}>
+                  {programExecution.lastResult === 'error' ? 'Failed' : 'Success'}
+                </span>
+                {programExecution.lastError && (
+                  <span className="text-[#dc2626]"> ({programExecution.lastError})</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

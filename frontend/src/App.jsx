@@ -75,6 +75,10 @@ function App() {
     const [systemStatus, setSystemStatus] = useState('Connecting...')
     const [logs, setLogs] = useState([])
 
+    // Schedule state
+    const [schedule, setSchedule] = useState({ cronExpression: '', enabled: false })
+    const [programExecution, setProgramExecution] = useState({ status: 'idle' })
+
     // Layout type state
     const [layoutType, setLayoutType] = useState('microchip')
 
@@ -246,53 +250,46 @@ function App() {
         }
     }
 
-    const handleSaveProgram = () => {
+    const handleSaveProgram = async () => {
         if (steps.length === 0) {
             console.error('No program steps to save.')
             return
         }
 
-        const programData = {
-            version: "1.0",
-            created: new Date().toISOString(),
-            steps: steps
+        try {
+            const response = await fetch('/api/program/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({steps, schedule})
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                console.log(data.message)
+            } else {
+                console.error(`Error: ${data.detail || 'Failed to save program'}`)
+            }
+        } catch (error) {
+            console.error(`Error: Unable to save program. ${error.message}`)
         }
-
-        const jsonString = JSON.stringify(programData, null, 2)
-        const blob = new Blob([jsonString], {type: 'application/json'})
-        const url = URL.createObjectURL(blob)
-
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `pipetting_program_${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-
-        console.log(`Program saved with ${steps.length} step(s)`)
     }
 
-    const handleLoadProgram = (event) => {
-        const file = event.target.files[0]
-        if (!file) return
+    const handleLoadProgram = async () => {
+        try {
+            const response = await fetch('/api/program/load')
+            const data = await response.json()
 
-        const reader = new FileReader()
-        reader.onload = (e) => {
-            try {
-                const programData = JSON.parse(e.target.result)
-                if (!programData.steps || !Array.isArray(programData.steps)) {
-                    console.error('Invalid program file format')
-                    return
-                }
-                setSteps(programData.steps)
-                console.log(`Program loaded successfully with ${programData.steps.length} step(s)`)
-                event.target.value = null
-            } catch (error) {
-                console.error(`Error loading program: ${error.message}`)
+            if (response.ok && data.steps) {
+                setSteps(data.steps)
+                if (data.schedule) setSchedule(data.schedule)
+                console.log(`Program loaded with ${data.steps.length} step(s)`)
+            } else {
+                console.error(`Error: ${data.detail || 'Failed to load program'}`)
             }
+        } catch (error) {
+            console.error(`Error: Unable to load program. ${error.message}`)
         }
-        reader.readAsText(file)
     }
 
     const handleExecute = async () => {
@@ -642,6 +639,16 @@ function App() {
         }
     }
 
+    const fetchProgramStatus = async () => {
+        try {
+            const response = await fetch('/api/program/status')
+            const data = await response.json()
+            if (data.execution) setProgramExecution(data.execution)
+        } catch (error) {
+            // silently ignore
+        }
+    }
+
     const fetchConfig = async () => {
         try {
             const response = await fetch('/api/config')
@@ -704,9 +711,11 @@ function App() {
         fetchCurrentPosition()
         fetchConfig()
         fetchAxisPositions()
+        fetchProgramStatus()
 
         const interval = setInterval(() => {
             fetchCurrentPosition()
+            fetchProgramStatus()
             if (activeTab === 'manual') {
                 fetchAxisPositions()
             }
@@ -786,6 +795,10 @@ function App() {
                             validateWellId={validateWellId}
                             setActiveTab={setActiveTab}
                             setWellSelectionMode={setWellSelectionMode}
+                            schedule={schedule}
+                            onScheduleChange={setSchedule}
+                            config={config}
+                            programExecution={programExecution}
                         />
                     )}
                 </div>
