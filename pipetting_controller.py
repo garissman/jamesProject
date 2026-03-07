@@ -259,7 +259,8 @@ class CoordinateMapper:
     @staticmethod
     def coordinates_to_steps(coords: WellCoordinates) -> Tuple[int, int, int]:
         """
-        Convert physical coordinates to motor steps
+        Convert physical coordinates to motor steps.
+        Reads STEPS_PER_MM from config at call time to stay in sync.
 
         Args:
             coords: WellCoordinates
@@ -267,9 +268,13 @@ class CoordinateMapper:
         Returns:
             Tuple of (x_steps, y_steps, z_steps)
         """
-        x_steps = int(coords.x * CoordinateMapper.STEPS_PER_MM_X)
-        y_steps = int(coords.y * CoordinateMapper.STEPS_PER_MM_Y)
-        z_steps = int(coords.z * CoordinateMapper.STEPS_PER_MM_Z)
+        spm_x = settings.get('STEPS_PER_MM_X')
+        spm_y = settings.get('STEPS_PER_MM_Y')
+        spm_z = settings.get('STEPS_PER_MM_Z')
+
+        x_steps = int(coords.x * spm_x)
+        y_steps = int(coords.y * spm_y)
+        z_steps = int(coords.z * spm_z)
 
         return x_steps, y_steps, z_steps
 
@@ -546,6 +551,13 @@ class PipettingController:
         self.operation_well = well_id
         self.log(f"Moving to well {well_id}...")
 
+        # Reload config so we always use the latest coordinates and step values
+        cfg = settings.load()
+        CoordinateMapper.LAYOUT_COORDINATES = cfg.get("LAYOUT_COORDINATES", {})
+        CoordinateMapper.STEPS_PER_MM_X = cfg.get('STEPS_PER_MM_X', 100)
+        CoordinateMapper.STEPS_PER_MM_Y = cfg.get('STEPS_PER_MM_Y', 100)
+        CoordinateMapper.STEPS_PER_MM_Z = cfg.get('STEPS_PER_MM_Z', 100)
+
         # Get target coordinates
         Z_UP_POSITION = 70.0
         try:
@@ -555,6 +567,7 @@ class PipettingController:
             self.current_operation = "idle"
             self.operation_well = None
             return
+        self.log(f"  Config coordinates for {well_id}: X={target_coords.x:.2f}, Y={target_coords.y:.2f} (layout={CoordinateMapper.CURRENT_LAYOUT})")
         # z_offset is negative for depth (e.g., -40 = go 40mm below travel height)
         # Wells return z=0 as placeholder; actual Z target = travel height + offset
         if z_offset != 0.0:
@@ -843,6 +856,13 @@ class PipettingController:
         """
         # Reset stop flag at the start
         self.stop_requested = False
+
+        # Reload config so we always use the latest coordinates and step values
+        cfg = settings.load()
+        CoordinateMapper.LAYOUT_COORDINATES = cfg.get("LAYOUT_COORDINATES", {})
+        CoordinateMapper.STEPS_PER_MM_X = cfg.get('STEPS_PER_MM_X', 100)
+        CoordinateMapper.STEPS_PER_MM_Y = cfg.get('STEPS_PER_MM_Y', 100)
+        CoordinateMapper.STEPS_PER_MM_Z = cfg.get('STEPS_PER_MM_Z', 100)
 
         self.log("=" * 60)
         self.log(f"EXECUTING PIPETTING SEQUENCE ({len(steps)} steps)")
