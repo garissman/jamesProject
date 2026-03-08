@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
 Standalone script to execute a saved pipetting program.
-Reads scheduled_program.json and runs it via PipettingController.
-Updates execution status in the JSON file so the UI can track progress.
+Reads scheduled_program.json, checks if the schedule is enabled and
+the cron expression matches the current time, then runs the steps
+via PipettingController.
+
+Called periodically by schedule_work.py (which acts like crontab).
 
 Usage:
     python run_program.py
-
-Crontab example (run daily at 8am):
-    0 8 * * * cd /path/to/jamesProject && .venv/bin/python run_program.py >> cron.log 2>&1
 """
 
 import json
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +45,42 @@ def update_status(status, error=None):
         json.dump(data, f, indent=2)
 
 
+def should_run_now(data):
+    """Check if the schedule is enabled and the cron expression matches now."""
+    schedule = data.get("schedule", {})
+
+    if not schedule.get("enabled"):
+        print("Schedule is disabled. Skipping.")
+        return False
+
+    cron_expr = (schedule.get("cronExpression") or "").strip()
+    if not cron_expr:
+        print("No cron expression configured. Skipping.")
+        return False
+
+    try:
+        from croniter import croniter
+    except ImportError:
+        print("Error: croniter is required. Install with: pip install croniter")
+        sys.exit(1)
+
+    # Check if the current minute matches the cron expression.
+    # We do this by getting the previous fire time and seeing if it falls
+    # within the current minute.
+    now = datetime.now()
+    cron = croniter(cron_expr, now)
+    prev_fire = cron.get_prev(datetime)
+
+    # If the previous fire time is within the last 60 seconds, it's time to run
+    diff = (now - prev_fire).total_seconds()
+    if diff < 60:
+        print(f"Cron '{cron_expr}' matches current time. Running program.")
+        return True
+    else:
+        print(f"Cron '{cron_expr}' does not match now (last match was {int(diff)}s ago). Skipping.")
+        return False
+
+
 def main():
     # Load program file
     if not PROGRAM_FILE.exists():
@@ -54,6 +89,10 @@ def main():
 
     with open(PROGRAM_FILE) as f:
         data = json.load(f)
+
+    # Check if schedule says we should run now
+    if not should_run_now(data):
+        return
 
     steps_data = data.get("steps", [])
     if not steps_data:
