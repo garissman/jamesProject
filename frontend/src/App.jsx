@@ -700,6 +700,38 @@ function App() {
 
     // ── Effects ──
 
+    // Load saved program from server on mount
+    const initialLoadDone = useRef(false)
+    useEffect(() => {
+        const loadSavedProgram = async () => {
+            try {
+                const response = await fetch('/api/program/load')
+                const data = await response.json()
+                if (response.ok) {
+                    if (data.steps && data.steps.length > 0) setSteps(data.steps)
+                    if (data.schedule) setSchedule(data.schedule)
+                    if (data.execution) setProgramExecution(data.execution)
+                }
+            } catch (error) {
+                // silently ignore on mount
+            } finally {
+                initialLoadDone.current = true
+            }
+        }
+        loadSavedProgram()
+    }, [])
+
+    // Auto-save steps and schedule to scheduled_program.json whenever they change
+    useEffect(() => {
+        if (!initialLoadDone.current) return
+        if (steps.length === 0) return
+        fetch('/api/program/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({steps, schedule})
+        }).catch(() => {})
+    }, [steps, schedule])
+
     // Fetch current position, config, and axis positions on mount; poll every second
     useEffect(() => {
         fetchCurrentPosition()
@@ -790,7 +822,17 @@ function App() {
                             setActiveTab={setActiveTab}
                             setWellSelectionMode={setWellSelectionMode}
                             schedule={schedule}
-                            onScheduleChange={setSchedule}
+                            onScheduleChange={(newSchedule) => {
+                                setSchedule(newSchedule)
+                                // Auto-save when enabled/disabled changes so the scheduler picks it up
+                                if (newSchedule.enabled !== schedule.enabled && steps.length > 0) {
+                                    fetch('/api/program/save', {
+                                        method: 'POST',
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({steps, schedule: newSchedule})
+                                    }).catch(() => {})
+                                }
+                            }}
                             config={config}
                             programExecution={programExecution}
                             isExecuting={isExecuting}

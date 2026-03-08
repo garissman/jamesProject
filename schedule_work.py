@@ -64,7 +64,28 @@ def load_schedule_from_config():
     return schedule.get("cronExpression", "").strip() or None
 
 
-def schedule_cron(cron_expr):
+def is_schedule_enabled():
+    """Re-read scheduled_program.json and check if schedule.enabled is still True."""
+    if not PROGRAM_FILE.exists():
+        return False
+    try:
+        with open(PROGRAM_FILE) as f:
+            data = json.load(f)
+        return bool(data.get("schedule", {}).get("enabled"))
+    except Exception:
+        return False
+
+
+def run_if_enabled(force=False):
+    """Run program only if schedule is still enabled (or force=True for CLI overrides)."""
+    if force or is_schedule_enabled():
+        return run_program()
+    else:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Skipped — schedule disabled in config")
+        return None
+
+
+def schedule_cron(cron_expr, force=False):
     """Run according to a cron expression using croniter."""
     try:
         from croniter import croniter
@@ -85,24 +106,31 @@ def schedule_cron(cron_expr):
         if wait > 0:
             time.sleep(wait)
 
-        run_program()
-        # Re-create croniter from now so it stays accurate
+        run_if_enabled(force)
+
+        # Re-read cron expression from config in case it changed
+        if not force:
+            updated_cron = load_schedule_from_config()
+            if updated_cron and updated_cron != cron_expr:
+                print(f"Cron expression changed: {cron_expr} -> {updated_cron}")
+                cron_expr = updated_cron
+
         cron = croniter(cron_expr, datetime.now())
 
 
-def schedule_interval(interval_seconds):
+def schedule_interval(interval_seconds, force=False):
     """Run on a fixed interval."""
     print(f"Scheduler started: running every {interval_seconds}s")
     print(f"Next run: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     while True:
-        run_program()
+        run_if_enabled(force)
         next_run = datetime.now() + timedelta(seconds=interval_seconds)
         print(f"\nNext run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
         time.sleep(interval_seconds)
 
 
-def schedule_daily(time_str):
+def schedule_daily(time_str, force=False):
     """Run once daily at the given HH:MM time."""
     hour, minute = map(int, time_str.split(":"))
     print(f"Scheduler started: running daily at {time_str}")
@@ -116,7 +144,7 @@ def schedule_daily(time_str):
         wait = (target - now).total_seconds()
         print(f"Next run: {target.strftime('%Y-%m-%d %H:%M:%S')} (in {int(wait)}s)")
         time.sleep(wait)
-        run_program()
+        run_if_enabled(force)
 
 
 def schedule_once(datetime_str):
@@ -160,11 +188,11 @@ def main():
         if args.once:
             schedule_once(args.once)
         elif args.at:
-            schedule_daily(args.at)
+            schedule_daily(args.at, force=True)
         elif args.cron:
-            schedule_cron(args.cron)
+            schedule_cron(args.cron, force=True)
         elif args.interval:
-            schedule_interval(args.interval)
+            schedule_interval(args.interval, force=True)
         else:
             # Default: read cron from scheduled_program.json
             cron_expr = load_schedule_from_config()
@@ -174,7 +202,7 @@ def main():
                 print("or pass --cron, --interval, --at, or --once.")
                 sys.exit(1)
             print(f"Loaded cron expression from config: {cron_expr}")
-            schedule_cron(cron_expr)
+            schedule_cron(cron_expr, force=False)
     except KeyboardInterrupt:
         print(f"\n\nScheduler stopped at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 

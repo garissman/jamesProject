@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "created": "2026-03-07T18:02:13.227520",
+  "modified": "2026-03-07T18:02:13.227555",
+  "steps": [
+    {
+      "stepType": "pipette",
+      "pickupWell": "A2",
+      "dropoffWell": "B2",
+      "rinseWell": "WS2",
+      "washWell": "WS1",
+      "sampleVolume": 1.0,
+      "waitTime": 0,
+      "cycles": 1,
+      "repetitionMode": "quantity",
+      "repetitionQuantity": 1,
+      "repetitionInterval": null,
+      "repetitionDuration": null,
+      "pipetteCount": 3
+    }
+  ],
+  "schedule": {
+    "cronExpression": "*/5 * * * *",
+    "enabled": true
+  }
+}
