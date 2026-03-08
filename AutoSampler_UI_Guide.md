@@ -1,178 +1,287 @@
-# AutoSampler - User Interface Guide
+# AutoSampler UI guide
+
+This document walks through each part of the web interface. The app has five tabs across the top: Plate Layout, Program, Manual, Drift Test, and Settings. A light/dark theme toggle sits in the top-right corner of the nav bar.
 
 ---
 
-## Overview
-
-AutoSampler is a laboratory pipetting automation system controlled through a web-based interface. The application allows users to manage well plates, create automated pipetting programs, manually control stepper motors, test motor precision, and configure system settings. The interface is organized into five main tabs accessible from the top navigation bar.
-
----
-
-## 1. Plate Layout Tab
+## 1. Plate Layout
 
 ![Plate Layout](screenshots/01_plate_layout.png)
 
-The **Plate Layout** tab is the main operational view of the system. From here, users can:
+This is the main working view. The well plate grid takes up most of the screen. Click any well to select it as a target.
 
-- **Switch between layouts**: Toggle between **MicroChip** and **Vial** layout modes using the buttons at the top left. The MicroChip layout shows an 8x15 well grid (rows A-H, columns 1-15) with 5 MicroChip slots (MC1-MC5). The Vial layout shows large vials and a smaller well grid.
+At the top left, buttons switch between layout types:
 
-- **View system status**: The top bar displays the current pipette position (e.g., "Position: WS1"), system connection status, and controller type (RPi badge).
+- **MicroChip** -- 8x15 well grid (A-H, 1-15) with 5 MicroChip slots (MC1-MC5)
+- **Vial** -- large vials plus a smaller well grid
 
-- **Control the Z-Axis**: The Z-Axis button toggles the pipette arm up or down. The button shows the current state (UP/DOWN).
+![Vial Layout](screenshots/02_vial_layout.png)
 
-- **Collect and Dispense**: Enter a volume in mL (default: 40 mL) and use the **Collect** (aspirate) or **Dispense** buttons to operate the pipette. The progress bar shows the current pipette volume.
+Both layouts include two washing stations (WS1, WS2) on the left side.
 
-- **Select wells**: Click any well on the plate grid to select it as a target. Washing stations (WS1, WS2) are shown on the left side. MicroChip slots (MC1-MC5) are shown at the bottom.
+The top bar shows the current pipette position (e.g. "Position: WS1"), connection status, and controller type.
 
-- **Action buttons** (right panel): **Execute** runs the programmed steps, **Stop** halts execution, **Home** returns all axes to the home position, and **Delete all** clears all program steps.
+Controls along the bottom/side:
 
-- **System Logs**: The right panel shows real-time system logs for monitoring operations.
+- **Z-Axis** -- toggles the pipette arm up or down, showing current state
+- **Collect / Dispense** -- enter a volume in mL (default 40) and click to aspirate or dispense; a progress bar shows current pipette volume
+- **Right panel** -- Execute, Stop, Home, and Delete All buttons, plus a scrolling log of system events
 
-### Quick Operation Mode
+### Quick operation mode
 
 ![Quick Operation Mode](screenshots/08_quick_operation.png)
 
-The **Quick Operation Mode** allows users to perform a single pipetting cycle (pickup, dropoff, rinse, wash) by clicking wells directly on the plate, without needing to create a full program. It is activated by clicking the green **Quick Operation Mode** button.
+Click the green "Quick Operation Mode" button to run a single pipetting cycle without building a full program. A 4-step guided workflow appears. The active step pulses blue to show which well to click next:
 
-Once activated, the panel expands into a guided 4-step workflow. The current active step pulses with a blue highlight to indicate which well the user should click next:
+1. **Pickup** -- click a well to set it as the source. A "P" badge appears on the plate. The step turns green with the well ID.
+2. **Dropoff** -- click a destination well. Gets a "D" badge.
+3. **Rinse** -- defaults to WS2 (pre-selected with an "R" badge). Click a different well to override.
+4. **Wash** -- defaults to WS1 (pre-selected with a "W" badge). Click to override.
 
-1. **Click pickup well** -- Click any well on the plate to set it as the source. The selected well gets a **"P"** badge overlay on the plate. The step turns green with the well ID shown (e.g., "A2").
+A volume field below lets you change the transfer amount (default 40 mL).
 
-2. **Click dropoff well** -- Click a well to set it as the destination. The selected well gets a **"D"** badge. In the screenshot, MC2 is selected as the dropoff.
+Once all four wells are set, the "Execute Operation" button turns blue. Clicking it runs the full cycle: move to pickup, aspirate, move to dropoff, dispense, rinse at WS2, wash at WS1, then home.
 
-3. **Click rinse well** -- Defaults to **WS2** (pre-selected, shown with an **"R"** badge on the plate). The user can click a different well to override this default.
-
-4. **Click wash well** -- Defaults to **WS1** (pre-selected, shown with a **"W"** badge on the plate). The user can click a different well to override this default.
-
-Below the 4 steps, a **Volume (mL)** field allows adjusting the transfer volume (default: 40 mL).
-
-Once all four wells are selected, the **Execute Operation** button becomes enabled (blue). Clicking it immediately runs the full cycle: the system moves to the pickup well, aspirates the specified volume, moves to the dropoff well, dispenses, then rinses at WS2 and washes at WS1. After completion, the system returns home automatically.
-
-A **Cancel** button in the top-right corner of the panel exits Quick Operation Mode and returns to normal well selection.
+Cancel in the top-right exits back to normal mode.
 
 ---
 
-## 2. Program Tab
+## 2. Program
 
-![Program Tab](screenshots/03_program_tab.png)
+![Program Tab - Steps](screenshots/10_program_steps.png)
 
-The **Program** tab allows users to create automated multi-step pipetting sequences. From here, users can:
+Build multi-step pipetting sequences here. The header shows "Program Steps" with an estimated run duration badge (e.g. "Est. 54s") calculated from motor speeds, well distances, and cycle counts. Three buttons on the right handle saving and loading: **Save**, **Save As**, and **Load**.
 
-- **View program steps**: All added steps are displayed as draggable cards showing pickup/dropoff wells, volume, timing, and repetition info.
+Each step appears as a draggable card. In the screenshot, step 1 shows "A2 -> B2" transferring 1 mL with rinse at WS2 and wash at WS1. Each card has edit, duplicate, and delete icons on the right. Drag the dotted handle on the left to reorder steps.
 
-- **Add steps**: Use the three buttons at the bottom of the step list to add different step types: **+ Add Cycle**, **+ Home**, and **+ Wait**.
+Three buttons below the step list add new steps:
 
-- **Reorder steps**: Drag and drop step cards to change their execution order.
+- **+ Add Cycle** -- opens the step wizard (see below)
+- **+ Home** -- adds a step that returns all axes to home position
+- **+ Wait** -- adds a timed pause
 
-- **Edit, duplicate, or delete steps**: Each step card has edit, duplicate, and delete action buttons.
-
-- **Save/Load programs**: Use **Save Program** to export the current sequence as a JSON file, or **Load Program** to import a previously saved sequence.
-
-### Step Types
+### Step types
 
 ![Program with Steps](screenshots/09_program_with_steps.png)
 
-There are three types of steps that can be added to a program:
+Each step card has a colored badge:
 
-1. **Home Step** (green badge) -- Returns all axes to their home position. This is useful at the start or end of a program, or between operations that require a known starting point. Added by clicking **+ Home**.
+- **Green (Home)** -- returns all axes to their starting position. Useful between operations or at the start/end of a program.
+- **Blue (Cycle)** -- a full pipetting cycle. The card shows pickup and dropoff wells (e.g. "A2 -> MC1"), transfer volume, and rinse/wash wells.
+- **Orange (Wait)** -- pauses for a set duration (e.g. "Wait 5 sec").
 
-2. **Cycle Step** (blue badge) -- A full pipetting cycle consisting of pickup, dropoff, rinse, and wash. The step card displays the pickup and dropoff wells (e.g., "A2 → MC1"), the transfer volume, and the rinse/wash wells. In the screenshot, Step 2 shows "A2 → MC1" with "40 mL | Rinse: WS2 | Wash: WS1". Added by clicking **+ Add Cycle**, which opens the step wizard.
-
-3. **Wait Step** (orange badge) -- Pauses execution for a specified duration. The step card shows the wait time (e.g., "Wait 5 sec"). Added by clicking **+ Wait**.
-
-### Step Wizard - Stage 1: Wells & Volume
+### Step wizard
 
 ![Step Wizard](screenshots/04_add_step_wizard.png)
 
-The step creation wizard guides users through a 2-stage process when adding a Cycle step:
+When you click "+ Add Cycle", a 2-stage wizard opens:
 
-**Stage 1 - Wells & Volume:**
-- **Pickup Well** (required): Enter the source well ID (e.g., A2, WS1, MC3) or click "Select from plate" to pick it visually from the plate layout.
-- **Dropoff Well**: The destination well for dispensing.
-- **Rinse Well** (default: WS2): The well used for rinsing the pipette between operations.
-- **Wash Well** (default: WS1): The well used for washing the pipette.
-- **Sample Volume**: Volume in mL to transfer (default: 40 mL).
+**Stage 1 -- Wells and volume:**
 
-**Stage 2 - Timing & Repetition:**
-- **Wait Time**: Pause duration in seconds between operations.
-- **Repetition Mode**: Choose between "By Quantity" (repeat N times) or "By Time Frequency" (repeat at intervals over a duration).
+- Pickup well (required) -- type a well ID (A2, WS1, MC3) or click "Select from plate" to pick visually
+- Dropoff well -- where to dispense
+- Rinse well -- defaults to WS2
+- Wash well -- defaults to WS1
+- Sample volume -- mL to transfer (default 40)
+
+**Stage 2 -- Timing and repetition:**
+
+- Wait time -- seconds to pause between operations
+- Repetition mode -- "By Quantity" (repeat N times) or "By Time Frequency" (repeat at an interval over a total duration)
+
+### Program management
+
+- **Save** -- saves steps and schedule to `scheduled_program.json`. Auto-save also runs on every change, so you rarely need to click this manually.
+- **Save As** -- type a name and save a copy to the `programs/` directory. Useful for keeping multiple program variants.
+- **Load** -- opens a list of previously saved programs. Each entry has load, download (as JSON), and delete buttons.
+
+### Schedule
+
+![Program Tab - Schedule](screenshots/11_program_schedule.png)
+
+The Schedule section sits below the step list. This is how you set up unattended, repeating execution of your program.
+
+**Enabled / Disabled toggle** -- the switch in the top-right corner of the Schedule box. When you flip it, the change saves immediately to `scheduled_program.json`. The scheduler (`run_program.py`) reads this flag every time it's called -- if disabled, it skips execution and exits. You can disable a schedule from the UI without stopping `schedule_work.py`.
+
+**Cron Expression** -- a standard 5-field cron expression that controls when the program runs. The five fields are:
+
+```
+minute  hour  day-of-month  month  day-of-week
+```
+
+For example, `*/5 * * * *` means "every 5 minutes". A human-readable description appears below the input (e.g. "Every 5 minutes") so you can verify you typed it correctly. The format hint underneath reminds you of the field order.
+
+**Quick Presets** -- buttons that fill in the cron expression for you. The available presets are:
+
+| Preset | Cron expression | Meaning |
+|--------|----------------|---------|
+| Every 5 minutes | `*/5 * * * *` | Runs at :00, :05, :10, :15, ... every hour |
+| Every hour | `0 * * * *` | Runs at the top of every hour |
+| Every 2 hours | `0 */2 * * *` | Runs at :00 every 2 hours |
+| Every 6 hours | `0 */6 * * *` | Runs 4 times a day (midnight, 6 AM, noon, 6 PM) |
+| Every 12 hours | `0 */12 * * *` | Runs twice a day (midnight and noon) |
+| Daily at 8:00 AM | `0 8 * * *` | Once a day at 8 AM |
+| Daily at 6:00 PM | `0 18 * * *` | Once a day at 6 PM |
+| Mon-Fri at 8 AM | `0 8 * * 1-5` | Weekdays only at 8 AM |
+| Every Monday 8 AM | `0 8 * * 1` | Once a week on Monday at 8 AM |
+
+The currently active preset is highlighted in green. You can also type any valid cron expression manually.
+
+**Execution status** -- at the bottom of the Schedule box, a colored dot shows the current state:
+
+- Green dot + "Idle" -- no program is running right now
+- Amber dot + "Running" -- a program is currently executing (shows step progress, e.g. "Step 3 of 7")
+- Red dot + "Error" -- the last run failed (shows error message)
+
+This status updates whether the program was started from the UI's Execute button or triggered by the scheduler. The last run timestamp also appears here after a completed run.
+
+### How scheduling works end-to-end
+
+1. Add your steps in the Program tab
+2. Set a cron expression (or pick a preset)
+3. Flip the toggle to "Enabled"
+4. On the Raspberry Pi, start the scheduler: `python schedule_work.py`
+5. Every 60 seconds, `schedule_work.py` calls `run_program.py`
+6. `run_program.py` reads `scheduled_program.json`, checks `schedule.enabled` is true, checks the cron expression matches the current minute, and only then sends the steps to the FastAPI server for execution
+7. To pause: flip the toggle to "Disabled" in the UI. The scheduler keeps running but `run_program.py` skips execution until you re-enable it
 
 ---
 
-## 3. Manual Tab
+## 3. Manual
 
 ![Manual Tab](screenshots/05_manual_tab.png)
 
-The **Manual** tab provides direct control over each axis motor for calibration and troubleshooting. From here, users can:
+Direct motor control for calibration and troubleshooting. Each axis (X, Y, Z, Pipette) gets its own card showing:
 
-- **Move individual axes**: Each axis (X, Y, Z, Pipette) has its own control card showing:
-  - Current position in mm (or mL for the pipette)
-  - A configurable step count input (default: 100 steps)
-  - **- (orange)** and **+ (green)** buttons to move the motor in either direction by the specified number of steps
+- Current position in mm (or mL for the pipette)
+- A step count input (default 100 steps)
+- Orange (-) and green (+) buttons to move that motor by the specified steps
 
-- **Set Current Position**: Click this button to manually override the tracked position values without moving the motors. This is useful after manual adjustments or to re-zero the coordinate system.
+"Set Current Position" lets you override the tracked position without moving anything. Useful after a manual adjustment or to re-zero.
 
-- **View status**: The bottom bar shows the current well position and backend connection status.
-
----
-
-## 4. Drift Test Tab
-
-![Drift Test](screenshots/06_drift_test.png)
-
-The **Drift Test** tab measures stepper motor precision by running back-and-forth cycles between limit switches. From here, users can:
-
-- **Select a motor**: Choose which motor to test (Motor 1 X-Axis, Motor 2 Y-Axis, Motor 3 Z-Axis, or Motor 4 Pipette).
-
-- **Configure test parameters**:
-  - **Number of Cycles**: How many round trips to perform (default: 10).
-  - **Motor Speed**: Step delay in seconds (default: 0.001s).
-  - **Steps per mm**: Conversion factor for distance calculations (default: 200).
-
-- **Check limit switches**: The Limit Switch Check panel shows the current state of each motor's min/max limit switches. Use the Refresh button to update.
-
-- **Start Drift Test**: Runs the configured test and displays results as a chart showing forward/backward step counts per cycle, with drift analysis.
-
-- **Clear Results**: Removes previous test results from the display.
+The bottom bar shows current well position and backend connection status.
 
 ---
 
-## 5. Settings Tab
+## 4. Drift test
 
-![Settings Tab](screenshots/07_settings_tab.png)
+The drift test measures how accurately a stepper motor returns to the same position after repeated back-and-forth travel. This helps identify mechanical issues like backlash, missed steps, or belt slippage before they affect real pipetting runs.
 
-The **Settings** tab provides system configuration organized into three sub-tabs:
+### Setup
 
-### Coordinate Mapping
-- **Map well positions**: For each layout (MicroChip or Vial), a table lists all reference wells with X and Y coordinate fields in mm.
-- **Capture positions**: Move the pipette to a well using Manual mode, then click **Capture** to save the current motor position as that well's coordinates.
-- **Manual entry**: Directly type X/Y coordinates into the table fields.
-- **Current Position display**: Shows the real-time X,Y position from the motors.
+![Drift Test - Setup](screenshots/drift_test_01_setup.png)
 
-### Motor Settings
-- Configure steps per mm for each axis (X, Y, Z).
-- Set pipette steps per mL and maximum volume.
-- Configure travel speed, pipette speed, pickup/dropoff depths, safe height, and rinse cycles.
-- Toggle axis inversion (Invert X, Y, Z, Pipette) for motors mounted in reverse.
-- Set washing station parameters (position, height, width, gap).
+At the top, select the motor to test and fill in the parameters:
+
+- **Motor** -- dropdown to pick Motor 1 (X), Motor 2 (Y), Motor 3 (Z), or Motor 4 (Pipette)
+- **Number of Cycles** -- how many round trips to run (default 10)
+- **Motor Speed (s)** -- delay between steps in seconds (default 0.001). Lower values = faster movement.
+- **Steps per mm** -- conversion factor used to translate step counts into mm for the charts
+
+The Limit Switch Check panel shows the MIN and MAX switch states for the selected motor (e.g. GPIO 26 = Open, GPIO 21 = TRIGGERED). Click Refresh to update. Press each switch by hand to verify it reads TRIGGERED before running a test.
+
+Click "Start Drift Test" to begin. A progress bar tracks completion (e.g. "20 / 20 cycles"). The Test Status box below shows the motor name, status (COMPLETED/RUNNING), and start/end timestamps. "Clear Results" wipes previous data.
+
+### Test results
+
+![Drift Test - Summary and cycle data](screenshots/drift_test_02_summary.png)
+
+After the test completes, results appear in two sections:
+
+**Test Summary** -- a table with the key numbers:
+
+- Forward/backward step counts (min, max, average)
+- Average forward and backward time per pass
+- Average cycle time and peak cycle time
+- Total drift in steps and mm
+- Average drift per cycle and max single-cycle drift
+
+**Cycle Data** -- one row per cycle showing: timestamp, forward steps, forward time, backward steps, backward time, cycle time, step difference, drift in mm, and cumulative forward/backward deltas.
+
+### Charts
+
+![Drift Test - Steps, drift, and timing charts](screenshots/drift_test_03_charts_upper.png)
+
+- **Steps per Cycle** -- forward and backward step counts overlaid. Both lines should sit flat and close together. Any separation means one direction consistently takes more steps than the other.
+- **Drift per Cycle** -- cumulative drift in mm. A flat line at zero is ideal. A steadily rising or falling line means the motor consistently overshoots or undershoots in one direction.
+- **Time per Cycle** -- forward time, backward time, and total cycle time. The forward and backward passes should take roughly the same time. Large differences may indicate binding in one direction.
+- **Running Average Time** -- smoothed version of the timing chart. Helps spot gradual slowdowns that are hard to see cycle-by-cycle.
+
+![Drift Test - Delta and time-series charts](screenshots/drift_test_04_charts_lower.png)
+
+- **Inter-Cycle Step Delta** -- forward and backward step deltas between consecutive cycles. Should hover near zero. Spikes mean the motor suddenly traveled more or fewer steps than the previous cycle.
+- **Drift over Time** -- drift in mm plotted against wall-clock timestamps. Same data as "Drift per Cycle" but on a time axis, so you can correlate drift with how long the test has been running.
+- **Step Difference over Time** -- per-cycle step difference (forward minus backward) against timestamps. A flat line near zero means the motor is balanced in both directions.
+
+The System Logs panel at the bottom shows the raw motor commands and homing sequences for debugging.
+
+### What to look for
+
+- Flat lines across all charts = the motor is accurate and repeatable.
+- Gradual trends in the drift chart = systematic error. Check belt tension or driver microstepping settings.
+- Random spikes in cycle differences = mechanical binding, loose couplings, or electrical noise.
+- Large total drift relative to cycle count = the system won't hold position over long programs. Recalibrate or inspect the mechanical assembly.
+
+---
+
+## 5. Settings
+
+The Settings tab has three sub-tabs: Coordinate Mapping, Motor Settings, and Calibration. All changes save to `config.json` and apply immediately without a server restart.
+
+### Coordinate mapping
+
+![Settings - Coordinate Mapping](screenshots/12_settings_coordinates.png)
+
+This is where you tell the system where each well is located in physical space. A table lists all reference wells for the selected layout (MicroChip or Vial) with X and Y coordinate columns in mm.
+
+At the top, "Current Position" shows the real-time motor X,Y coordinates. Use the Layout dropdown to switch between MicroChip and Vial.
+
+Each row has:
+- Well name (WS1, WS2, A2, B2, MC1, etc.)
+- X and Y fields you can type into directly
+- A green dot in the Status column when coordinates are set
+- **Capture** -- saves the current motor position as that well's coordinates. Move the pipette to the well using Manual mode first, then click Capture.
+- **Clear** -- removes the saved coordinates for that well
+
+### Motor settings
+
+![Settings - Motor Settings](screenshots/13_settings_motor.png)
+
+Four configuration sections:
+
+**Motor Configuration** -- steps per mm for the X, Y, and Z axes (default 200 each). Below that, inversion toggles for each axis and the pipette. Flip these if a motor moves the wrong direction.
+
+**Pipette Configuration** -- steps per mL (default 60) and maximum pipette volume in mL (default 100).
+
+**Pipetting Operation Parameters** -- pickup depth (how far Z goes down to aspirate, default 40 mm), dropoff depth (how far Z goes down to dispense, default 5 mm), safe height (Z clearance during XY moves, default 20 mm), and rinse cycles (how many aspirate/dispense cycles per rinse, default 1).
+
+**Movement Speed Configuration** -- travel speed in seconds per step (default 0.0001s, lower = faster) and pipette speed in seconds per step (default 0.001s, slower for precision).
+
+Click "Save Configuration" at the bottom to write all changes to `config.json`.
 
 ### Calibration
-- Run calibration routines for each axis: move a known number of steps, measure the actual distance, and the system calculates the correct steps-per-mm value.
 
-All settings are saved to `config.json` and applied immediately without a server restart.
+![Settings - Calibration](screenshots/14_settings_calibration.png)
+
+Each axis (X, Y, Z) and the pipette gets its own calibration card. The process for each:
+
+1. Note the current Steps/mm value at the top of the card
+2. Enter a test step count (default 1000)
+3. Click "Move +" or "Move -" to send that many steps to the motor
+4. Measure the actual distance traveled with a ruler (or volume with a graduated cylinder for the pipette)
+5. Enter the measured value in "Measured Distance (mm)" (or "Measured Volume (mL)" for the pipette)
+6. Click "Calculate" -- the system computes the correct steps-per-mm (or steps-per-mL) value
+7. Click "Save" to apply the new value
+
+The pipette card works the same way but uses "Aspirate +" and "Dispense -" buttons instead of Move, and measures volume in mL instead of distance.
 
 ---
 
-## Common Workflow
+## Typical workflow
 
-1. **Home the system**: Click **Home** to move all axes to their starting positions.
-2. **Calibrate coordinates** (first time): Go to Settings > Coordinate Mapping, use Manual mode to position the pipette over each well, and click Capture.
-3. **Create a program**: Go to the Program tab, add steps defining pickup, dropoff, rinse, and wash sequences.
-4. **Execute**: Click **Execute** to run the program. Monitor progress in the System Logs panel. The Plate Layout tab will show real-time animations of the current operation.
-5. **Stop if needed**: Click **Stop** at any time to halt execution.
-
----
-
-## Theme
-
-The interface supports **Light** and **Dark** modes, toggled via the button in the top-right corner of the navigation bar.
+1. **Home** -- click Home to move all axes to starting positions
+2. **Calibrate** (first time only) -- go to Settings > Coordinate Mapping, use Manual mode to position over each reference well, click Capture
+3. **Build a program** -- go to the Program tab, add cycle/home/wait steps
+4. **Run it** -- click Execute. Watch progress in the logs panel. The Plate Layout tab shows which well the system is working on.
+5. **Schedule it** (optional) -- enable the schedule, pick a cron expression, then run `python schedule_work.py` on the Pi
+6. **Stop** -- click Stop at any time to halt execution

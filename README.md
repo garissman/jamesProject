@@ -1,14 +1,14 @@
-# JamesProject — Laboratory Auto-Sampler
+# JamesProject
 
-A full-stack laboratory sampler application that controls a 3-axis gantry with pipette for automated sample handling on well plates and microchips. Includes a web UI for building pipetting programs and a scheduler for unattended execution.
+Laboratory auto-sampler that moves a 3-axis gantry with pipettes over well plates and microchips. You build pipetting programs in a browser, run them from the web UI, or schedule them with cron for unattended operation.
 
 ## Hardware
 
-- **Platform**: Raspberry Pi — 4 stepper motors driven via GPIO pins through external drivers (DRV8825/A4988), with limit switches for homing.
-- **Well plate**: Standard 96-well (8 rows A-H x 12 columns 1-12), 4 mm spacing, 14 mm high, 8 mm diameter
-- **Pipettes**: Always 3 pipettes, volume always 40 mL
+The system runs on a Raspberry Pi with 4 stepper motors (X, Y, Z, pipette) driven through DRV8825 or A4988 driver boards, plus limit switches for homing. It always uses 3 pipettes at 40 mL volume.
 
-### Pin Configuration
+The well plate is a standard 96-well format: 8 rows (A-H) x 12 columns (1-12), 4 mm spacing, 14 mm high, 8 mm diameter per well.
+
+### Pin configuration
 
 | Motor | Function | Pulse | Dir | Limit Min | Limit Max |
 |-------|----------|-------|-----|-----------|-----------|
@@ -17,52 +17,50 @@ A full-stack laboratory sampler application that controls a 3-axis gantry with p
 | 3 | Z-axis | GPIO05 | GPIO06 | GPIO12 | GPIO25 |
 | 4 | Pipette | GPIO13 | GPIO19 | GPIO24 | GPIO23 |
 
-### Raspberry Pi Setup Notes
+### Raspberry Pi notes
 
-**GPIO mode:** BCM (Broadcom pin numbering), set automatically by `stepper_control.py`.
+`stepper_control.py` sets BCM (Broadcom) pin numbering automatically.
 
-**Driver wiring:** Each motor connects to a DRV8825 or A4988 driver board. The Pulse (STEP) pin triggers one motor step per HIGH→LOW transition. The Dir (DIR) pin sets rotation direction (HIGH = clockwise, LOW = counterclockwise).
+Each motor connects to a driver board. The Pulse pin triggers one step per HIGH-LOW transition. The Dir pin sets direction (HIGH = clockwise, LOW = counterclockwise).
 
-**Limit switches:** Normally-open switches wired between the GPIO pin and GND. Internal pull-up resistors are enabled in software (`GPIO.PUD_UP`), so the pin reads HIGH when the switch is open and LOW when triggered. Edge detection with 50 ms debounce is configured for interrupt-driven limit stops.
+Limit switches are normally-open, wired between the GPIO pin and GND. Internal pull-ups are enabled in software, so the pin reads HIGH when open and LOW when triggered. Edge detection with 50 ms debounce handles interrupt-driven stops.
 
-**Axis inversion:** If a motor moves in the wrong direction, toggle the `INVERT_X` / `INVERT_Y` / `INVERT_Z` / `INVERT_PIPETTE` flags in the Settings tab or directly in `config.json`.
+If a motor moves the wrong way, flip the `INVERT_X` / `INVERT_Y` / `INVERT_Z` / `INVERT_PIPETTE` flag in the Settings tab or in `config.json` directly.
 
-**Simulation mode:** When `RPi.GPIO` is not available (e.g. running on Mac/PC for development), the system automatically runs in simulation mode — no hardware required.
+When `RPi.GPIO` isn't available (Mac/PC), the system runs in simulation mode automatically.
 
-**Power considerations:**
-- Use an external power supply for the stepper drivers (typically 12V or 24V). Do not power motors from the Pi's 5V rail.
-- Ensure the Pi and drivers share a common ground.
-- A heatsink on the driver boards is recommended for sustained operation.
+Power the stepper drivers from an external supply (12V or 24V), not the Pi's 5V rail. Share a common ground between the Pi and drivers. Heatsinks on the driver boards help during long runs.
 
-## Project Structure
+## Project structure
 
 ```
 jamesProject/
-├── main.py                        # FastAPI backend server
+├── main.py                        # FastAPI backend
 ├── pipetting_controller.py        # Motor control + coordinate mapping
-├── stepper_control.py             # Raspberry Pi GPIO stepper driver
-├── settings.py                    # JSON-backed runtime config
-├── config.json                    # Calibration, motor settings & layout coordinates
-├── run_program.py                 # Standalone script to execute a saved program
-├── schedule_work.py               # Scheduler — simulates crontab for run_program.py
-├── scheduled_program.json         # Saved program + schedule (created via UI)
-├── requirements.txt               # Python dependencies
-├── frontend/                      # React + Vite + Tailwind web UI
+├── stepper_control.py             # GPIO stepper driver
+├── settings.py                    # JSON-backed config
+├── config.json                    # Calibration, motor settings, layout coordinates
+├── run_program.py                 # Checks cron, runs saved program
+├── schedule_work.py               # Calls run_program.py every minute (like crontab)
+├── scheduled_program.json         # Current program + schedule + execution status
+├── programs/                      # Named programs (Save As)
+├── requirements.txt
+├── frontend/
 │   └── src/
-│       ├── App.jsx                # Main app with tab routing & state
+│       ├── App.jsx                # Tab routing, state management
 │       └── components/
-│           ├── PlateLayout.jsx    # Well plate visualization & quick operations
-│           ├── ProgramTab.jsx     # Step wizard, program list & schedule config
+│           ├── PlateLayout.jsx    # Well plate grid + quick operations
+│           ├── ProgramTab.jsx     # Step wizard, program list, schedule
 │           ├── ManualTab.jsx      # Direct axis control
 │           ├── DriftTestTab.jsx   # Repeatability testing
-│           ├── SettingsTab.jsx    # Calibration & coordinate capture
-│           ├── RightPanel.jsx     # Logs & action buttons
-│           └── NavBar.jsx         # Tab navigation & theme toggle
+│           ├── SettingsTab.jsx    # Calibration + coordinate capture
+│           ├── RightPanel.jsx     # Logs + action buttons
+│           └── NavBar.jsx         # Tab navigation
 └── docs/
-    └── plans/                     # Design & implementation plans
+    └── plans/
 ```
 
-## Quick Start
+## Quick start
 
 ```bash
 # Backend
@@ -77,134 +75,244 @@ npm install
 npm run dev
 ```
 
-Backend at `http://localhost:8000`, frontend dev server at `http://localhost:5173`.
+Backend runs at `http://localhost:8000`, frontend at `http://localhost:5173`.
 
-## Web UI Tabs
+## Web UI
+
+The interface has five tabs:
 
 ### Plate Layout
 
-Interactive well plate visualization. Supports three layout types:
+Shows the well plate grid. Three layout types are available:
 
-- **MicroChip** — 8x15 well grid + 5 MicroChip slots + 2 washing stations (WS1, WS2)
-- **Vial** — 5 vials + 12x6 small well grid + washing stations
-- **Wellplate** — 24 small wells + 24 standard wells + washing stations
+- **MicroChip** -- 8x15 well grid + 5 MicroChip slots + 2 washing stations (WS1, WS2)
+- **Vial** -- 5 vials + 12x6 small well grid + washing stations
+- **Wellplate** -- 24 small wells + 24 standard wells + washing stations
 
-Features quick-operation mode for one-click pipetting cycles: pickup → dropoff → rinse (WS2) → wash (WS1).
+There's a quick-operation mode where clicking a well runs a full cycle: pickup, dropoff, rinse (WS2), wash (WS1).
 
 ### Program
 
-Build multi-step pipetting sequences using a 2-stage wizard:
+A 2-step wizard for building pipetting sequences:
 
-1. **Wells & Volume** — Select pickup, dropoff, rinse, and wash wells; set sample volume
-2. **Timing & Repetition** — Set wait time, repetition mode (by quantity or time frequency)
+1. Select pickup, dropoff, rinse, and wash wells; set sample volume
+2. Set wait time, repetition mode (by quantity or by time interval)
 
-Also supports Home and Wait steps. Steps can be reordered via drag-and-drop, duplicated, edited, and deleted.
+You can also add Home and Wait steps. Steps support drag-and-drop reordering, duplication, editing, and deletion.
 
-**Schedule section** — Enable scheduling and define a cron expression for automated execution. Quick presets include every hour, daily at 8 AM, Mon–Fri at 8 AM, and more. Saved with the program via "Save Program".
+Programs can be saved, loaded, deleted, and downloaded as JSON. The UI shows an estimated run duration based on motor speeds, well distances, and cycle counts.
+
+The schedule section lets you enable a cron expression for automated runs. Presets are available for common intervals (every 5 minutes, hourly, daily at 8 AM, weekdays at 8 AM, etc.).
+
+While a program runs, the tab shows status (idle/running/error), which step is executing, and when the last run finished.
+
+Steps and schedule auto-save to `scheduled_program.json` on every change.
 
 ### Manual
 
-Direct motor control with step inputs for each axis (X, Y, Z, Pipette). Override tracked positions without moving motors.
+Move individual axes by step count. You can also override the tracked position without actually moving motors.
 
-### Drift Test
+### Drift test
 
-Run repeatability tests to measure mechanical drift over multiple cycles.
+Runs repeatability tests over multiple cycles to measure mechanical drift.
 
 ### Settings
 
-- **Layout Coordinates** — Capture and store XY coordinates for reference wells per layout type
-- **Calibration** — Calculate steps/mm by measuring actual travel distance
-- **Motor Config** — Steps/mm, travel speed, pipette speed, axis inversion
+Capture and store XY coordinates for reference wells per layout type. Calibrate steps/mm by measuring actual travel distance. Configure motor parameters: steps/mm, travel speed, pipette speed, axis inversion flags.
 
-## Program Scheduling
+## Scheduling
 
-Programs can be scheduled for unattended execution without crontab.
+Two ways to run programs on a schedule:
 
-### How it works
+### Option 1: schedule_work.py
 
-1. Build your program steps in the **Program** tab
-2. Enable **Schedule** and choose a cron expression (or pick a preset)
-3. Click **Save Program** — saves steps + schedule to `scheduled_program.json`
-4. Run the scheduler:
+`schedule_work.py` is a simple loop that calls `run_program.py` every 60 seconds, like a built-in crontab. `run_program.py` reads `scheduled_program.json`, checks that `schedule.enabled` is true and the cron expression matches the current minute, and only then sends the steps to the FastAPI server's `/api/pipetting/execute` endpoint. This avoids GPIO conflicts -- only the FastAPI server owns the hardware.
+
+```
+schedule_work.py  --(every 60s)-->  run_program.py  --(checks cron)--> FastAPI /api/pipetting/execute
+                                         |
+                                         +-- reads scheduled_program.json
+                                         +-- checks schedule.enabled
+                                         +-- checks cron matches current minute
+                                         +-- POSTs steps to FastAPI if both pass
+```
+
+Setup:
+
+1. Build steps in the Program tab
+2. Enable the schedule and pick a cron expression
+3. Start the scheduler:
 
 ```bash
 python schedule_work.py
+
+# Or with a custom check interval:
+python schedule_work.py --interval 30
 ```
 
-The scheduler reads the cron expression from the saved program and calls `run_program.py` at each scheduled time.
+### Option 2: system crontab
 
-### Scheduler options
+You can skip `schedule_work.py` entirely and use your system's crontab. Since `run_program.py` already checks the cron expression, you just need crontab to call it every minute:
 
 ```bash
-# Default: use cron expression from saved program
-python schedule_work.py
-
-# Override with a custom cron expression
-python schedule_work.py --cron "0 */2 * * *"
-
-# Run every N seconds
-python schedule_work.py --interval 300
-
-# Run daily at a specific time
-python schedule_work.py --at 08:00
-
-# Run once at a specific datetime
-python schedule_work.py --once "2026-03-08 08:00:00"
+crontab -e
 ```
 
-### Standalone execution
+Add this line (adjust the path to match your setup):
 
-To run a saved program once without the scheduler:
+```
+* * * * * cd /home/pi/jamesProject && /home/pi/jamesProject/.venv/bin/python run_program.py >> /home/pi/jamesProject/cron.log 2>&1
+```
+
+What each part does:
+
+| Part | Purpose |
+|------|---------|
+| `* * * * *` | Crontab calls the script every minute. The actual run schedule is controlled by the cron expression in the UI. |
+| `cd /home/pi/jamesProject` | Sets the working directory so `scheduled_program.json` and `config.json` are found |
+| `.venv/bin/python` | Uses the project's virtualenv with all dependencies |
+| `>> cron.log 2>&1` | Appends output to a log file for debugging |
+
+To verify it's working:
+
+```bash
+crontab -l                       # list entries
+sudo systemctl status cron       # check cron service is running
+```
+
+To stop: either disable the schedule in the UI or remove the crontab entry.
+
+### Running once manually
 
 ```bash
 python run_program.py
 ```
 
+This still checks the cron expression. If the cron doesn't match the current minute, it skips execution and exits.
+
+### scheduled_program.json
+
+```json
+{
+  "version": "1.0",
+  "steps": [],
+  "schedule": {
+    "cronExpression": "*/5 * * * *",
+    "enabled": true
+  },
+  "execution": {
+    "status": "idle",
+    "lastRunAt": "2026-03-07T08:00:01",
+    "lastResult": "success"
+  }
+}
+```
+
+`schedule.enabled` -- toggled from the UI; `run_program.py` skips execution when false.
+`schedule.cronExpression` -- standard 5-field cron expression.
+`execution.status` -- `"running"` during execution, `"idle"` otherwise.
+`execution.lastResult` -- `"success"` or `"error"` after each run.
+
 ## API
+
+### Pipetting
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/pipetting/execute` | Run a sequence of steps |
+| POST | `/api/pipetting/stop` | Stop execution |
+| POST | `/api/pipetting/home` | Home all axes |
+| POST | `/api/pipetting/move-to-well` | Move to a well |
+| POST | `/api/pipetting/toggle-z` | Raise or lower Z |
+| POST | `/api/pipetting/aspirate` | Aspirate volume |
+| POST | `/api/pipetting/dispense` | Dispense volume |
+| GET | `/api/pipetting/status` | Current state, well, operation |
+| GET | `/api/pipetting/logs` | Recent log entries |
+| POST | `/api/pipetting/set-layout` | Set layout type and wells |
+| POST | `/api/pipetting/set-layout-type` | Set layout type only |
+| POST | `/api/pipetting/set-pipette-count` | Set pipette count |
+| POST | `/api/pipetting/set-controller-type` | Set controller type |
+
+### Programs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/program/save` | Save steps + schedule to `scheduled_program.json` |
+| GET | `/api/program/load` | Load current program |
+| GET | `/api/program/status` | Poll execution status |
+| POST | `/api/programs/save` | Save a named program |
+| GET | `/api/programs/list` | List saved programs |
+| GET | `/api/programs/load/{name}` | Load a program by name |
+| DELETE | `/api/programs/{name}` | Delete a program |
+| GET | `/api/programs/download/{name}` | Download as JSON |
+
+### Axes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/axis/move` | Move one axis by N steps |
+| GET | `/api/axis/positions` | Current positions |
+| POST | `/api/axis/set-position` | Override tracked position |
+| GET | `/api/limit-switches` | Limit switch states |
+
+### Coordinates
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/coordinates/capture` | Capture current position for a well |
+| POST | `/api/coordinates/save` | Save a coordinate |
+| GET | `/api/coordinates/{layout}` | Get coordinates for a layout |
+
+### Drift test
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/drift-test/start` | Start test |
+| POST | `/api/drift-test/stop` | Stop test |
+| GET | `/api/drift-test/status` | Progress and results |
+| POST | `/api/drift-test/clear` | Clear results |
+
+### Config
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/config` | Read all settings |
 | POST | `/api/config` | Update settings |
-| GET | `/api/pipetting/status` | System status, current well, operation |
-| POST | `/api/pipetting/execute` | Run pipetting program |
-| POST | `/api/pipetting/stop` | Stop current execution |
-| POST | `/api/pipetting/home` | Home all axes |
-| POST | `/api/pipetting/move-to-well` | Move to a specific well |
-| POST | `/api/pipetting/toggle-z` | Raise/lower Z-axis |
-| POST | `/api/pipetting/aspirate` | Aspirate volume |
-| POST | `/api/pipetting/dispense` | Dispense volume |
-| POST | `/api/axis/move` | Move single axis by steps |
-| GET | `/api/axis/positions` | Read current axis positions |
-| POST | `/api/axis/set-position` | Override tracked position |
-| POST | `/api/program/save` | Save program + schedule to disk |
-| GET | `/api/program/load` | Load saved program + schedule |
-| POST | `/api/pipetting/set-layout` | Switch layout type |
-| POST | `/api/drift-test/start` | Start drift test |
-| GET | `/api/drift-test/status` | Drift test progress |
-| GET | `/api/pipetting/logs` | Recent system logs |
 
-## Architecture
+### Hardware
 
-### Motion Sequence
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/led/test` | LED on/off test |
+| GET | `/api/mcu/ping` | Ping MCU |
+| GET | `/api/mcu/limits` | MCU limit switch states |
 
-All movements follow: **Z up** (if down) → **Move X and Y** to target → **Z down**
+## How motion works
 
-Each pipetting circle: **Pickup** → **Drop-off** → **Rinse** (WS2) → **Wash** (WS1) → **Home** (after program finishes)
+Every move follows the same pattern: raise Z (if down), move X and Y to the target, lower Z.
 
-### System Diagram
+A pipetting cycle goes: pickup, dropoff, rinse (WS2), wash (WS1). After a program finishes, the system always homes.
 
 ```
-Browser  ──HTTP──▶  FastAPI (main.py)
-                        │
-                        ▼
-                  Raspberry Pi
-                (stepper_control.py)
-                   GPIO pins
-                        │
-                        ▼
-              Stepper Drivers → Motors (X, Y, Z, Pipette)
+Browser  --HTTP-->  FastAPI (main.py)
+                        |
+                        v
+                  PipettingController
+                        |
+                        v
+                  StepperController (GPIO)
+                        |
+                        v
+                  Drivers --> Motors (X, Y, Z, Pipette)
 
-schedule_work.py ──▶ run_program.py ──▶ PipettingController
-     (cron)            (standalone)        (direct motor control)
+schedule_work.py --(every 60s)--> run_program.py --(cron check)--> FastAPI /api/pipetting/execute
+                                       |
+                                       v
+                                scheduled_program.json
 ```
+
+## Dependencies
+
+**Python:** FastAPI, Uvicorn, Pydantic, croniter, RPi.GPIO (optional, simulated on non-Pi), matplotlib, msgpack, pyserial
+
+**Frontend:** React, Vite, Tailwind CSS

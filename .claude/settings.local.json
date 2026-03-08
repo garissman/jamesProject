@@ -78,8 +78,11 @@
       "mcp__playwright__browser_evaluate",
       "Bash(pandoc:*)",
       "mcp__plugin_playwright_playwright__browser_fill_form",
-      "Bash(lsof:*)",
-      "Bash(ss:*)"
+      "Bash(sips:*)",
+      "Bash(pip3 install:*)",
+      "Bash(pdftoppm:*)",
+      "Bash(pdfinfo:*)",
+      "Bash(pdftotext:*)"
     ],
     "deny": [],
     "ask": []
