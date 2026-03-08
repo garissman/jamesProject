@@ -1,9 +1,0 @@
-{
-  "version": "1.0",
-  "created": "2026-03-07T17:38:03.099352",
-  "steps": [],
-  "schedule": {
-    "cronExpression": "",
-    "enabled": false
-  }
-}
