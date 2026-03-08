@@ -2,8 +2,10 @@
 """
 Standalone script to execute a saved pipetting program.
 Reads scheduled_program.json, checks if the schedule is enabled and
-the cron expression matches the current time, then runs the steps
-via PipettingController.
+the cron expression matches the current time, then triggers execution
+via the FastAPI server's /api/pipetting/execute endpoint.
+
+This avoids GPIO conflicts — only the FastAPI server owns the hardware.
 
 Called periodically by schedule_work.py (which acts like crontab).
 
@@ -15,11 +17,11 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-
-from pipetting_controller import PipettingController, PipettingStep, CoordinateMapper
-import settings
+from urllib.request import urlopen, Request
+from urllib.error import URLError
 
 PROGRAM_FILE = Path(__file__).parent / "scheduled_program.json"
+API_BASE = "http://localhost:8000"
 
 
 def update_status(status, error=None):
@@ -99,40 +101,27 @@ def main():
         print("Error: No steps found in program file.")
         sys.exit(1)
 
-    # Load layout coordinates into CoordinateMapper
-    cfg = settings.load()
-    CoordinateMapper.LAYOUT_COORDINATES = cfg.get("LAYOUT_COORDINATES", {})
-
-    # Convert JSON steps to PipettingStep objects
-    pipetting_steps = []
-    for s in steps_data:
-        pipetting_steps.append(PipettingStep(
-            step_type=s.get("stepType", "pipette"),
-            pickup_well=s.get("pickupWell", ""),
-            dropoff_well=s.get("dropoffWell", ""),
-            rinse_well=s.get("rinseWell"),
-            wash_well=s.get("washWell"),
-            volume_ml=s.get("sampleVolume", 0),
-            wait_time=s.get("waitTime", 0),
-            cycles=s.get("cycles", 1),
-            repetition_mode=s.get("repetitionMode", "quantity"),
-            repetition_quantity=s.get("repetitionQuantity", 1),
-            repetition_interval=s.get("repetitionInterval"),
-            repetition_duration=s.get("repetitionDuration"),
-            pipette_count=s.get("pipetteCount", 3),
-        ))
-
-    print(f"Loaded {len(pipetting_steps)} step(s) from {PROGRAM_FILE}")
+    print(f"Loaded {len(steps_data)} step(s) from {PROGRAM_FILE}")
 
     # Mark as running
     update_status("running")
 
-    # Initialize controller and execute
+    # Execute via FastAPI server (which already owns the GPIO hardware)
     error = None
     try:
-        controller = PipettingController()
-        controller.execute_sequence(pipetting_steps)
-        print("Program execution complete.")
+        payload = json.dumps({"steps": steps_data}).encode("utf-8")
+        req = Request(
+            f"{API_BASE}/api/pipetting/execute",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(req, timeout=600) as resp:
+            result = json.loads(resp.read().decode())
+            print(f"Program execution complete: {result.get('message', 'OK')}")
+    except URLError as e:
+        error = f"Cannot reach FastAPI server at {API_BASE}: {e}"
+        print(f"Program execution failed: {error}")
     except Exception as e:
         error = e
         print(f"Program execution failed: {e}")
