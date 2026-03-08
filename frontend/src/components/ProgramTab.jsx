@@ -781,6 +781,12 @@ export default function ProgramTab({
         handleLoadProgram(data.steps, data.schedule)
         setProgramName(name)
         setShowProgramList(false)
+        // Also save as the scheduled program
+        fetch('/api/program/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ steps: data.steps, schedule: data.schedule })
+        }).catch(() => {})
       }
     } catch (e) { console.error('Failed to load program', e) }
   }
