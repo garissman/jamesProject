@@ -77,7 +77,9 @@
       "mcp__playwright__browser_drag",
       "mcp__playwright__browser_evaluate",
       "Bash(pandoc:*)",
-      "mcp__plugin_playwright_playwright__browser_fill_form"
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "Bash(lsof:*)",
+      "Bash(ss:*)"
     ],
     "deny": [],
     "ask": []

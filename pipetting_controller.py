@@ -845,7 +845,7 @@ class PipettingController:
             # Wait between cycles
             if step.wait_time > 0 and cycle < step.cycles - 1:
                 self.log(f"  Waiting {step.wait_time} seconds...")
-                time.sleep(step.wait_time)
+                self._interruptible_sleep(step.wait_time)
 
         return True
 
@@ -894,14 +894,14 @@ class PipettingController:
                 self.home()
                 if step.wait_time > 0:
                     self.log(f"  Waiting {step.wait_time} seconds...")
-                    time.sleep(step.wait_time)
+                    self._interruptible_sleep(step.wait_time)
                 continue
 
             if step.step_type == 'wait':
                 wait_secs = step.wait_time if step.wait_time > 0 else 0
                 self.log(f"Action: Wait {wait_secs} seconds")
                 if wait_secs > 0:
-                    time.sleep(wait_secs)
+                    self._interruptible_sleep(wait_secs)
                 continue
 
             self.log(f"Pipette Configuration: {step.pipette_count} pipette(s)")
@@ -929,7 +929,7 @@ class PipettingController:
                     if rep < step.repetition_quantity - 1:
                         if step.wait_time > 0:
                             self.log(f"  Waiting {step.wait_time} seconds before next repetition...")
-                            time.sleep(step.wait_time)
+                            self._interruptible_sleep(step.wait_time)
 
             elif step.repetition_mode == 'timeFrequency':
                 # Time frequency mode: repeat at intervals for a duration
@@ -960,7 +960,7 @@ class PipettingController:
                         # Only wait if we haven't exceeded the duration and there's time left
                         if remaining_time > 0 and elapsed < step.repetition_duration:
                             self.log(f"  Waiting {remaining_time:.1f} seconds until next repetition...")
-                            time.sleep(min(remaining_time, step.repetition_duration - elapsed))
+                            self._interruptible_sleep(min(remaining_time, step.repetition_duration - elapsed))
                 else:
                     self.log("Warning: Time frequency mode selected but interval/duration not specified")
                     # Fall back to single execution
@@ -985,7 +985,7 @@ class PipettingController:
             # Wait before next step (if not the last step)
             if step.wait_time > 0 and step_num < len(steps):
                 self.log(f"  Waiting {step.wait_time} seconds before next step...")
-                time.sleep(step.wait_time)
+                self._interruptible_sleep(step.wait_time)
 
         self.current_step_index = None
         self.total_steps = None
@@ -993,6 +993,16 @@ class PipettingController:
         self.log("SEQUENCE COMPLETE — returning home")
         self.log("=" * 60)
         self.home()
+
+    def _interruptible_sleep(self, seconds):
+        """Sleep in small increments so stop_requested is checked promptly."""
+        elapsed = 0.0
+        while elapsed < seconds:
+            if self.stop_requested:
+                return
+            chunk = min(0.25, seconds - elapsed)
+            time.sleep(chunk)
+            elapsed += chunk
 
     def stop(self):
         """Request to stop the current execution"""
