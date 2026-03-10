@@ -283,8 +283,8 @@ class PipettingController:
     """High-level controller for pipetting operations"""
 
     # Pipette parameters - read from config.json at import time
-    PIPETTE_STEPS_PER_ML = settings.get('PIPETTE_STEPS_PER_ML')  # Steps to aspirate/dispense 1mL
-    PIPETTE_MAX_ML       = settings.get('PIPETTE_MAX_ML')       # Maximum pipette volume in mL
+    PIPETTE_STEPS_PER_ML = settings.get('PIPETTE_STEPS_PER_ML')  # Steps to aspirate/dispense 1µL
+    PIPETTE_MAX_ML       = settings.get('PIPETTE_MAX_ML')       # Maximum pipette volume in µL
     PICKUP_DEPTH  = settings.get('PICKUP_DEPTH')   # mm to descend into well for pickup
     DROPOFF_DEPTH = settings.get('DROPOFF_DEPTH')  # mm to descend into well for dropoff
     SAFE_HEIGHT   = settings.get('SAFE_HEIGHT')    # mm above well for travel
@@ -323,7 +323,7 @@ class PipettingController:
         self.total_steps = None  # Total number of steps in current sequence
         self.layout_type = "microchip"  # Current layout type: microchip or wellplate
         CoordinateMapper.CURRENT_LAYOUT = self.layout_type
-        self.pipette_ml = 0.0  # Current pipette volume in mL
+        self.pipette_ml = 0.0  # Current pipette volume in µL
 
         # Load stored per-layout coordinates so get_current_well() resolves correctly
         cfg = settings.load()
@@ -638,7 +638,7 @@ class PipettingController:
         Aspirate liquid into pipette
 
         Args:
-            volume_ml: Volume to aspirate in mL
+            volume_ml: Volume to aspirate in µL
         """
         # Ensure Z is down before aspirating
         if self.current_position.z > 1.0:
@@ -649,16 +649,16 @@ class PipettingController:
         # Clamp to max pipette capacity
         allowed = max(0.0, self.PIPETTE_MAX_ML - self.pipette_ml)
         if volume_ml > allowed:
-            self.log(f"  Pipette limit: clamped {volume_ml} mL -> {allowed:.3f} mL (max {self.PIPETTE_MAX_ML} mL)")
+            self.log(f"  Pipette limit: clamped {volume_ml} µL -> {allowed:.3f} µL (max {self.PIPETTE_MAX_ML} µL)")
             volume_ml = allowed
         if volume_ml <= 0:
-            self.log(f"  Pipette already at max capacity ({self.PIPETTE_MAX_ML} mL) — skipping aspirate")
+            self.log(f"  Pipette already at max capacity ({self.PIPETTE_MAX_ML} µL) — skipping aspirate")
             self.current_operation = "idle"
             self.operation_well = None
             return
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         actual_ml = steps / self.PIPETTE_STEPS_PER_ML
-        self.log(f"  Aspirating {actual_ml:.3f} mL ({steps} steps)...")
+        self.log(f"  Aspirating {actual_ml:.3f} µL ({steps} steps)...")
         self._move_motor(4, steps, self._inv(Direction.CLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         self.pipette_ml += actual_ml
         self.save_position()
@@ -671,7 +671,7 @@ class PipettingController:
         Dispense liquid from pipette
 
         Args:
-            volume_ml: Volume to dispense in mL
+            volume_ml: Volume to dispense in µL
         """
         # Ensure Z is down before dispensing
         if self.current_position.z > 1.0:
@@ -681,7 +681,7 @@ class PipettingController:
         self.operation_well = self.get_current_well()
         # Clamp to what's actually in the pipette
         if volume_ml > self.pipette_ml:
-            self.log(f"  Pipette limit: clamped {volume_ml} mL -> {self.pipette_ml:.3f} mL (current volume)")
+            self.log(f"  Pipette limit: clamped {volume_ml} µL -> {self.pipette_ml:.3f} µL (current volume)")
             volume_ml = self.pipette_ml
         if volume_ml <= 0:
             self.log(f"  Pipette is empty — skipping dispense")
@@ -690,7 +690,7 @@ class PipettingController:
             return
         steps = int(volume_ml * self.PIPETTE_STEPS_PER_ML)
         actual_ml = steps / self.PIPETTE_STEPS_PER_ML
-        self.log(f"  Dispensing {actual_ml:.3f} mL ({steps} steps)...")
+        self.log(f"  Dispensing {actual_ml:.3f} µL ({steps} steps)...")
         self._move_motor(4, steps, self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE), self.PIPETTE_SPEED)
         self.pipette_ml = max(0.0, self.pipette_ml - actual_ml)
         self.save_position()
@@ -749,12 +749,12 @@ class PipettingController:
         Args:
             pickup_well: Source well ID
             dropoff_well: Destination well ID
-            volume_ml: Volume to transfer in mL
+            volume_ml: Volume to transfer in µL
             rinse_well: Optional well for rinsing after transfer
             wash_well: Optional well for washing after rinse
         """
         Z_UP = 70.0
-        self.log(f"Transfer: {pickup_well} -> {dropoff_well} ({volume_ml} mL)")
+        self.log(f"Transfer: {pickup_well} -> {dropoff_well} ({volume_ml} µL)")
 
         # 1. Ensure Z is up
         if self.current_position.z < Z_UP:
@@ -1209,15 +1209,15 @@ class PipettingController:
                 allowed_ml = max(0.0, self.PIPETTE_MAX_ML - self.pipette_ml)
                 if delta_ml > allowed_ml:
                     steps = int(allowed_ml * self.PIPETTE_STEPS_PER_ML)
-                    self.log(f"Pipette limit: clamped to {steps} steps (max {self.PIPETTE_MAX_ML} mL)")
+                    self.log(f"Pipette limit: clamped to {steps} steps (max {self.PIPETTE_MAX_ML} µL)")
                 if steps <= 0:
-                    self.log(f"Pipette at max capacity ({self.PIPETTE_MAX_ML} mL) — skipping")
+                    self.log(f"Pipette at max capacity ({self.PIPETTE_MAX_ML} µL) — skipping")
                     return self.get_axis_positions()
             else:
                 allowed_ml = self.pipette_ml
                 if delta_ml > allowed_ml:
                     steps = int(allowed_ml * self.PIPETTE_STEPS_PER_ML)
-                    self.log(f"Pipette limit: clamped to {steps} steps (pipette at {self.pipette_ml:.3f} mL)")
+                    self.log(f"Pipette limit: clamped to {steps} steps (pipette at {self.pipette_ml:.3f} µL)")
                 if steps <= 0:
                     self.log(f"Pipette is empty — skipping")
                     return self.get_axis_positions()

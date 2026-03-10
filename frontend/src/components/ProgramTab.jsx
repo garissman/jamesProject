@@ -27,9 +27,9 @@ function StepCard({ step, index, isActive, onEdit, onDuplicate, onDelete, onDrag
     const pickup = step.pickupWell || '—'
     const dropoff = step.dropoffWell || '—'
     title = `${pickup} \u2192 ${dropoff}`
-    const rinse = step.rinseWell ? `Rinse: ${step.rinseWell}` : null
     const wash = step.washWell ? `Wash: ${step.washWell}` : null
-    const volume = step.sampleVolume ? `${step.sampleVolume} mL` : null
+    const rinse = step.rinseWell ? `Rinse: ${step.rinseWell}` : null
+    const volume = step.sampleVolume ? `${step.sampleVolume} µL` : null
     const wait = step.waitTime ? `Wait: ${step.waitTime}s` : null
     const cycles = step.cycles > 1 ? `${step.cycles} cycles` : null
 
@@ -40,7 +40,7 @@ function StepCard({ step, index, isActive, onEdit, onDuplicate, onDelete, onDrag
       repInfo = `every ${fmtTime(step.repetitionInterval)} / ${fmtTime(step.repetitionDuration)}`
     }
 
-    details = [volume, rinse, wash, wait, cycles, repInfo].filter(Boolean).join(' | ')
+    details = [volume, wash, rinse, wait, cycles, repInfo].filter(Boolean).join(' | ')
   }
 
   const badgeColor = stepType === 'home' ? '#059669' : stepType === 'wait' ? '#f59e0b' : '#3b82f6'
@@ -301,30 +301,6 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
             {errors.dropoffWell && <span className="text-xs text-[#dc2626]">{errors.dropoffWell}</span>}
           </div>
 
-          {/* Rinse Well */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-[var(--text-primary)]">
-              Rinse Well <span className="text-xs text-[var(--text-tertiary)] font-normal">(optional)</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder={wellPlaceholder}
-                value={form.rinseWell}
-                onChange={(e) => set('rinseWell', e.target.value)}
-                className={`${inputClass} flex-1 ${errors.rinseWell ? 'border-[#dc2626]' : ''}`}
-              />
-              <button
-                type="button"
-                onClick={() => handleSelectFromPlate('rinseWell')}
-                className="px-3 py-2 text-sm font-medium rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
-              >
-                Select from plate
-              </button>
-            </div>
-            {errors.rinseWell && <span className="text-xs text-[#dc2626]">{errors.rinseWell}</span>}
-          </div>
-
           {/* Wash Well */}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-[var(--text-primary)]">
@@ -349,9 +325,33 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
             {errors.washWell && <span className="text-xs text-[#dc2626]">{errors.washWell}</span>}
           </div>
 
+          {/* Rinse Well */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-[var(--text-primary)]">
+              Rinse Well <span className="text-xs text-[var(--text-tertiary)] font-normal">(optional)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={wellPlaceholder}
+                value={form.rinseWell}
+                onChange={(e) => set('rinseWell', e.target.value)}
+                className={`${inputClass} flex-1 ${errors.rinseWell ? 'border-[#dc2626]' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => handleSelectFromPlate('rinseWell')}
+                className="px-3 py-2 text-sm font-medium rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
+              >
+                Select from plate
+              </button>
+            </div>
+            {errors.rinseWell && <span className="text-xs text-[#dc2626]">{errors.rinseWell}</span>}
+          </div>
+
           {/* Volume */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-[var(--text-primary)]">Sample Volume (mL)</label>
+            <label className="text-sm font-semibold text-[var(--text-primary)]">Sample Volume (µL)</label>
             <input
               type="number"
               min="0"

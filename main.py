@@ -81,7 +81,7 @@ class PipettingStepRequest(BaseModel):
     dropoffWell: Optional[str] = Field(None, description="Destination well (e.g., 'A15')")
     rinseWell: Optional[str] = Field(None, description="Rinse well (optional)")
     washWell: Optional[str] = Field(None, description="Wash well (optional)")
-    sampleVolume: Optional[float] = Field(None, gt=0, description="Volume in mL")
+    sampleVolume: Optional[float] = Field(None, gt=0, description="Volume in µL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
     repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
@@ -667,7 +667,7 @@ async def toggle_z_axis(request: ToggleZRequest):
 
 class VolumeRequest(BaseModel):
     """Request for aspirate/dispense operations"""
-    volume: float = Field(..., gt=0, description="Volume in mL")
+    volume: float = Field(..., gt=0, description="Volume in µL")
 
 
 @app.post("/api/pipetting/aspirate")
@@ -683,7 +683,7 @@ async def aspirate_liquid(request: VolumeRequest):
         await asyncio.to_thread(pipetting_controller.aspirate, request.volume)
         return {
             "status": "success",
-            "message": f"Aspirated {request.volume} mL",
+            "message": f"Aspirated {request.volume} µL",
             "volume": request.volume
         }
     except Exception as e:
@@ -706,7 +706,7 @@ async def dispense_liquid(request: VolumeRequest):
         await asyncio.to_thread(pipetting_controller.dispense, request.volume)
         return {
             "status": "success",
-            "message": f"Dispensed {request.volume} mL",
+            "message": f"Dispensed {request.volume} µL",
             "volume": request.volume
         }
     except Exception as e:
@@ -898,7 +898,7 @@ class SetPositionRequest(BaseModel):
     x: float = Field(..., description="X position in mm")
     y: float = Field(..., description="Y position in mm")
     z: float = Field(..., description="Z position in mm")
-    pipette_ml: float = Field(0.0, description="Pipette position in mL")
+    pipette_ml: float = Field(0.0, description="Pipette position in µL")
 
 
 @app.post("/api/axis/set-position")
@@ -925,7 +925,7 @@ async def set_axis_position(request: SetPositionRequest):
         pipetting_controller.save_position()
         return {
             "status": "success",
-            "message": f"Position set to X={request.x}, Y={request.y}, Z={request.z}, Pipette={request.pipette_ml}mL",
+            "message": f"Position set to X={request.x}, Y={request.y}, Z={request.z}, Pipette={request.pipette_ml}µL",
             "positions": pipetting_controller.get_axis_positions()
         }
     except Exception as e:
@@ -1439,8 +1439,8 @@ class ConfigurationModel(BaseModel):
     STEPS_PER_MM_Z: int = Field(..., gt=0, description="Z-axis steps per mm")
 
     # Pipette Configuration
-    PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per mL")
-    PIPETTE_MAX_ML: float = Field(..., gt=0, description="Maximum pipette volume in mL")
+    PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per µL")
+    PIPETTE_MAX_ML: float = Field(..., gt=0, description="Maximum pipette volume in µL")
 
     # Pipetting Operation Parameters
     PICKUP_DEPTH: float = Field(..., gt=0, description="Depth to descend for pickup in mm")

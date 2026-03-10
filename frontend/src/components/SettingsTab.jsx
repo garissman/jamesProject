@@ -417,7 +417,7 @@ export default function SettingsTab({
                             <h3 className="m-0 mb-5 text-[var(--text-primary)] text-[1.1em] font-semibold">Pipette Configuration</h3>
                             <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-[15px]">
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Pipette Steps/mL:</label>
+                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Pipette Steps/µL:</label>
                                     <input
                                         type="text"
                                         value={config.PIPETTE_STEPS_PER_ML}
@@ -426,7 +426,7 @@ export default function SettingsTab({
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Max Pipette Volume (mL):</label>
+                                    <label className="text-[1.1rem] font-semibold text-[var(--text-primary)]">Max Pipette Volume (µL):</label>
                                     <input
                                         type="text"
                                         value={config.PIPETTE_MAX_ML}
@@ -659,7 +659,7 @@ export default function SettingsTab({
                                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-[10px] p-4 flex flex-col gap-2.5 overflow-hidden min-w-0">
                                     <h4 className="m-0 text-[1.1rem]">Pipette</h4>
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[0.85rem] text-[var(--text-secondary)]">Steps/mL:</label>
+                                        <label className="text-[0.85rem] text-[var(--text-secondary)]">Steps/µL:</label>
                                         <div className="flex gap-2 items-center min-w-0">
                                             <input
                                                 type="text"
@@ -723,7 +723,7 @@ export default function SettingsTab({
                                     </div>
 
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[0.85rem] text-[var(--text-secondary)]">Measured Volume (mL):</label>
+                                        <label className="text-[0.85rem] text-[var(--text-secondary)]">Measured Volume (µL):</label>
                                         <input
                                             type="number" step="0.01" min="0"
                                             value={calibration.pipette.measuredVolume}
@@ -732,7 +732,7 @@ export default function SettingsTab({
                                                 pipette: {...prev.pipette, measuredVolume: e.target.value}
                                             }))}
                                             className="p-3 px-4 text-base border-2 border-[var(--input-border)] rounded-lg bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-300 focus:outline-none focus:border-[var(--border-hover)] focus:bg-[var(--input-focus-bg)]"
-                                            placeholder="Enter measured mL"
+                                            placeholder="Enter measured µL"
                                         />
                                     </div>
 
@@ -756,7 +756,7 @@ export default function SettingsTab({
                                     {calibration.pipette.calculatedSPML !== null && (
                                         <div className="flex items-center justify-between gap-2.5 p-2.5 bg-[var(--bg-overlay)] rounded-md">
                                             <span className="font-semibold text-[1.05rem]">
-                                                {calibration.pipette.calculatedSPML} steps/mL
+                                                {calibration.pipette.calculatedSPML} steps/µL
                                             </span>
                                             <button
                                                 className="shrink-0 py-2 px-3.5 border border-[var(--border-color)] rounded-md bg-[var(--bg-secondary)] text-[var(--text-primary)] cursor-pointer text-[0.9rem] transition-all duration-200 hover:border-[var(--border-hover)] hover:bg-[var(--nav-hover)] disabled:opacity-40 disabled:cursor-not-allowed"

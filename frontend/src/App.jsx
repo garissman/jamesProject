@@ -459,7 +459,7 @@ function App() {
         const vol = parseFloat(volume)
         const maxML = config.PIPETTE_MAX_ML || 100
         if (isNaN(vol) || vol <= 0 || vol > maxML) {
-            console.error(`Volume must be between 0 and ${maxML} mL`)
+            console.error(`Volume must be between 0 and ${maxML} µL`)
             return
         }
 
@@ -487,7 +487,7 @@ function App() {
         const vol = parseFloat(volume)
         const maxML = config.PIPETTE_MAX_ML || 100
         if (isNaN(vol) || vol <= 0 || vol > maxML) {
-            console.error(`Volume must be between 0 and ${maxML} mL`)
+            console.error(`Volume must be between 0 and ${maxML} µL`)
             return
         }
 
