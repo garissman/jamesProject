@@ -33,7 +33,7 @@ export default function ManualTab({
     { key: 'x', label: 'X-Axis', unit: 'mm', value: axisPositions.x },
     { key: 'y', label: 'Y-Axis', unit: 'mm', value: axisPositions.y },
     { key: 'z', label: 'Z-Axis', unit: 'mm', value: axisPositions.z },
-    { key: 'pipette', label: 'Pipette', unit: 'mL', value: axisPositions.pipette_ml },
+    { key: 'pipette', label: 'Pipette', unit: 'µL', value: axisPositions.pipette_ml },
   ]
 
   return (
@@ -158,7 +158,7 @@ export default function ManualTab({
                 />
               </label>
               <label className="flex items-center gap-1.5 font-semibold text-[0.9rem]">
-                Pipette (mL):
+                Pipette (µL):
                 <input
                   type="number"
                   step="0.01"
