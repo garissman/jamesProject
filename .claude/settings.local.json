@@ -79,7 +79,10 @@
       "Bash(pandoc:*)",
       "mcp__plugin_playwright_playwright__browser_fill_form",
       "Bash(lsof:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(while read:*)",
+      "Bash(do wc:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []
