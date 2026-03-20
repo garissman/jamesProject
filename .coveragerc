@@ -1,0 +1,13 @@
+[run]
+branch = true
+omit =
+    .venv/*
+    stepper_control_arduino.py
+    generate_sample_data.py
+    analyze_drift_data.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+fail_under = 100
+show_missing = true
