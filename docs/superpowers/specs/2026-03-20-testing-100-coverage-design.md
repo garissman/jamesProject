@@ -15,7 +15,9 @@ Add comprehensive automated testing to the AutoSampler laboratory pipetting proj
 
 ### Framework
 
-pytest + pytest-cov + pytest-asyncio + httpx (for FastAPI TestClient)
+pytest + pytest-cov + pytest-asyncio
+
+API integration tests use Starlette's synchronous `TestClient` (included with FastAPI). The `TestClient` must be used as a context manager (`with TestClient(app) as client:`) to trigger the `lifespan` startup/shutdown. No `httpx` needed — all endpoints use `asyncio.to_thread()` which the synchronous TestClient handles correctly.
 
 ### Directory Structure
 
@@ -26,7 +28,8 @@ tests/
 │   ├── test_stepper_control.py
 │   ├── test_settings.py
 │   ├── test_pipetting_controller.py
-│   └── test_run_program.py
+│   ├── test_run_program.py
+│   └── test_main_helpers.py  # Module-level functions in main.py (drift test, sanitize, etc.)
 ├── integration/
 │   └── test_api.py          # FastAPI TestClient hitting all /api/* endpoints
 └── fixtures/
@@ -49,16 +52,16 @@ Each test gets a fresh `config.json` via `tmp_path` fixture — no test touches 
 omit =
     .venv/*
     stepper_control_arduino.py
-    test_motor.py
     generate_sample_data.py
     analyze_drift_data.py
 
 [report]
 exclude_lines =
-    if __name__ == .__main__.
     pragma: no cover
 fail_under = 100
 ```
+
+**`__main__` block strategy:** Add `# pragma: no cover` to the `if __name__ == "__main__":` guard line in `stepper_control.py`, `pipetting_controller.py`, `run_program.py`, `schedule_work.py`, and `main.py`. pytest-cov's block-exclusion behavior will then skip the entire guarded block — not just the `if` line. The `exclude_lines` regex approach alone only skips the matching line, leaving the block body uncovered.
 
 ## Backend Test Coverage Plan
 
@@ -77,10 +80,16 @@ fail_under = 100
 
 **StepperController:**
 - Multi-motor init with/without limit switches
+- `get_motor()`: valid motor_id returns motor, invalid raises ValueError
 - `move_motor()` delegation to correct motor
+- `move_motor_until_limit()`: controller-level delegation to `motor.move_until_limit()`
 - `move_multiple()` sequential execution
-- `check_all_limit_switches()` aggregation
-- `home_all()` with limit switches and without (reset only)
+- `check_limit_switch()`: controller-level wrapper with `limit_type` arg ('min', 'max', 'both')
+- `check_all_limit_switches()` aggregation (returns dict with min/max/state per motor)
+- `get_all_positions()`: returns dict of all motor positions
+- `get_all_limit_states()`: returns dict of limit state names (distinct from `check_all_limit_switches`)
+- `home_motor()`: controller-level wrapper for `motor.home()`
+- `home_all()` with limit switches and without (reset only), with custom home_sequence
 - `stop_all()` de-energizes all motors
 - `cleanup()` GPIO teardown
 
@@ -106,7 +115,13 @@ fail_under = 100
 
 **PipettingController:**
 - Init: loads position file, syncs motor step counters, sets layout type
-- `move_to_well()`: Z-up-if-down → XY simultaneous threads → Z-down-if-offset sequence, skips Z-up if already up, position update and save
+- `_inv()`: both `invert=True` (flips direction) and `invert=False` (passthrough) branches
+- `_speed()`: RPi path returns float seconds, Arduino path returns int microseconds
+- `_move_motor()`: RPi path calls `stepper_controller.move_motor()` with `check_limits` kwarg, Arduino path calls with `respect_limit` kwarg and logs result
+- `_move_x_safe()` / `_move_y_safe()` / `_move_z_safe()`: software travel limit clamping, Arduino passthrough, moving-away-from-home vs toward-home logic
+- `_z_to()`: absolute Z movement, near-zero-delta skip, up vs down branches, motor step counter sync (RPi only, skipped for Arduino)
+- `execute_step_with_cycles()`: returns True on completion, returns False on stop_requested, wait between cycles (except last)
+- `move_to_well()`: Z-up-if-down → XY simultaneous threads → Z-down-if-offset sequence, skips Z-up if already up, unknown well ID catches ValueError internally and returns early (sets `current_operation = "idle"`), position update and save
 - `aspirate()`: Z-down-if-up before aspirate, volume clamping to max, empty skip, step calculation, motor move, pipette_ml tracking
 - `dispense()`: Z-down-if-up before dispense, volume clamping to current, empty skip, motor move, pipette_ml tracking
 - `rinse()`: N cycles of move→aspirate→dispense
@@ -120,12 +135,34 @@ fail_under = 100
 - `save_position()` / `load_position()`: JSON persistence, default on missing file
 - `set_pipette_count()`: valid (1, 3), invalid raises
 - `log()` / `get_logs()` / `clear_logs()`: buffer management
+- `cleanup()`: delegates to stepper_controller.cleanup()
+
+**Dual controller type parameterization:** Tests for `_inv()`, `_speed()`, `_move_motor()`, `_move_x_safe()`, `_move_y_safe()`, `_move_z_safe()`, `_z_to()`, `_home_axis_to_min()`, and `move_axis()` must be run with both `controller_type = 'raspberry_pi'` and `controller_type = 'arduino_uno_q'` to cover all branches. Use `@pytest.mark.parametrize` or separate test functions.
 
 ### test_run_program.py
 
 - `should_run_now()`: disabled schedule → False, no cron expression → False, matching cron → True, non-matching cron → False, missing croniter → sys.exit
-- `main()`: missing program file → sys.exit, empty steps → sys.exit, successful API call updates status, API URLError updates status with error, schedule disabled skips
-- `update_status()`: "running" writes startedAt, "idle" writes lastRunAt and lastResult
+- `main()`: missing program file → sys.exit, empty steps → sys.exit, successful API call updates status, API URLError updates status with error, general Exception (non-URLError, e.g. JSONDecodeError) updates status with error, schedule disabled skips
+- `update_status()`: "running" writes startedAt, "idle" writes lastRunAt and lastResult, "idle" with error writes lastError
+
+### test_main_helpers.py
+
+Module-level functions defined in `main.py` that are not directly exercised by endpoint tests:
+
+- `_sanitize_program_name()`: strips invalid characters, empty input returns "untitled", whitespace-only returns "untitled", valid name passes through
+- `run_drift_test()`: full drift test logic with mocked `pipetting_controller` and `time.time`:
+  - RPi path: uses `_move_until_limit_rpi()` which calls `motor.move_until_limit()`
+  - Arduino path: uses `_move_until_limit_arduino()` which calls `stepper.move_until_limit()` and `_refresh_limit_cache()`
+  - Error paths: controller not initialized, no limit switches configured, could not find any limit switch (both directions fail)
+  - Homing phase: finds first limit, tries other direction if first fails
+  - Cycle loop: forward + backward steps, step difference / drift calculation, inter-cycle deltas (`fwd_delta`, `bwd_delta`)
+  - Stop requested mid-cycle: sets `status = "stopped"`
+  - Summary calculation: `n > 1` (has inter-cycle deltas) vs `n == 1` (deltas are [0])
+  - Motor inversion: tests with inverted and non-inverted motors
+- `_move_until_limit_rpi()`: delegates to motor.move_until_limit(), returns (steps, bool)
+- `_move_until_limit_arduino()`: converts delay to microseconds, calls stepper.move_until_limit(), calls `_refresh_limit_cache()`, returns (steps, bool)
+- `_refresh_limit_cache()`: updates `get_limit_switches._last_result`, exception path logs warning
+- `run_pipetting_sequence()`: background thread wrapper, sets `is_executing` flag, handles exceptions
 
 ### test_api.py (Integration)
 
@@ -176,8 +213,12 @@ All endpoints tested via FastAPI `TestClient`:
 - GET `/api/drift-test/status` — idle, running, completed
 - POST `/api/drift-test/clear` — success, while running (400)
 
+**Stub/legacy endpoints:**
+- GET `/api/items` — returns item list
+- POST `/api/items` — creates item with valid `Item` model
+
 **Limit switches:**
-- GET `/api/limit-switches` — RPi path, not initialized (503)
+- GET `/api/limit-switches` — RPi path, Arduino path (with lock busy/non-busy), not initialized (503)
 
 **Arduino-specific:**
 - POST `/api/led/test` — wrong controller type (400)
@@ -239,20 +280,24 @@ coverage: {
 - Theme toggle switches light/dark label
 
 ### PlateLayout.test.jsx
+
+**Required props in test setup:** All tests must pass mock functions for every prop including `fetchAxisPositions`, `setTargetWell`, `fetchCurrentPosition`, `setIsExecuting`, `setActiveTab`, `setWellSelectionMode`, and `getPipetteWells` (in addition to the obvious handler props). Missing props will cause undefined-function crashes.
+
 - Layout toggle: microchip/vial button click calls `handleSetLayout`
 - Well click: calls `handleWellClick` with well ID
-- Quick operation mode: enable → click 4 wells in sequence → shows badges (P/D/R/W) → execute calls API
+- Quick operation mode: enable → click 4 wells in sequence → shows badges (P/D/R/W) → execute calls API via fetch mock
 - Z-axis toggle: button label reflects state, click calls `handleToggleZ`
 - Collect/Dispense: volume input, button clicks call handlers with volume
-- Well selection mode: banner shows, cancel dismisses
-- Operation status display: aspirating/dispensing/moving indicators
+- Well selection mode: banner shows field name, cancel dismisses
+- Operation status display: aspirating/dispensing/moving indicators with correct well
 - Disabled states during execution
+- Both microchip grid (grouped 3-pipette mode and individual mode) and vial grid rendering
 
 ### ProgramTab.test.jsx
 - **StepWizard:** stage 1 validation (empty pickup = error, invalid well = error), fill fields and advance to stage 2, set repetition mode (quantity / timeFrequency), save creates step, cancel returns to list
 - **StepCard:** renders pipette/home/wait types correctly, edit/duplicate/delete buttons fire callbacks, drag events fire reorder callbacks, active step highlighting during execution
 - **Step management:** add step via wizard, edit existing step, duplicate step, delete step, drag reorder
-- **Program save/load:** save dialog with name input, save-as, load from list, delete from list, download
+- **Program save/load:** save dialog with name input, save-as, load from list, delete from list, download. The fetch mock must intercept these specific URL patterns: `POST /api/programs/save`, `GET /api/programs/load/{name}`, `DELETE /api/programs/{name}`, `GET /api/programs/download/{name}`, `GET /api/programs/list`, `POST /api/program/save` (scheduled program auto-save)
 - **Schedule:** toggle enabled/disabled, cron expression input, preset buttons, `describeCron()` output, execution status display
 - **Estimation:** `estimateProgramTime()` calculation, `formatDuration()` output
 - **Wait input:** add wait step with unit conversion (seconds/minutes/hours), edit existing wait
@@ -349,7 +394,6 @@ Playwright's `page.route()` intercepts all `/api/*` requests and returns control
 pytest
 pytest-cov
 pytest-asyncio
-httpx
 ```
 
 ### Frontend (package.json devDependencies)
