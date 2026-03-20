@@ -50,6 +50,7 @@ Each test gets a fresh `config.json` via `tmp_path` fixture — no test touches 
 
 ```ini
 [run]
+branch = true
 omit =
     .venv/*
     stepper_control_arduino.py
@@ -60,11 +61,12 @@ omit =
 exclude_lines =
     pragma: no cover
 fail_under = 100
+show_missing = true
 ```
 
 **`__main__` block strategy:** Add `# pragma: no cover` to the `if __name__ == "__main__":` guard line in `stepper_control.py`, `pipetting_controller.py`, `run_program.py`, `schedule_work.py`, and `main.py`. When `coverage.py` excludes a line via `exclude_lines` or `# pragma: no cover`, it uses clause-exclusion: the entire suite (block body) under the excluded `if` is also excluded. Adding `# pragma: no cover` inline is the belt-and-suspenders approach — either mechanism works.
 
-**Frontend static-serving branches in `main.py`:** Lines 1547-1612 contain three mutually exclusive branches gated on `FRONTEND_DIST_DIR.exists()` / `FRONTEND_DEV_DIR.exists()`. Only one branch is active at import time based on the filesystem. Add `# pragma: no cover` to `serve_frontend_prod()`, `serve_frontend_dev()`, and `root()` function definitions — these are pure framework boilerplate for serving static files and are not testable business logic.
+**Frontend static-serving branches in `main.py`:** Lines 1547-1612 contain three mutually exclusive branches gated on `FRONTEND_DIST_DIR.exists()` / `FRONTEND_DEV_DIR.exists()`. Only one branch is active at import time based on the filesystem. Add `# pragma: no cover` to the **outer guard lines** — the `if FRONTEND_DIST_DIR.exists():` line, the `elif FRONTEND_DEV_DIR.exists() ...` line, and the `else:` line — not just the inner function definitions. With `branch = true` in `.coveragerc`, the two un-taken branches of the three-way conditional would otherwise be reported as missed. Placing pragma on the guard lines causes `coverage.py` to exclude the entire clause (guard + body).
 
 ## Backend Test Coverage Plan
 
