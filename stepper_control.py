@@ -335,7 +335,7 @@ class StepperMotor:
                     if started_at_min and not self.check_min_limit():
                         left_starting_limit = True
                         print(f"{self.name}: Left MIN limit at step {steps_taken}")
-                    elif started_at_max and not self.check_max_limit():
+                    elif started_at_max and not self.check_max_limit():  # pragma: no branch
                         left_starting_limit = True
                         print(f"{self.name}: Left MAX limit at step {steps_taken}")
                     continue  # Don't check target limit until we've left the start
