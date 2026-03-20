@@ -68,5 +68,5 @@ def main():
         print(f"\n\nScheduler stopped at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

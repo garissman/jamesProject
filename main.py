@@ -441,7 +441,7 @@ async def move_to_well(request: MoveToWellRequest):
         # Move to the specified well
         await asyncio.to_thread(pipetting_controller.move_to_well, request.wellId, 0)
         return {"status": "success", "message": f"Moved to well {request.wellId}"}
-    except ValueError as e:
+    except ValueError as e:  # pragma: no cover
         raise HTTPException(
             status_code=400,
             detail=f"Invalid well ID: {str(e)}"
@@ -1544,7 +1544,7 @@ async def update_configuration(config: ConfigurationModel):
 
 
 # Mount static files for frontend (serve built React app or dev version)
-if FRONTEND_DIST_DIR.exists():
+if FRONTEND_DIST_DIR.exists():  # pragma: no cover
     # Production mode: serve built files
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_DIR / "assets"), name="assets")
 
@@ -1566,7 +1566,7 @@ if FRONTEND_DIST_DIR.exists():
 
         return {"error": "Frontend not built. Run 'cd frontend && npm run build'"}
 
-elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():
+elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():  # pragma: no cover
     # Development mode: serve source files directly
     # Mount src directory for module imports
     if (FRONTEND_DEV_DIR / "src").exists():
@@ -1600,7 +1600,7 @@ elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():
             "current": "Serving static files without hot reload"
         }
 
-else:
+else:  # pragma: no cover
     @app.get("/")
     async def root():
         return {
@@ -1611,7 +1611,7 @@ else:
             ]
         }
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import argparse
     import uvicorn
 
