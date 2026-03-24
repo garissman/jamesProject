@@ -2,6 +2,7 @@
 import json
 import sys
 import shutil
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -19,6 +20,13 @@ def mock_gpio(monkeypatch):
     monkeypatch.setitem(sys.modules, 'RPi', MagicMock())
     monkeypatch.setitem(sys.modules, 'RPi.GPIO', gpio_mock)
     return gpio_mock
+
+
+@pytest.fixture(autouse=True)
+def fast_stepper_sleep(monkeypatch):
+    """Replace time.sleep in stepper_control with a no-op to speed up motor tests."""
+    if 'stepper_control' in sys.modules:
+        monkeypatch.setattr('stepper_control.time.sleep', lambda _: None)
 
 
 @pytest.fixture
