@@ -20,6 +20,12 @@ dist/
 *.swp
 *.swo
 
+# Coverage
+.coverage
+coverage.json
+cov_debug.json
+frontend/coverage/
+
 # Pipetting system state
 pipette_position.json
 /.playwright-mcp
