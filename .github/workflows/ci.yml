@@ -84,5 +84,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout master
-          git merge --ff-only develop
+          git merge develop --no-edit
           git push origin master
