@@ -129,5 +129,5 @@ def main():
         update_status("idle", error)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

@@ -1,0 +1,12 @@
+extend-exclude = [
+    ".venv",
+    "stepper_control_arduino.py",
+    "generate_sample_data.py",
+    "analyze_drift_data.py",
+    "arduino-app",
+    "frontend",
+]
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]

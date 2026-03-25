@@ -1,7 +1,6 @@
 export default function RightPanel({
   logs,
   logsEndRef,
-  activeTab,
   steps,
   targetWell,
   isExecuting,

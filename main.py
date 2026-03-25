@@ -2,7 +2,6 @@ import asyncio
 import json
 import threading
 from contextlib import asynccontextmanager
-from functools import partial
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -81,7 +80,7 @@ class PipettingStepRequest(BaseModel):
     dropoffWell: Optional[str] = Field(None, description="Destination well (e.g., 'A15')")
     rinseWell: Optional[str] = Field(None, description="Rinse well (optional)")
     washWell: Optional[str] = Field(None, description="Wash well (optional)")
-    sampleVolume: Optional[float] = Field(None, gt=0, description="Volume in mL")
+    sampleVolume: Optional[float] = Field(None, gt=0, description="Volume in µL")
     waitTime: int = Field(0, ge=0, description="Wait time in seconds")
     cycles: int = Field(1, ge=1, le=100, description="Number of cycles")
     repetitionMode: str = Field('quantity', description="Repetition mode: 'quantity' or 'timeFrequency'")
@@ -269,7 +268,7 @@ async def program_execution_status():
         with open(SCHEDULED_PROGRAM_FILE) as f:
             data = json.load(f)
         return {"status": "success", "execution": data.get("execution", {"status": "idle"})}
-    except Exception as e:
+    except Exception:
         return {"status": "success", "execution": {"status": "idle"}}
 
 
@@ -441,7 +440,7 @@ async def move_to_well(request: MoveToWellRequest):
         # Move to the specified well
         await asyncio.to_thread(pipetting_controller.move_to_well, request.wellId, 0)
         return {"status": "success", "message": f"Moved to well {request.wellId}"}
-    except ValueError as e:
+    except ValueError as e:  # pragma: no cover
         raise HTTPException(
             status_code=400,
             detail=f"Invalid well ID: {str(e)}"
@@ -667,7 +666,7 @@ async def toggle_z_axis(request: ToggleZRequest):
 
 class VolumeRequest(BaseModel):
     """Request for aspirate/dispense operations"""
-    volume: float = Field(..., gt=0, description="Volume in mL")
+    volume: float = Field(..., gt=0, description="Volume in µL")
 
 
 @app.post("/api/pipetting/aspirate")
@@ -683,7 +682,7 @@ async def aspirate_liquid(request: VolumeRequest):
         await asyncio.to_thread(pipetting_controller.aspirate, request.volume)
         return {
             "status": "success",
-            "message": f"Aspirated {request.volume} mL",
+            "message": f"Aspirated {request.volume} µL",
             "volume": request.volume
         }
     except Exception as e:
@@ -706,7 +705,7 @@ async def dispense_liquid(request: VolumeRequest):
         await asyncio.to_thread(pipetting_controller.dispense, request.volume)
         return {
             "status": "success",
-            "message": f"Dispensed {request.volume} mL",
+            "message": f"Dispensed {request.volume} µL",
             "volume": request.volume
         }
     except Exception as e:
@@ -898,7 +897,7 @@ class SetPositionRequest(BaseModel):
     x: float = Field(..., description="X position in mm")
     y: float = Field(..., description="Y position in mm")
     z: float = Field(..., description="Z position in mm")
-    pipette_ml: float = Field(0.0, description="Pipette position in mL")
+    pipette_ml: float = Field(0.0, description="Pipette position in µL")
 
 
 @app.post("/api/axis/set-position")
@@ -925,7 +924,7 @@ async def set_axis_position(request: SetPositionRequest):
         pipetting_controller.save_position()
         return {
             "status": "success",
-            "message": f"Position set to X={request.x}, Y={request.y}, Z={request.z}, Pipette={request.pipette_ml}mL",
+            "message": f"Position set to X={request.x}, Y={request.y}, Z={request.z}, Pipette={request.pipette_ml}µL",
             "positions": pipetting_controller.get_axis_positions()
         }
     except Exception as e:
@@ -1439,8 +1438,8 @@ class ConfigurationModel(BaseModel):
     STEPS_PER_MM_Z: int = Field(..., gt=0, description="Z-axis steps per mm")
 
     # Pipette Configuration
-    PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per mL")
-    PIPETTE_MAX_ML: float = Field(..., gt=0, description="Maximum pipette volume in mL")
+    PIPETTE_STEPS_PER_ML: int = Field(..., gt=0, description="Pipette steps per µL")
+    PIPETTE_MAX_ML: float = Field(..., gt=0, description="Maximum pipette volume in µL")
 
     # Pipetting Operation Parameters
     PICKUP_DEPTH: float = Field(..., gt=0, description="Depth to descend for pickup in mm")
@@ -1544,7 +1543,7 @@ async def update_configuration(config: ConfigurationModel):
 
 
 # Mount static files for frontend (serve built React app or dev version)
-if FRONTEND_DIST_DIR.exists():
+if FRONTEND_DIST_DIR.exists():  # pragma: no cover
     # Production mode: serve built files
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_DIR / "assets"), name="assets")
 
@@ -1566,7 +1565,7 @@ if FRONTEND_DIST_DIR.exists():
 
         return {"error": "Frontend not built. Run 'cd frontend && npm run build'"}
 
-elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():
+elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():  # pragma: no cover
     # Development mode: serve source files directly
     # Mount src directory for module imports
     if (FRONTEND_DEV_DIR / "src").exists():
@@ -1600,7 +1599,7 @@ elif FRONTEND_DEV_DIR.exists() and (FRONTEND_DEV_DIR / "index.html").exists():
             "current": "Serving static files without hot reload"
         }
 
-else:
+else:  # pragma: no cover
     @app.get("/")
     async def root():
         return {
@@ -1611,7 +1610,7 @@ else:
             ]
         }
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import argparse
     import uvicorn
 

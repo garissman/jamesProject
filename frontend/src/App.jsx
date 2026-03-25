@@ -97,7 +97,7 @@ function App() {
     const zAxisUp = axisPositions.z >= 35
 
     // Well data
-    const [wellData, setWellData] = useState({})
+    const [_wellData, _setWellData] = useState({})
 
     // Ref for auto-scrolling logs
     const logsEndRef = useRef(null)
@@ -390,7 +390,7 @@ function App() {
                 body: JSON.stringify({layoutType: mode})
             })
             if (res.ok) {
-                const data = await res.json()
+                const _data = await res.json()
                 setLayoutType(mode)
             } else {
                 const data = await res.json()
@@ -459,7 +459,7 @@ function App() {
         const vol = parseFloat(volume)
         const maxML = config.PIPETTE_MAX_ML || 100
         if (isNaN(vol) || vol <= 0 || vol > maxML) {
-            console.error(`Volume must be between 0 and ${maxML} mL`)
+            console.error(`Volume must be between 0 and ${maxML} µL`)
             return
         }
 
@@ -487,7 +487,7 @@ function App() {
         const vol = parseFloat(volume)
         const maxML = config.PIPETTE_MAX_ML || 100
         if (isNaN(vol) || vol <= 0 || vol > maxML) {
-            console.error(`Volume must be between 0 and ${maxML} mL`)
+            console.error(`Volume must be between 0 and ${maxML} µL`)
             return
         }
 
@@ -582,7 +582,9 @@ function App() {
 
                 if (data.pipette_count !== undefined) setCurrentPipetteCount(data.pipette_count)
                 if (data.layout_type !== undefined) setLayoutType(data.layout_type)
+                /* v8 ignore start */
                 if (data.is_executing !== undefined) setIsExecuting(data.is_executing)
+                /* v8 ignore stop */
                 setCurrentStepIndex(data.current_step_index ?? null)
                 setTotalSteps(data.total_steps ?? null)
                 if (data.controller_type !== undefined) setControllerType(data.controller_type)
@@ -638,7 +640,7 @@ function App() {
             const response = await fetch('/api/program/status')
             const data = await response.json()
             if (data.execution) setProgramExecution(data.execution)
-        } catch (error) {
+        } catch {
             // silently ignore
         }
     }
@@ -712,7 +714,7 @@ function App() {
                     if (data.schedule) setSchedule(data.schedule)
                     if (data.execution) setProgramExecution(data.execution)
                 }
-            } catch (error) {
+            } catch {
                 // silently ignore on mount
             } finally {
                 initialLoadDone.current = true

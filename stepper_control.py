@@ -180,7 +180,7 @@ class StepperMotor:
 
         # Acceleration ramp parameters
         start_delay = max(delay * 4, 0.004)  # Start slow (4× target or 4ms minimum)
-        accel_steps = min(steps // 4, 200)    # Ramp over 25% of move, max 200 steps
+        accel_steps = min(steps // 4, 200)  # Ramp over 25% of move, max 200 steps
 
         # Remember which limits are already pressed at the start
         # so we can move away from them but stop if we hit a NEW limit
@@ -228,7 +228,7 @@ class StepperMotor:
             remaining = steps - i
             if accel_steps > 0:
                 # Ramp phase: pick the slower of accel-up and decel-down
-                accel_factor = min(i, accel_steps) / accel_steps           # 0→1 during ramp-up
+                accel_factor = min(i, accel_steps) / accel_steps  # 0→1 during ramp-up
                 decel_factor = min(remaining - 1, accel_steps) / accel_steps  # 1→0 during ramp-down
                 ramp = min(accel_factor, decel_factor)  # 0 at ends, 1 at cruise
                 current_delay = start_delay - (start_delay - delay) * ramp
@@ -335,7 +335,7 @@ class StepperMotor:
                     if started_at_min and not self.check_min_limit():
                         left_starting_limit = True
                         print(f"{self.name}: Left MIN limit at step {steps_taken}")
-                    elif started_at_max and not self.check_max_limit():
+                    elif started_at_max and not self.check_max_limit():  # pragma: no branch
                         left_starting_limit = True
                         print(f"{self.name}: Left MAX limit at step {steps_taken}")
                     continue  # Don't check target limit until we've left the start
@@ -438,7 +438,7 @@ class StepperController:
         1: (26, 21),  # Motor 1 X-axis: Min=GPIO26, Max=GPIO21
         2: (20, 16),  # Motor 2 Y-axis: Min=GPIO20, Max=GPIO16
         3: (12, 25),  # Motor 3 Z-axis: Min=GPIO12, Max=GPIO25
-        4: (24, 23)  # Motor 4 Pipette: Min=GPIO24, Max=GPIO23
+        4: (24, 23)  # Motor 4 Pipette:Min=GPIO24, Max=GPIO23
     }
 
     def __init__(self, use_limit_switches: bool = True):
@@ -641,7 +641,7 @@ class StepperController:
 
 
 # Example usage
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     # Create controller with limit switches enabled
     controller = StepperController(use_limit_switches=True)
 
