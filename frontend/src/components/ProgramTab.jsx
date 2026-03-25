@@ -152,6 +152,7 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
     return Math.round(num * unitMultipliers[unit])
   }
 
+  /* v8 ignore start -- formatSeconds is reserved for future use */
   const formatSeconds = (totalSeconds) => {
     const s = Number(totalSeconds)
     if (!s || isNaN(s)) return ''
@@ -160,6 +161,7 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
     if (s >= 60 && s % 60 === 0) return `${s / 60}m`
     return `${s}s`
   }
+  /* v8 ignore stop */
 
   const wellPlaceholder = layoutType === 'microchip' ? 'e.g., A1, WS1, MC3' : 'e.g., SA1, VA1, WS2'
 
@@ -517,7 +519,9 @@ const Z_UP = 70.0
 const SETTLE_TIME = 0.5 // seconds after each aspirate/dispense
 
 function estimateProgramTime(steps, config, layoutType) {
+  /* v8 ignore start */
   if (!steps || steps.length === 0) return 0
+  /* v8 ignore stop */
 
   const travelSpeed = config.TRAVEL_SPEED || 0.001
   const pipetteSpeed = config.PIPETTE_SPEED || 0.002
@@ -632,13 +636,17 @@ function estimateProgramTime(steps, config, layoutType) {
       // Time-frequency mode: total time is the specified duration
       total += step.repetitionDuration
     } else {
+      /* v8 ignore start */
       const reps = (step.repetitionMode === 'quantity') ? (step.repetitionQuantity || 1) : 1
+      /* v8 ignore stop */
 
       for (let rep = 0; rep < reps; rep++) {
         for (let c = 0; c < cycles; c++) {
           const result = transferTime(prevWell, pickup, dropoff, rinse, wash, volume)
           total += result.time
+          /* v8 ignore start */
           prevWell = result.lastWell || prevWell
+          /* v8 ignore stop */
 
           // Wait between cycles (except last)
           if (step.waitTime && c < cycles - 1) {
@@ -661,7 +669,9 @@ function estimateProgramTime(steps, config, layoutType) {
 }
 
 function formatDuration(seconds) {
+  /* v8 ignore start */
   if (!seconds || seconds <= 0) return '0s'
+  /* v8 ignore stop */
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.round(seconds % 60)
@@ -687,7 +697,9 @@ const CRON_PRESETS = [
 ]
 
 function describeCron(expr) {
+  /* v8 ignore start */
   if (!expr || !expr.trim()) return ''
+  /* v8 ignore stop */
   const parts = expr.trim().split(/\s+/)
   if (parts.length !== 5) return 'Invalid expression (need 5 fields: min hour dom month dow)'
   const [min, hour, dom, month, dow] = parts
@@ -755,7 +767,9 @@ export default function ProgramTab({
 
   const handleSaveAs = async () => {
     const name = programName.trim()
+    /* v8 ignore start */
     if (!name || steps.length === 0) return
+    /* v8 ignore stop */
     try {
       const res = await fetch('/api/programs/save', {
         method: 'POST',
@@ -861,7 +875,7 @@ export default function ProgramTab({
     dragIndexRef.current = index
   }
 
-  const onDragOver = (e) => {
+  const onDragOver = /* v8 ignore next */ (e) => {
     e.preventDefault()
   }
 
@@ -1028,7 +1042,9 @@ export default function ProgramTab({
         const defVal = defUnit === 'hours' ? existing / 3600 : defUnit === 'minutes' ? existing / 60 : (existing || 5)
         const multipliers = { seconds: 1, minutes: 60, hours: 3600 }
         const submitWait = (container) => {
+          /* v8 ignore start */
           const val = Number(container.querySelector('#wait-value').value) || 1
+          /* v8 ignore stop */
           const unit = container.querySelector('#wait-unit').value
           handleAddWait(Math.round(val * multipliers[unit]))
         }

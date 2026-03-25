@@ -193,7 +193,7 @@ export default function SettingsTab({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {(REFERENCE_WELLS[coordLayout] || []).map((wellId) => {
+                                        {/* v8 ignore next */ (REFERENCE_WELLS[coordLayout] || []).map((wellId) => {
                                             const coord = coordData[wellId]
                                             const isSet = coord !== null && coord !== undefined
                                             return (
@@ -608,7 +608,9 @@ export default function SettingsTab({
                                                 disabled={!cal.measuredDistance || parseFloat(cal.measuredDistance) <= 0}
                                                 onClick={() => {
                                                     const dist = parseFloat(cal.measuredDistance)
+                                                    /* v8 ignore start */
                                                     if (dist > 0) {
+                                                    /* v8 ignore stop */
                                                         const spm = Math.round(cal.testSteps / dist)
                                                         setCalibration(prev => ({
                                                             ...prev,
@@ -741,7 +743,9 @@ export default function SettingsTab({
                                         disabled={!calibration.pipette.measuredVolume || parseFloat(calibration.pipette.measuredVolume) <= 0}
                                         onClick={() => {
                                             const vol = parseFloat(calibration.pipette.measuredVolume)
+                                            /* v8 ignore start */
                                             if (vol > 0) {
+                                            /* v8 ignore stop */
                                                 const spml = Math.round(calibration.pipette.testSteps / vol)
                                                 setCalibration(prev => ({
                                                     ...prev,

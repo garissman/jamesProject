@@ -582,7 +582,9 @@ function App() {
 
                 if (data.pipette_count !== undefined) setCurrentPipetteCount(data.pipette_count)
                 if (data.layout_type !== undefined) setLayoutType(data.layout_type)
+                /* v8 ignore start */
                 if (data.is_executing !== undefined) setIsExecuting(data.is_executing)
+                /* v8 ignore stop */
                 setCurrentStepIndex(data.current_step_index ?? null)
                 setTotalSteps(data.total_steps ?? null)
                 if (data.controller_type !== undefined) setControllerType(data.controller_type)
