@@ -4,10 +4,7 @@ Covers every REST endpoint reachable via the API, using TestClient
 as a context manager so the lifespan (PipettingController init) fires.
 """
 import json
-import sys
-import threading
-from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -174,7 +171,6 @@ class TestCreateItem:
 
 class TestExecutePipetting:
     def test_success(self, client, monkeypatch):
-        import main
         # Patch threading.Thread so we don't start a real thread
         mock_thread = MagicMock()
         monkeypatch.setattr("main.threading.Thread", lambda **kw: mock_thread)
@@ -212,7 +208,6 @@ class TestExecutePipetting:
         assert r.status_code == 422
 
     def test_multiple_steps(self, client, monkeypatch):
-        import main
         mock_thread = MagicMock()
         monkeypatch.setattr("main.threading.Thread", lambda **kw: mock_thread)
 
@@ -224,9 +219,7 @@ class TestExecutePipetting:
 
     def test_value_error_400(self, client, monkeypatch):
         """When PipettingStep construction raises ValueError, endpoint returns 400."""
-        import main
         from pipetting_controller import PipettingStep
-        orig_init = PipettingStep.__init__
 
         def bad_init(self, *args, **kwargs):
             raise ValueError("bad step")
@@ -317,7 +310,6 @@ class TestPipettingStatus:
         """When accessing attributes raises, status returns initialized=False."""
         import main
         # Make current_position raise via a property
-        original_ctrl = main.pipetting_controller
         broken_ctrl = MagicMock()
         type(broken_ctrl).current_position = PropertyMock(side_effect=RuntimeError("broken"))
         monkeypatch.setattr(main, "pipetting_controller", broken_ctrl)
@@ -557,7 +549,6 @@ class TestDispense:
 
 class TestSetControllerType:
     def test_raspberry_pi(self, client, monkeypatch):
-        import main
         # Patch PipettingController() call inside the endpoint
         mock_new_ctrl = MagicMock()
         monkeypatch.setattr("main.PipettingController", lambda: mock_new_ctrl)
@@ -568,7 +559,6 @@ class TestSetControllerType:
         assert r.json()["controller_type"] == "raspberry_pi"
 
     def test_arduino_uno_q(self, client, monkeypatch):
-        import main
         mock_new_ctrl = MagicMock()
         monkeypatch.setattr("main.PipettingController", lambda: mock_new_ctrl)
         r = client.post("/api/pipetting/set-controller-type", json={
@@ -747,7 +737,6 @@ class TestPostConfig:
         }
 
     def test_save_and_reinitialize(self, client, monkeypatch):
-        import main
         mock_new_ctrl = MagicMock()
         monkeypatch.setattr("main.PipettingController", lambda: mock_new_ctrl)
         r = client.post("/api/config", json=self._full_config())
@@ -756,7 +745,6 @@ class TestPostConfig:
 
     def test_reinit_fails_still_success(self, client, monkeypatch):
         """When PipettingController() raises during reinit, endpoint still succeeds."""
-        import main
         monkeypatch.setattr("main.PipettingController", MagicMock(side_effect=RuntimeError("init fail")))
         r = client.post("/api/config", json=self._full_config())
         assert r.status_code == 200
@@ -1381,9 +1369,7 @@ class TestMcuLimits:
 class TestExecuteEdgeCases:
     def test_general_exception_500(self, client, monkeypatch):
         """When an unexpected exception occurs during step conversion, endpoint returns 500."""
-        import main
         from pipetting_controller import PipettingStep
-        orig_init = PipettingStep.__init__
 
         def bad_init(self, *args, **kwargs):
             raise RuntimeError("unexpected error")
@@ -1396,7 +1382,6 @@ class TestExecuteEdgeCases:
 
     def test_home_step_type(self, client, monkeypatch):
         """Steps with stepType='home' are accepted."""
-        import main
         mock_thread = MagicMock()
         monkeypatch.setattr("main.threading.Thread", lambda **kw: mock_thread)
 
@@ -1407,7 +1392,6 @@ class TestExecuteEdgeCases:
 
     def test_wait_step_type(self, client, monkeypatch):
         """Steps with stepType='wait' are accepted."""
-        import main
         mock_thread = MagicMock()
         monkeypatch.setattr("main.threading.Thread", lambda **kw: mock_thread)
 
@@ -1553,7 +1537,6 @@ class TestSetPipetteCountEdgeCases:
 
 class TestSetControllerTypeEdgeCases:
     def test_reinit_exception_500(self, client, monkeypatch):
-        import main
         monkeypatch.setattr("main.PipettingController", MagicMock(side_effect=RuntimeError("init fail")))
         r = client.post("/api/pipetting/set-controller-type", json={
             "controllerType": "raspberry_pi"

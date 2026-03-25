@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SettingsTab from './SettingsTab'
 import { mockFetch } from '../test-utils'
 
@@ -1064,7 +1064,7 @@ describe('Calibration', () => {
     fireEvent.click(screen.getByText('Calibration'))
 
     await waitFor(() => {
-      const moveMinusBtns = screen.getAllByText(/Move ./)
+      screen.getAllByText(/Move ./)
       // "Move −" buttons (Unicode minus sign)
       const ccwBtns = screen.getAllByText('Move −')
       fireEvent.click(ccwBtns[0]) // X-Axis Move -

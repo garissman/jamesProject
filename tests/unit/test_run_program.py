@@ -3,7 +3,6 @@
 import json
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 

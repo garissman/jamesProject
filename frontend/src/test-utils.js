@@ -12,7 +12,7 @@ afterEach(() => {
  * Usage: mockFetch({ '/api/pipetting/status': { initialized: true, ... } })
  */
 export function mockFetch(responses = {}) {
-  return vi.fn((url, options) => {
+  return vi.fn((url) => {
     const path = typeof url === 'string' ? url : url.toString()
     for (const [pattern, data] of Object.entries(responses)) {
       if (path.includes(pattern)) {

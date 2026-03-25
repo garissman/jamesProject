@@ -181,7 +181,7 @@ function standardMockFetch() {
 
 // Helper to create a fetch mock with specific error responses
 function errorMockFetch(errorEndpoints = {}) {
-  return vi.fn((url, options) => {
+  return vi.fn((url, _options) => {
     const path = typeof url === 'string' ? url : url.toString()
     for (const [pattern, data] of Object.entries(errorEndpoints)) {
       if (path.includes(pattern)) {
@@ -225,7 +225,7 @@ function errorMockFetch(errorEndpoints = {}) {
 
 // Helper to create a fetch mock that rejects for specific endpoints
 function networkErrorMockFetch(errorEndpoints = []) {
-  return vi.fn((url, options) => {
+  return vi.fn((url, _options) => {
     const path = typeof url === 'string' ? url : url.toString()
     for (const pattern of errorEndpoints) {
       if (path.includes(pattern)) {

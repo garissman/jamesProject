@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { mockFetch } from '../test-utils'
 
 // Mock chart.js and react-chartjs-2 before importing the component
 vi.mock('react-chartjs-2', () => ({
-    Line: (props) => <canvas data-testid="mock-chart" />,
+    Line: (_props) => <canvas data-testid="mock-chart" />,
 }))
 vi.mock('chart.js', () => ({
     Chart: { register: vi.fn() },

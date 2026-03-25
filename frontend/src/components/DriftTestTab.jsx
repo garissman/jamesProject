@@ -120,7 +120,7 @@ export default function DriftTestTab() {
             } else {
                 setLimitSwitchStatus({error: data.detail})
             }
-        } catch (error) {
+        } catch {
             setLimitSwitchStatus({error: 'Could not reach backend'})
         } finally {
             setLimitSwitchLoading(false)
@@ -649,7 +649,7 @@ export default function DriftTestTab() {
                     interaction: { mode: 'nearest', axis: 'x', intersect: false },
                 })
 
-                const timeData = (values, color, fill = false) => values.map((v, i) => ({ x: new Date(cycles[i].timestamp), y: v }))
+                const timeData = (values) => values.map((v, i) => ({ x: new Date(cycles[i].timestamp), y: v }))
 
                 return (
                     <>

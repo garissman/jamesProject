@@ -9,8 +9,7 @@ Targets:
     - run_drift_test
 """
 import sys
-import time
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -392,7 +391,6 @@ class TestRunDriftTest:
         monkeypatch.setattr(main_mod, "_move_until_limit_rpi", mock_move_rpi)
 
         # After homing, set drift_test_running to False so the cycle loop breaks
-        original_move = main_mod._move_until_limit_rpi
         call_count = [0]
         def mock_move_and_stop(motor, direction, speed):
             call_count[0] += 1

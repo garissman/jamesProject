@@ -3,9 +3,7 @@ import {useState} from 'react'
 export default function PlateLayout({
                                         selectedWell,
                                         targetWell,
-                                        setTargetWell,
                                         currentPipetteCount,
-                                        handleSetPipetteCount,
                                         currentOperation,
                                         operationWell,
                                         layoutType,
@@ -22,7 +20,6 @@ export default function PlateLayout({
                                         systemStatus,
                                         controllerType,
                                         fetchCurrentPosition,
-                                        fetchAxisPositions,
                                         wellSelectionMode,
                                         setWellSelectionMode,
                                     }) {

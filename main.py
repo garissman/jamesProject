@@ -2,7 +2,6 @@ import asyncio
 import json
 import threading
 from contextlib import asynccontextmanager
-from functools import partial
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -269,7 +268,7 @@ async def program_execution_status():
         with open(SCHEDULED_PROGRAM_FILE) as f:
             data = json.load(f)
         return {"status": "success", "execution": data.get("execution", {"status": "idle"})}
-    except Exception as e:
+    except Exception:
         return {"status": "success", "execution": {"status": "idle"}}
 
 

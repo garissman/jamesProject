@@ -7,8 +7,6 @@ export default function ManualTab({
   systemStatus,
   handleAxisMove,
   handleSetPosition,
-  fetchCurrentPosition,
-  fetchAxisPositions,
 }) {
   const [axisStepInputs, setAxisStepInputs] = useState({ x: 100, y: 100, z: 100, pipette: 100 })
   const [positionEditMode, setPositionEditMode] = useState(false)

@@ -1,6 +1,6 @@
 """Tests for stepper_control.py — targeting 100% line + branch coverage."""
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

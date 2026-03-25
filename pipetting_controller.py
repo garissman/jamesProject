@@ -78,7 +78,7 @@ class CoordinateMapper:
         WS2 is offset from WS1 by WS_HEIGHT + WS_GAP in Y."""
         ws_pos_x    = settings.get('WS_POSITION_X')
         ws_pos_y    = settings.get('WS_POSITION_Y')
-        ws_height   = settings.get('WS_HEIGHT')
+        settings.get('WS_HEIGHT')
         ws_gap      = settings.get('WS_GAP')
 
         center_x = ws_pos_x
@@ -684,7 +684,7 @@ class PipettingController:
             self.log(f"  Pipette limit: clamped {volume_ml} µL -> {self.pipette_ml:.3f} µL (current volume)")
             volume_ml = self.pipette_ml
         if volume_ml <= 0:
-            self.log(f"  Pipette is empty — skipping dispense")
+            self.log("  Pipette is empty — skipping dispense")
             self.current_operation = "idle"
             self.operation_well = None
             return
@@ -1219,7 +1219,7 @@ class PipettingController:
                     steps = int(allowed_ml * self.PIPETTE_STEPS_PER_ML)
                     self.log(f"Pipette limit: clamped to {steps} steps (pipette at {self.pipette_ml:.3f} µL)")
                 if steps <= 0:
-                    self.log(f"Pipette is empty — skipping")
+                    self.log("Pipette is empty — skipping")
                     return self.get_axis_positions()
 
         self.log(f"Moving {axis.upper()}-axis: {steps} steps {direction.upper()}")

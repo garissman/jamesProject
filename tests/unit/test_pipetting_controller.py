@@ -1,10 +1,8 @@
 """Tests for pipetting_controller.py -- targeting 100% line + branch coverage."""
 import json
 import sys
-import time
-import threading
 from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock, call
+from unittest.mock import patch, MagicMock, call
 
 import pytest
 
@@ -19,9 +17,9 @@ def _ensure_import(mock_gpio):
         rpi_mod.GPIO = mock_gpio
 
     if 'stepper_control' not in sys.modules:
-        import stepper_control
+        pass
     else:
-        stepper_control = sys.modules['stepper_control']
+        sys.modules['stepper_control']
 
     if 'pipetting_controller' not in sys.modules:
         import pipetting_controller
@@ -430,8 +428,8 @@ class TestPipettingControllerInit:
 
     def test_syncs_motor_step_counters(self, ctrl):
         """RPi controller sets motor current_position from loaded pos."""
-        motor1 = ctrl.stepper_controller.get_motor(1)
-        motor2 = ctrl.stepper_controller.get_motor(2)
+        ctrl.stepper_controller.get_motor(1)
+        ctrl.stepper_controller.get_motor(2)
         motor3 = ctrl.stepper_controller.get_motor(3)
         # Default position is (0,0,70) from tmp_position
         assert motor3.current_position == int(70.0 * ctrl.mapper.STEPS_PER_MM_Z)
@@ -486,7 +484,7 @@ class TestMoveMotor:
         assert result is not None
 
     def test_arduino_path(self, arduino_ctrl, pc_mod):
-        result = arduino_ctrl._move_motor(1, 100, pc_mod.Direction.CLOCKWISE, 0.001)
+        arduino_ctrl._move_motor(1, 100, pc_mod.Direction.CLOCKWISE, 0.001)
         arduino_ctrl.stepper_controller.move_motor.assert_called()
 
     def test_arduino_respect_limit(self, arduino_ctrl, pc_mod):
@@ -1161,7 +1159,7 @@ class TestExecuteSequence:
     def test_home_step_type(self, ctrl, pc_mod):
         step = self._make_step(pc_mod, step_type='home', wait_time=1)
         with patch.object(ctrl, 'home') as mock_home, \
-             patch.object(ctrl, '_interruptible_sleep') as mock_sleep:
+             patch.object(ctrl, '_interruptible_sleep'):
             ctrl.execute_sequence([step])
         # home() called twice: once for the step, once at end
         assert mock_home.call_count == 2
@@ -1176,7 +1174,7 @@ class TestExecuteSequence:
     def test_wait_step_zero_wait(self, ctrl, pc_mod):
         step = self._make_step(pc_mod, step_type='wait', wait_time=0)
         with patch.object(ctrl, 'home'), \
-             patch.object(ctrl, '_interruptible_sleep') as mock_sleep:
+             patch.object(ctrl, '_interruptible_sleep'):
             ctrl.execute_sequence([step])
 
     def test_quantity_repetition(self, ctrl, pc_mod):
@@ -1549,7 +1547,7 @@ class TestHomeStepTypeNoWait:
             volume_ml=5.0, wait_time=0, step_type='home',
         )
         with patch.object(ctrl, 'home') as mock_home, \
-             patch.object(ctrl, '_interruptible_sleep') as mock_sleep:
+             patch.object(ctrl, '_interruptible_sleep'):
             ctrl.execute_sequence([step])
         # home called for the step AND for the final home
         assert mock_home.call_count == 2
@@ -1625,7 +1623,6 @@ class TestExecuteSequenceStopAtLoopStart:
         # Actually, let's set it after first step finishes.
         # The stop check at loop start happens after step_num increments.
         # We need stop_requested to be True when the loop iterates to step 2.
-        orig_interruptible = ctrl._interruptible_sleep
         def sleep_and_stop(secs):
             ctrl.stop_requested = True
 
@@ -1656,7 +1653,7 @@ class TestTimeFrequencyWaitCalculation:
         time_iter = iter(times)
         with patch.object(ctrl, 'execute_transfer'), \
              patch.object(ctrl, 'home'), \
-             patch.object(ctrl, '_interruptible_sleep') as mock_sleep, \
+             patch.object(ctrl, '_interruptible_sleep'), \
              patch('pipetting_controller.time.time', side_effect=time_iter):
             ctrl.execute_sequence([step])
 
@@ -1959,5 +1956,5 @@ class TestCreateStepperController:
     def test_arduino(self, pc_mod):
         mock_sc_class = MagicMock()
         with patch.dict(sys.modules, {'stepper_control_arduino': MagicMock(StepperController=mock_sc_class)}):
-            sc = pc_mod._create_stepper_controller('arduino_uno_q')
+            pc_mod._create_stepper_controller('arduino_uno_q')
         mock_sc_class.assert_called_once()

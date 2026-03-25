@@ -322,7 +322,7 @@ export default function SettingsTab({
                                                     const r = await fetch('/api/mcu/ping')
                                                     const data = await r.json()
                                                     setConfigMessage(data.connected ? 'MCU: Connected (pong)' : 'MCU: No response')
-                                                } catch (e) {
+                                                } catch {
                                                     setConfigMessage('MCU: Connection failed')
                                                 }
                                             }}
@@ -346,7 +346,7 @@ export default function SettingsTab({
                                                                 body: JSON.stringify({pattern, value: 0})
                                                             })
                                                             setConfigMessage(`LED: ${pattern} test sent`)
-                                                        } catch (e) {
+                                                        } catch {
                                                             setConfigMessage('LED test failed')
                                                         }
                                                     }}

@@ -187,7 +187,7 @@ describe('PlateLayout', () => {
             const props = defaultProps({ isExecuting: true })
             // We need to render in quick op mode but the button is disabled when executing
             // So render without executing, enable quick op, then re-render
-            const { rerender } = render(<PlateLayout {...props} />)
+            render(<PlateLayout {...props} />)
             // Since isExecuting=true from the start, the "Quick Operation Mode" button is disabled
             expect(screen.getByRole('button', { name: /Quick Operation Mode/i })).toBeDisabled()
         })
@@ -809,7 +809,7 @@ describe('PlateLayout', () => {
     // --- Operation animation in grouped mode ---
     describe('Operation animation in grouped mode', () => {
         it('shows aspirating animation on group containing operationWell', () => {
-            const getPipetteWells = vi.fn((well, count) => {
+            const getPipetteWells = vi.fn((well, _count) => {
                 if (!well) return []
                 const row = well.charAt(0)
                 const col = parseInt(well.substring(1))
@@ -828,7 +828,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows dispensing animation on group containing operationWell', () => {
-            const getPipetteWells = vi.fn((well, count) => {
+            const getPipetteWells = vi.fn((well, _count) => {
                 if (!well) return []
                 const row = well.charAt(0)
                 const col = parseInt(well.substring(1))
@@ -847,7 +847,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows moving animation on group containing operationWell', () => {
-            const getPipetteWells = vi.fn((well, count) => {
+            const getPipetteWells = vi.fn((well, _count) => {
                 if (!well) return []
                 const row = well.charAt(0)
                 const col = parseInt(well.substring(1))
@@ -910,7 +910,7 @@ describe('PlateLayout', () => {
     // --- Wellplate vial operation animations ---
     describe('Wellplate vial operation animations', () => {
         it('shows aspirating animation on vials in wellplate layout', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'aspirating',
@@ -959,7 +959,7 @@ describe('PlateLayout', () => {
     // --- 1-pipette mode: operation animations on individual wells ---
     describe('Individual well operation animation in 1-pipette mode', () => {
         it('shows aspirating animation on individual well in 1-pipette mode', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 currentPipetteCount: 1,
                 layoutType: 'microchip',
@@ -977,7 +977,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows dispensing animation on individual well in 1-pipette mode', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 currentPipetteCount: 1,
                 layoutType: 'microchip',
@@ -993,7 +993,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows moving animation on individual well in 1-pipette mode', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 currentPipetteCount: 1,
                 layoutType: 'microchip',
@@ -1025,7 +1025,7 @@ describe('PlateLayout', () => {
         })
 
         it('highlights side pipette wells in 1-pipette mode', () => {
-            const getPipetteWells = vi.fn((well, count) => {
+            const getPipetteWells = vi.fn((well, _count) => {
                 if (!well) return []
                 const row = well.charAt(0)
                 const col = parseInt(well.substring(1))
@@ -1098,7 +1098,7 @@ describe('PlateLayout', () => {
     // --- Wellplate vial dispensing animation ---
     describe('Wellplate vial dispensing and moving animations', () => {
         it('shows dispensing animation on vials in wellplate layout', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'dispensing',
@@ -1111,7 +1111,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows moving animation on vials in wellplate layout', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'moving',
@@ -1136,7 +1136,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows aspirating animation in middle column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'aspirating',
@@ -1160,7 +1160,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows dispensing animation in right column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'dispensing',
@@ -1175,7 +1175,7 @@ describe('PlateLayout', () => {
         })
 
         it('shows moving animation in right column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'moving',
@@ -1378,7 +1378,7 @@ describe('PlateLayout', () => {
     // --- Wellplate middle column: moving animation ---
     describe('Wellplate middle column moving animation', () => {
         it('shows moving animation in middle column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'moving',
@@ -1396,7 +1396,7 @@ describe('PlateLayout', () => {
     // --- Wellplate middle column: dispensing animation ---
     describe('Wellplate middle column dispensing animation', () => {
         it('shows dispensing animation in middle column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'dispensing',
@@ -1517,7 +1517,7 @@ describe('PlateLayout', () => {
     // --- Wellplate right column: aspirating animation ---
     describe('Wellplate right column aspirating animation', () => {
         it('shows aspirating animation in right column', () => {
-            const getPipetteWells = vi.fn((well, count) => well ? [well] : [])
+            const getPipetteWells = vi.fn((well, _count) => well ? [well] : [])
             const props = defaultProps({
                 layoutType: 'wellplate',
                 currentOperation: 'aspirating',

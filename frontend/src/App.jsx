@@ -97,7 +97,7 @@ function App() {
     const zAxisUp = axisPositions.z >= 35
 
     // Well data
-    const [wellData, setWellData] = useState({})
+    const [_wellData, _setWellData] = useState({})
 
     // Ref for auto-scrolling logs
     const logsEndRef = useRef(null)
@@ -390,7 +390,7 @@ function App() {
                 body: JSON.stringify({layoutType: mode})
             })
             if (res.ok) {
-                const data = await res.json()
+                const _data = await res.json()
                 setLayoutType(mode)
             } else {
                 const data = await res.json()
@@ -640,7 +640,7 @@ function App() {
             const response = await fetch('/api/program/status')
             const data = await response.json()
             if (data.execution) setProgramExecution(data.execution)
-        } catch (error) {
+        } catch {
             // silently ignore
         }
     }
@@ -714,7 +714,7 @@ function App() {
                     if (data.schedule) setSchedule(data.schedule)
                     if (data.execution) setProgramExecution(data.execution)
                 }
-            } catch (error) {
+            } catch {
                 // silently ignore on mount
             } finally {
                 initialLoadDone.current = true

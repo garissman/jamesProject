@@ -1,4 +1,4 @@
-export default function NavBar({ activeTab, setActiveTab, controllerType, theme, toggleTheme }) {
+export default function NavBar({ activeTab, setActiveTab, theme, toggleTheme }) {
   const baseTab =
     'bg-transparent border-2 border-[var(--border-color)] text-[var(--text-primary)] py-3 px-10 text-[1.1rem] cursor-pointer transition-all duration-300 flex items-center gap-2.5 rounded-none';
   const activeClass = 'bg-[var(--nav-active)] border-[var(--border-hover)]';

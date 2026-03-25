@@ -5,7 +5,7 @@ const selectClass = inputClass + ' cursor-pointer'
 
 // ─── StepCard ────────────────────────────────────────────────────────────────
 
-function StepCard({ step, index, isActive, onEdit, onDuplicate, onDelete, onDragStart, onDragOver, onDrop }) {
+function StepCard({ step, index, isActive, onEdit, onDuplicate, onDelete, onDragStart, onDrop }) {
   const stepType = step.stepType || 'pipette'
 
   const fmtTime = (s) => {
@@ -153,6 +153,7 @@ function StepWizard({ initial, layoutType, onSave, onCancel, validateWellId, set
   }
 
   /* v8 ignore start -- formatSeconds is reserved for future use */
+  // eslint-disable-next-line no-unused-vars
   const formatSeconds = (totalSeconds) => {
     const s = Number(totalSeconds)
     if (!s || isNaN(s)) return ''

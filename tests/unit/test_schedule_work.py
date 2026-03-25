@@ -1,10 +1,9 @@
 """Tests for schedule_work.py — periodic scheduler for run_program.py."""
 
-import subprocess
 import sys
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
