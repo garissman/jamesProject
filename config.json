@@ -1,4 +1,12 @@
 {
+  "BED_OFFSET_X": 70.0,
+  "BED_OFFSET_Y": 15.0,
+  "WELL_SPACING": 4.0,
+  "WELL_DIAMETER": 8.0,
+  "WELL_HEIGHT": 14.0,
+  "VIAL_WELL_SPACING": 45.0,
+  "VIAL_WELL_DIAMETER": 8.0,
+  "VIAL_WELL_HEIGHT": 14.0,
   "STEPS_PER_MM_X": 200,
   "STEPS_PER_MM_Y": 200,
   "STEPS_PER_MM_Z": 200,
@@ -19,6 +27,7 @@
   "INVERT_Y": false,
   "INVERT_Z": false,
   "INVERT_PIPETTE": true,
+  "MOTOR_STOP": false,
   "CONTROLLER_TYPE": "raspberry_pi",
   "LAYOUT_COORDINATES": {
     "microchip": {
