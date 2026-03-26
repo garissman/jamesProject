@@ -2393,6 +2393,34 @@ describe('handleStop flow', () => {
 
     consoleSpy.mockRestore()
   })
+
+  it('does not set isExecuting to false when motor_stopped is false (release)', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    global.fetch = mockFetch({
+      '/api/pipetting/status': {
+        initialized: true, current_well: 'WS1', message: 'System ready',
+        pipette_count: 3, layout_type: 'microchip', is_executing: true,
+        controller_type: 'raspberry_pi', current_operation: 'idle',
+        operation_well: null, motor_stopped: false,
+      },
+      '/api/axis/positions': { status: 'success', positions: { x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {} } },
+      '/api/pipetting/logs': { logs: [] },
+      '/api/config': { status: 'success', config: {} },
+      '/api/program/load': { steps: [], schedule: { cronExpression: '', enabled: false } },
+      '/api/program/status': { execution: { status: 'idle' } },
+      '/api/pipetting/stop': { message: 'Motor stop released', motor_stopped: false },
+    })
+
+    await act(async () => { render(<App />) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    await act(async () => { fireEvent.click(screen.getByTestId('right-stop')) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+
+    // isExecuting stays true because motor_stopped is false (release, not engage)
+    expect(screen.getByTestId('right-is-executing').textContent).toBe('true')
+
+    consoleSpy.mockRestore()
+  })
 })
 
 // ─── handleHome sets isExecuting during call ────────────────────────────────
@@ -2590,6 +2618,30 @@ describe('handleExecute error without detail', () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to execute sequence'))
     })
     consoleSpy.mockRestore()
+  })
+})
+
+// ─── motor_stopped syncs from status polling even without current_well ───────
+
+describe('motorStopped status polling', () => {
+  it('updates motorStopped from status even when current_well is null', async () => {
+    global.fetch = mockFetch({
+      '/api/pipetting/status': {
+        initialized: false, current_well: null, message: 'Not ready',
+        motor_stopped: true,
+      },
+      '/api/axis/positions': { status: 'success', positions: { x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {} } },
+      '/api/pipetting/logs': { logs: [] },
+      '/api/config': { status: 'success', config: {} },
+      '/api/program/load': { steps: [], schedule: { cronExpression: '', enabled: false } },
+      '/api/program/status': { execution: { status: 'idle' } },
+    })
+
+    await act(async () => { render(<App />) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+
+    // motorStopped prop should be passed to RightPanel even when system not initialized
+    expect(rightPanelProps.motorStopped).toBe(true)
   })
 })
 

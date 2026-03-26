@@ -1126,6 +1126,28 @@ class TestHomeAllMixedLimits:
 # GPIO import failure (lines 12-14)
 # ===================================================================
 
+class TestMoveUntilLimitStopRequested:
+    @patch("time.sleep")
+    def test_stop_requested_during_move_until_limit(self, mock_sleep, sc, mock_gpio, monkeypatch):
+        """stop_requested causes move_until_limit to return early with 'none'."""
+        monkeypatch.setattr(sc, 'GPIO_AVAILABLE', False)
+        m = sc.StepperMotor(4, 17, "Sim", limit_min_pin=26, limit_max_pin=21)
+        m.simulated_position = 5000
+        # Set stop_requested after the first batch completes (via sleep side effect)
+        call_count = [0]
+        original_sleep = mock_sleep.side_effect
+        def set_stop_on_batch(*args, **kwargs):
+            call_count[0] += 1
+            # After first batch of 50 steps + EMI settle sleep -> set stop
+            if call_count[0] > 50:
+                m.stop_requested = True
+        mock_sleep.side_effect = set_stop_on_batch
+        steps_taken, which = m.move_until_limit(sc.Direction.CLOCKWISE, delay=0.001, max_steps=10000)
+        assert which == 'none'
+        # Should have moved one batch (50 steps) then stopped
+        assert steps_taken <= 100
+
+
 class TestGpioImportFailure:
     def test_import_failure_sets_gpio_available_false(self, mock_gpio, monkeypatch):
         """When RPi.GPIO import fails, GPIO_AVAILABLE = False."""

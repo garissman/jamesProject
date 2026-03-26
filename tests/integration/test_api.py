@@ -29,6 +29,7 @@ def _build_mock_controller():
     ctrl.current_step_index = None
     ctrl.total_steps = None
     ctrl.pipette_ml = 0.0
+    ctrl.motor_stopped = False
     ctrl.current_position = MagicMock(x=0.0, y=0.0, z=70.0)
     ctrl.get_current_well.return_value = "WS1"
     ctrl.get_logs.return_value = []
@@ -241,6 +242,24 @@ class TestStopPipetting:
         r = client.post("/api/pipetting/stop")
         assert r.status_code == 200
         assert r.json()["status"] == "success"
+        assert "motor_stopped" in r.json()
+
+    def test_toggle_engages_and_calls_stop(self, client):
+        import main
+        main.pipetting_controller.motor_stopped = False
+        r = client.post("/api/pipetting/stop")
+        assert r.status_code == 200
+        assert r.json()["motor_stopped"] is True
+        main.pipetting_controller.set_motor_stop.assert_called_with(True)
+        main.pipetting_controller.stop.assert_called()
+
+    def test_toggle_releases(self, client):
+        import main
+        main.pipetting_controller.motor_stopped = True
+        r = client.post("/api/pipetting/stop")
+        assert r.status_code == 200
+        assert r.json()["motor_stopped"] is False
+        main.pipetting_controller.set_motor_stop.assert_called_with(False)
 
     def test_not_initialized_503(self, client_no_controller):
         r = client_no_controller.post("/api/pipetting/stop")
@@ -298,6 +317,7 @@ class TestPipettingStatus:
         assert data["initialized"] is True
         assert "position" in data
         assert "is_executing" in data
+        assert "motor_stopped" in data
 
     def test_not_initialized(self, client_no_controller):
         r = client_no_controller.get("/api/pipetting/status")

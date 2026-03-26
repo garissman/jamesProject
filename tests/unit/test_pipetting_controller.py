@@ -1948,6 +1948,89 @@ class TestTimeFrequencyStopRequested:
         # to the home() call at the end.
 
 
+class TestMotorStopInterlock:
+    """Tests for motor_stopped flag blocking all motor operations."""
+
+    def test_move_to_well_blocked(self, ctrl, pc_mod):
+        pc_mod.CoordinateMapper.LAYOUT_COORDINATES = {"microchip": {"A2": {"x": 100.0, "y": 20.0}}}
+        pc_mod.CoordinateMapper.CURRENT_LAYOUT = "microchip"
+        ctrl.motor_stopped = True
+        original = pc_mod.WellCoordinates(x=ctrl.current_position.x, y=ctrl.current_position.y, z=ctrl.current_position.z)
+        ctrl.move_to_well("A2", z_offset=-40.0)
+        assert ctrl.current_position.x == original.x
+        assert ctrl.current_position.y == original.y
+        assert ctrl.current_position.z == original.z
+
+    def test_aspirate_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        ctrl.current_position.z = 0.0
+        ctrl.pipette_ml = 0.0
+        ctrl.aspirate(40.0)
+        assert ctrl.pipette_ml == 0.0
+
+    def test_dispense_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        ctrl.current_position.z = 0.0
+        ctrl.pipette_ml = 40.0
+        ctrl.dispense(40.0)
+        assert ctrl.pipette_ml == 40.0
+
+    def test_z_to_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        ctrl.current_position.z = 0.0
+        ctrl._z_to(70.0)
+        assert ctrl.current_position.z == 0.0
+
+    def test_toggle_z_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        original_z = ctrl.current_position.z
+        ctrl.toggle_z('up')
+        assert ctrl.current_position.z == original_z
+
+    def test_move_axis_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        original_x = ctrl.current_position.x
+        result = ctrl.move_axis('x', 100, 'cw')
+        assert result['x'] == original_x
+
+    def test_home_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        original = (ctrl.current_position.x, ctrl.current_position.y, ctrl.current_position.z)
+        ctrl.home()
+        assert (ctrl.current_position.x, ctrl.current_position.y, ctrl.current_position.z) == original
+
+    def test_home_axis_to_min_blocked(self, ctrl):
+        ctrl.motor_stopped = True
+        ctrl._home_axis_to_min(1, "X")
+        # No exception, just returns early
+
+    def test_move_motor_blocked(self, ctrl, pc_mod):
+        ctrl.motor_stopped = True
+        result = ctrl._move_motor(1, 100, pc_mod.Direction.CLOCKWISE, 0.001)
+        assert result is None
+
+    def test_set_motor_stop_engage(self, ctrl):
+        ctrl.set_motor_stop(True)
+        assert ctrl.motor_stopped is True
+        import settings
+        assert settings.get('MOTOR_STOP') is True
+
+    def test_set_motor_stop_release(self, ctrl):
+        ctrl.motor_stopped = True
+        ctrl.set_motor_stop(False)
+        assert ctrl.motor_stopped is False
+        import settings
+        assert settings.get('MOTOR_STOP') is False
+
+    def test_motor_stopped_loaded_from_config(self, make_controller):
+        ctrl = make_controller(MOTOR_STOP=True)
+        assert ctrl.motor_stopped is True
+
+    def test_motor_stopped_false_by_default(self, make_controller):
+        ctrl = make_controller(MOTOR_STOP=False)
+        assert ctrl.motor_stopped is False
+
+
 class TestCreateStepperController:
     def test_raspberry_pi(self, pc_mod, mock_gpio):
         sc = pc_mod._create_stepper_controller('raspberry_pi')
