@@ -106,6 +106,31 @@ body {
     50% { border-color: #fbbf24; box-shadow: 0 0 16px rgba(245,158,11,0.4); }
 }
 
+@keyframes motor-stop-pulse {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(220, 38, 38, 0.6), inset 0 0 0 rgba(220, 38, 38, 0);
+    }
+    50% {
+        box-shadow: 0 0 24px rgba(220, 38, 38, 0.9), inset 0 0 4px rgba(220, 38, 38, 0.2);
+    }
+}
+
+@keyframes motor-stop-border {
+    0%, 100% {
+        border-color: rgba(220, 38, 38, 0.4);
+        box-shadow: inset 0 0 20px rgba(220, 38, 38, 0.03);
+    }
+    50% {
+        border-color: rgba(220, 38, 38, 0.8);
+        box-shadow: inset 0 0 40px rgba(220, 38, 38, 0.06);
+    }
+}
+
+@keyframes motor-stop-banner {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+}
+
 /* Custom animation utilities */
 @layer utilities {
     .animate-pulse-well {
@@ -134,6 +159,19 @@ body {
 
     .animate-step-active {
         animation: step-active-pulse 1.5s ease-in-out infinite;
+    }
+
+    .animate-motor-stop-btn {
+        animation: motor-stop-pulse 1.5s ease-in-out infinite;
+    }
+
+    .animate-motor-stop-border {
+        border: 6px solid rgba(220, 38, 38, 0.5);
+        animation: motor-stop-border 2s ease-in-out infinite;
+    }
+
+    .animate-motor-stop-banner {
+        animation: motor-stop-banner 2s ease-in-out infinite;
     }
 
     .toggle-track {

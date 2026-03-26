@@ -310,6 +310,11 @@ class StepperMotor:
 
         try:
             while max_steps == 0 or steps_taken < max_steps:
+                # Check for user stop request between batches
+                if self.stop_requested:
+                    print(f"{self.name}: stop requested during move_until_limit")
+                    return steps_taken, 'none'
+
                 # Move a batch of steps
                 batch = CHECK_INTERVAL if max_steps == 0 else min(CHECK_INTERVAL, max_steps - steps_taken)
                 for _ in range(batch):

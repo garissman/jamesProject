@@ -40,6 +40,7 @@ DEFAULTS: dict[str, Any] = {
     "INVERT_Y":               False,
     "INVERT_Z":               False,
     "INVERT_PIPETTE":         False,
+    "MOTOR_STOP":             False,
     "CONTROLLER_TYPE":        "raspberry_pi",
     "LAYOUT_COORDINATES": {
         "microchip": {

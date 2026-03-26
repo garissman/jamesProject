@@ -166,7 +166,7 @@ function standardMockFetch() {
     '/api/program/status': { execution: { status: 'idle' } },
     '/api/program/save': { status: 'success', message: 'Program saved' },
     '/api/pipetting/execute': { message: 'Executed', steps_executed: 1 },
-    '/api/pipetting/stop': { message: 'Stopped' },
+    '/api/pipetting/stop': { message: 'Motor stop engaged', motor_stopped: true },
     '/api/pipetting/home': { message: 'Homed' },
     '/api/pipetting/set-pipette-count': { message: 'Pipette count set' },
     '/api/pipetting/set-layout': { message: 'Layout set' },
@@ -2607,7 +2607,7 @@ describe('handleStop error without detail', () => {
     await act(async () => { fireEvent.click(screen.getByTestId('right-stop')) })
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to stop execution'))
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to toggle motor stop'))
     })
     consoleSpy.mockRestore()
   })

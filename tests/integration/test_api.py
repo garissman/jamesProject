@@ -1408,10 +1408,10 @@ class TestExecuteEdgeCases:
 class TestStopEdgeCases:
     def test_stop_exception_500(self, client):
         import main
-        main.pipetting_controller.stop.side_effect = RuntimeError("can't stop")
+        main.pipetting_controller.set_motor_stop.side_effect = RuntimeError("can't stop")
         r = client.post("/api/pipetting/stop")
         assert r.status_code == 500
-        main.pipetting_controller.stop.side_effect = None
+        main.pipetting_controller.set_motor_stop.side_effect = None
 
 
 # ===================================================================

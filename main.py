@@ -372,9 +372,7 @@ async def download_program(name: str):
 
 @app.post("/api/pipetting/stop")
 async def stop_pipetting_execution():
-    """Stop the current pipetting execution"""
-    global is_executing
-
+    """Toggle motor stop interlock. When engaged, no steps are sent to motors."""
     if pipetting_controller is None:
         raise HTTPException(
             status_code=503,
@@ -382,13 +380,20 @@ async def stop_pipetting_execution():
         )
 
     try:
-        pipetting_controller.stop()
-        # Note: is_executing will be set to False by the background thread when it finishes
-        return {"status": "success", "message": "Stop requested - execution will halt after current operation"}
+        new_state = not pipetting_controller.motor_stopped
+        pipetting_controller.set_motor_stop(new_state)
+        if new_state:
+            # Also stop any running execution sequence
+            pipetting_controller.stop()
+        return {
+            "status": "success",
+            "motor_stopped": new_state,
+            "message": "Motor stop engaged" if new_state else "Motor stop released"
+        }
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error stopping execution: {str(e)}"
+            detail=f"Error toggling motor stop: {str(e)}"
         )
 
 
@@ -489,6 +494,7 @@ async def get_pipetting_status():
             "operation_well": operation_well,
             "current_step_index": pipetting_controller.current_step_index,
             "total_steps": pipetting_controller.total_steps,
+            "motor_stopped": pipetting_controller.motor_stopped,
             "message": "Executing" if is_executing else "System ready"
         }
     except Exception as e:
@@ -499,7 +505,8 @@ async def get_pipetting_status():
             "pipette_count": 3,
             "is_executing": False,
             "current_operation": "idle",
-            "operation_well": None
+            "operation_well": None,
+            "motor_stopped": False
         }
 
 

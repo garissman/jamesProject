@@ -90,6 +90,9 @@ function App() {
     // Controller type
     const [controllerType, setControllerType] = useState('raspberry_pi')
 
+    // Motor stop interlock
+    const [motorStopped, setMotorStopped] = useState(false)
+
     // Axis positions state
     const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {}})
 
@@ -326,10 +329,11 @@ function App() {
 
             if (response.ok) {
                 console.log(`${data.message}`)
-                setIsExecuting(false)
+                setMotorStopped(data.motor_stopped)
+                if (data.motor_stopped) setIsExecuting(false)
                 fetchCurrentPosition()
             } else {
-                console.error(`Error: ${data.detail || 'Failed to stop execution'}`)
+                console.error(`Error: ${data.detail || 'Failed to toggle motor stop'}`)
             }
         } catch (error) {
             console.error(`Error: Unable to connect to backend. ${error.message}`)
@@ -576,6 +580,9 @@ function App() {
             const response = await fetch('/api/pipetting/status')
             const data = await response.json()
 
+            // Always update motor_stopped regardless of initialization state
+            if (data.motor_stopped !== undefined) setMotorStopped(data.motor_stopped)
+
             if (data.initialized && data.current_well) {
                 setSelectedWell(data.current_well)
                 setSystemStatus(data.message || 'System ready')
@@ -798,7 +805,14 @@ function App() {
     // ── Render ──
 
     return (
-        <div className="min-h-screen flex flex-col bg-[image:var(--bg-primary)] text-[var(--text-primary)] font-sans">
+        <div className={`min-h-screen flex flex-col bg-[image:var(--bg-primary)] text-[var(--text-primary)] font-sans ${motorStopped ? 'animate-motor-stop-border' : ''}`}>
+            {motorStopped && (
+                <div className="animate-motor-stop-banner bg-[#dc2626] text-white text-center py-1.5 text-sm font-semibold tracking-wide flex items-center justify-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+                    MOTORS STOPPED
+                    <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+                </div>
+            )}
             <NavBar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -901,6 +915,7 @@ function App() {
                     targetWell={targetWell}
                     setTargetWell={setTargetWell}
                     isExecuting={isExecuting}
+                    motorStopped={motorStopped}
                     logs={logs}
                     logsEndRef={logsEndRef}
                     handleExecute={handleExecute}

@@ -4,6 +4,7 @@ export default function RightPanel({
   steps,
   targetWell,
   isExecuting,
+  motorStopped,
   handleMoveToWell,
   handleExecute,
   handleStop,
@@ -48,10 +49,22 @@ export default function RightPanel({
           {isExecuting ? 'Executing...' : 'Execute'}
         </button>
         <button
-          className="py-[15px] px-[30px] text-[1.1rem] font-semibold border-none rounded-[10px] cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)] bg-[#f59e0b] text-white hover:bg-[#d97706]"
+          type="button"
+          className={`py-[15px] px-[30px] text-[1.1rem] font-semibold border-none rounded-[10px] cursor-pointer transition-all duration-200 flex items-center justify-center gap-2.5 select-none ${
+            motorStopped
+              ? 'bg-[#dc2626] text-white animate-motor-stop-btn'
+              : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] hover:-translate-y-0.5 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)]'
+          }`}
           onClick={handleStop}
         >
-          Stop
+          <input
+            type="checkbox"
+            checked={motorStopped}
+            readOnly
+            tabIndex={-1}
+            className="w-4 h-4 accent-white pointer-events-none"
+          />
+          {motorStopped ? 'Motors Stopped' : 'Motor Stop'}
         </button>
         <button
           className="py-[15px] px-[30px] text-[1.1rem] font-semibold border-none rounded-[10px] cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)] bg-[#3b82f6] text-white hover:bg-[#2563eb] disabled:bg-[#6b7280] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#6b7280] disabled:hover:translate-y-0 disabled:hover:shadow-none"

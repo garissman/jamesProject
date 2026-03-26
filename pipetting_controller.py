@@ -314,6 +314,7 @@ class PipettingController:
         self.stepper_controller = _create_stepper_controller(self.controller_type)
         self.mapper = CoordinateMapper()
         self.stop_requested = False
+        self.motor_stopped = bool(settings.get('MOTOR_STOP'))  # Persisted motor interlock
         self.log_buffer = []  # Store log messages for UI display
         self.max_logs = 100  # Maximum number of logs to keep
         self.current_pipette_count = 1  # Current pipette configuration (default: 1)
@@ -377,6 +378,9 @@ class PipettingController:
         RPi signature:  move_motor(id, steps, Direction, delay_s, check_limits) -> (steps, LimitSwitchState)
         Arduino signature: move_motor(id, steps, Direction, delay_us) -> dict
         """
+        if self.motor_stopped:
+            self.log(f"Motor stopped — ignoring move command (motor {motor_id}, {steps} steps)")
+            return None
         converted_speed = self._speed(speed)
         check_limits = kwargs.get('check_limits', True)
         if self.controller_type == 'arduino_uno_q':
@@ -549,6 +553,9 @@ class PipettingController:
             well_id: Well identifier (e.g., 'A12')
             z_offset: Additional Z offset in mm (negative goes down)
         """
+        if self.motor_stopped:
+            self.log(f"Motor stop engaged — ignoring move to {well_id}")
+            return
         self.current_operation = "moving"
         self.operation_well = well_id
         self.log(f"Moving to well {well_id}...")
@@ -640,6 +647,9 @@ class PipettingController:
         Args:
             volume_ml: Volume to aspirate in µL
         """
+        if self.motor_stopped:
+            self.log("Motor stop engaged — ignoring aspirate")
+            return
         # Ensure Z is down before aspirating
         if self.current_position.z > 1.0:
             self.log(f"  Z is up ({self.current_position.z:.1f}mm), moving down before aspirate")
@@ -673,6 +683,9 @@ class PipettingController:
         Args:
             volume_ml: Volume to dispense in µL
         """
+        if self.motor_stopped:
+            self.log("Motor stop engaged — ignoring dispense")
+            return
         # Ensure Z is down before dispensing
         if self.current_position.z > 1.0:
             self.log(f"  Z is up ({self.current_position.z:.1f}mm), moving down before dispense")
@@ -723,6 +736,8 @@ class PipettingController:
 
     def _z_to(self, target_z: float):
         """Move Z axis to an absolute position in mm"""
+        if self.motor_stopped:
+            return
         delta = target_z - self.current_position.z
         if abs(delta) < 0.1:
             return
@@ -1010,11 +1025,29 @@ class PipettingController:
         self.stop_requested = True
         self.stepper_controller.stop_all()
 
+    def set_motor_stop(self, stopped: bool):
+        """Toggle motor interlock. When stopped, no steps are sent to motors."""
+        self.motor_stopped = stopped
+        if stopped:
+            # Immediately halt any running motors
+            self.stepper_controller.stop_all()
+            self.log("Motor stop ENGAGED — motors will not move")
+        else:
+            self.log("Motor stop RELEASED — motors can move")
+        # Persist to config
+        cfg = settings.load()
+        cfg['MOTOR_STOP'] = stopped
+        settings.save(cfg)
+
     def _home_axis_to_min(self, motor_id: int, axis_name: str, first_direction: Direction = Direction.CLOCKWISE):
         """
         Home a single axis to its MIN limit switch.
         Tries first_direction, then reverses if it hits MAX instead.
         """
+        if self.motor_stopped:
+            self.log(f"Motor stop engaged — skipping {axis_name} homing")
+            return
+
         if self.controller_type == 'arduino_uno_q':
             # Arduino: use move_until_limit which properly finds the MIN limit
             # Use single get_limit RPC (not get_limit_states which queries all 4 motors)
@@ -1084,6 +1117,9 @@ class PipettingController:
 
     def home(self):
         """Return to home position by moving X and Y axes to their MIN limit switches"""
+        if self.motor_stopped:
+            self.log("Motor stop engaged — ignoring home")
+            return
         self.log("Homing all axes to MIN limit switches...")
 
         # Raise Z to safe height only if Z is currently down
@@ -1154,6 +1190,9 @@ class PipettingController:
         Args:
             direction: 'up' or 'down'
         """
+        if self.motor_stopped:
+            self.log("Motor stop engaged — ignoring Z toggle")
+            return
         Z_TOGGLE_STEPS = int(70.0 * self.mapper.STEPS_PER_MM_Z)
 
         if direction == 'up':
@@ -1183,6 +1222,9 @@ class PipettingController:
         Returns:
             dict with axis positions
         """
+        if self.motor_stopped:
+            self.log("Motor stop engaged — ignoring axis move")
+            return self.get_axis_positions()
         axis = axis.lower()
         steps = abs(steps)
 

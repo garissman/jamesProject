@@ -11,6 +11,7 @@ function renderPanel(overrides = {}) {
     steps: [],
     targetWell: null,
     isExecuting: false,
+    motorStopped: false,
     handleMoveToWell: vi.fn(),
     handleExecute: vi.fn(),
     handleStop: vi.fn(),
@@ -45,10 +46,10 @@ describe('RightPanel', () => {
   })
 
   describe('Action Buttons', () => {
-    it('renders Execute, Stop, Home, Delete all buttons', () => {
+    it('renders Execute, Motor Stop, Home, Delete all buttons', () => {
       renderPanel()
       expect(screen.getByText('Execute')).toBeInTheDocument()
-      expect(screen.getByText('Stop')).toBeInTheDocument()
+      expect(screen.getByText('Motor Stop')).toBeInTheDocument()
       expect(screen.getByText('Home')).toBeInTheDocument()
       expect(screen.getByText('Delete all')).toBeInTheDocument()
     })
@@ -59,10 +60,15 @@ describe('RightPanel', () => {
       expect(props.handleExecute).toHaveBeenCalledTimes(1)
     })
 
-    it('clicking Stop fires handleStop', () => {
+    it('clicking Motor Stop fires handleStop', () => {
       const props = renderPanel()
-      fireEvent.click(screen.getByText('Stop'))
+      fireEvent.click(screen.getByText('Motor Stop'))
       expect(props.handleStop).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows Motors Stopped when motorStopped is true', () => {
+      renderPanel({ motorStopped: true })
+      expect(screen.getByText('Motors Stopped')).toBeInTheDocument()
     })
 
     it('clicking Home fires handleHome', () => {
