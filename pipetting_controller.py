@@ -1190,16 +1190,21 @@ class PipettingController:
         # Step 1: Home Z to MAX limit switch (fully up)
         self._home_z_to_max()
 
-        # Step 2: Home X and Y axes simultaneously to MIN limit switches
+        # Step 2: Home X, Y, and Pipette simultaneously to MIN limit switches
+        pipette_min_dir = self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE)
         t_x = threading.Thread(target=self._home_axis_to_min, args=(1, "X", Direction.CLOCKWISE))
         t_y = threading.Thread(target=self._home_axis_to_min, args=(2, "Y", Direction.COUNTERCLOCKWISE))
+        t_p = threading.Thread(target=self._home_axis_to_min, args=(4, "Pipette", pipette_min_dir))
         t_x.start()
         t_y.start()
+        t_p.start()
         t_x.join()
         t_y.join()
+        t_p.join()
 
-        # Position is now at origin (X/Y at MIN limits, Z at MAX)
+        # Position is now at origin (X/Y at MIN limits, Z at MAX, Pipette empty)
         self.current_position = WellCoordinates(x=0.0, y=0.0, z=z_target_mm)
+        self.pipette_ml = 0.0
         self.save_position()
         self.log(f"Home complete - position: X=0, Y=0, Z={z_target_mm:.1f}mm")
 
