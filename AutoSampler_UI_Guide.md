@@ -277,6 +277,46 @@ The pipette card works the same way but uses "Aspirate +" and "Dispense -" butto
 
 ---
 
+## Motor Stop
+
+The Motor Stop is a safety interlock that immediately halts all motor movement. It can be triggered from the UI or from a physical switch on the sampler.
+
+### UI stop button
+
+![Motor Stop Engaged](screenshots/15_motor_stop_engaged.png)
+
+The right panel has a "Motor Stop" button with a checkbox indicator. Clicking it toggles the interlock:
+
+- **Engaging** -- all motors stop immediately. Any running program or manual movement is interrupted. The checkbox becomes checked and the button turns red with a pulsing glow.
+- **Releasing** -- the system automatically runs a Home sequence to re-zero all axes before you can do anything else.
+
+When motors are stopped, two visual indicators appear and stay fixed on screen regardless of scrolling:
+
+- A **red pulsing border** around the entire viewport
+- A **red banner** at the top reading "MOTORS STOPPED" with pulsing dots
+
+Both disappear once the stop is released. The motor stop state is persisted in `config.json` so it survives a server restart.
+
+![Motor Stop Released](screenshots/16_motor_stop_released.png)
+
+After releasing the stop, the system automatically homes all axes. The logs show the homing sequence completing before normal operation resumes.
+
+### Physical stop switch
+
+The sampler has a physical emergency stop switch that cuts power to the motor drivers directly. It is not wired to the Raspberry Pi -- the software has no way to detect that it was pressed. When the physical switch is pressed:
+
+1. All motors lose power immediately and stop moving
+2. The Raspberry Pi and software keep running, but the tracked position is now out of sync with reality
+
+To recover after using the physical switch:
+
+1. Reset the physical switch on the hardware to restore power to the motors
+2. Press the **Motor Stop** button in the UI to engage the software interlock
+3. Press the **Motor Stop** button again to release it -- this triggers the automatic Home sequence and re-zeros all axes
+4. Normal operation can now resume
+
+---
+
 ## Typical workflow
 
 1. **Home** -- click Home to move all axes to starting positions
@@ -284,4 +324,4 @@ The pipette card works the same way but uses "Aspirate +" and "Dispense -" butto
 3. **Build a program** -- go to the Program tab, add cycle/home/wait steps
 4. **Run it** -- click Execute. Watch progress in the logs panel. The Plate Layout tab shows which well the system is working on.
 5. **Schedule it** (optional) -- enable the schedule, pick a cron expression, then run `python schedule_work.py` on the Pi
-6. **Stop** -- click Stop at any time to halt execution
+6. **Stop** -- click Stop at any time to halt execution. Release it and click Home to resume.
