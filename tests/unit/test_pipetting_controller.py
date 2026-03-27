@@ -850,15 +850,18 @@ class TestHome:
         ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=0.0)
         motor3 = ctrl.stepper_controller.get_motor(3)
         motor3.current_position = 0
-        with patch.object(ctrl, '_home_axis_to_min'):
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max'):
             ctrl.home()
         assert ctrl.current_position.z == 70.0
         assert ctrl.current_position.x == 0.0
         assert ctrl.current_position.y == 0.0
+        assert ctrl.pipette_ml == 0.0
 
     def test_z_skip_if_already_up(self, ctrl, pc_mod):
         ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=70.0)
-        with patch.object(ctrl, '_home_axis_to_min'):
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max'):
             ctrl.home()
         assert ctrl.current_position.z == 70.0
 
@@ -867,16 +870,45 @@ class TestHome:
         ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=-10.0)
         motor3 = ctrl.stepper_controller.get_motor(3)
         motor3.current_position = 0
-        with patch.object(ctrl, '_home_axis_to_min'):
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max'):
             ctrl.home()
         assert ctrl.current_position.z == 70.0
 
     def test_arduino_home(self, arduino_ctrl, pc_mod):
         arduino_ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=0.0)
-        with patch.object(arduino_ctrl, '_home_axis_to_min'):
+        with patch.object(arduino_ctrl, '_home_axis_to_min'), \
+             patch.object(arduino_ctrl, '_home_z_to_max'):
             arduino_ctrl.home()
         assert arduino_ctrl.current_position.z == 70.0
         assert arduino_ctrl.current_position.x == 0.0
+
+    def test_home_calls_home_z_to_max(self, ctrl, pc_mod):
+        """Verify home() calls _home_z_to_max before homing X/Y/Pipette."""
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max') as mock_z_max:
+            ctrl.home()
+        mock_z_max.assert_called_once()
+
+    def test_home_calls_home_axis_to_min_for_pipette(self, ctrl, pc_mod):
+        """Verify home() homes the Pipette axis (motor 4) in addition to X and Y."""
+        with patch.object(ctrl, '_home_z_to_max'), \
+             patch.object(ctrl, '_home_axis_to_min') as mock_home_min:
+            ctrl.home()
+        # Should be called for X(1), Y(2), and Pipette(4)
+        assert mock_home_min.call_count == 3
+        called_motor_ids = [c.args[0] for c in mock_home_min.call_args_list]
+        assert 1 in called_motor_ids
+        assert 2 in called_motor_ids
+        assert 4 in called_motor_ids
+
+    def test_home_sets_pipette_ml_zero(self, ctrl, pc_mod):
+        """Verify home() resets pipette_ml to 0.0."""
+        ctrl.pipette_ml = 25.0
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max'):
+            ctrl.home()
+        assert ctrl.pipette_ml == 0.0
 
 
 class TestHomeAxisToMin:
@@ -943,6 +975,105 @@ class TestHomeAxisToMin:
         arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': False}
         arduino_ctrl._home_axis_to_min(1, "X")
         # Should log WARNING
+
+
+class TestHomeZToMax:
+    """Tests for _home_z_to_max() — homes Z axis to MAX limit switch."""
+
+    def test_rpi_already_at_max(self, ctrl, pc_mod, mock_gpio):
+        """When Z is already at MAX limit, should return immediately."""
+        motor = ctrl.stepper_controller.get_motor(3)
+        mock_gpio.set_pin_state(motor.limit_max_pin, mock_gpio.LOW)
+        ctrl._home_z_to_max()
+        # No move_until_limit call expected
+
+    def test_rpi_finds_max_first_direction(self, ctrl, pc_mod, mock_gpio):
+        """Z finds MAX limit on the first direction (up)."""
+        motor = ctrl.stepper_controller.get_motor(3)
+        motor.move_until_limit = MagicMock(return_value=(500, 'max'))
+        ctrl._home_z_to_max()
+        motor.move_until_limit.assert_called_once()
+
+    def test_rpi_hits_min_then_finds_max(self, ctrl, pc_mod, mock_gpio):
+        """Z hits MIN first, reverses, then finds MAX."""
+        motor = ctrl.stepper_controller.get_motor(3)
+        motor.move_until_limit = MagicMock(side_effect=[(500, 'min'), (1000, 'max')])
+        ctrl._home_z_to_max()
+        assert motor.move_until_limit.call_count == 2
+
+    def test_rpi_no_limit_found(self, ctrl, pc_mod, mock_gpio):
+        """No limit found in either direction — WARNING log."""
+        motor = ctrl.stepper_controller.get_motor(3)
+        motor.move_until_limit = MagicMock(return_value=(1000, 'none'))
+        ctrl._home_z_to_max()
+        assert motor.move_until_limit.call_count == 2
+
+    def test_rpi_hits_min_then_no_limit(self, ctrl, pc_mod, mock_gpio):
+        """Z hits MIN first direction, then no limit in second direction."""
+        motor = ctrl.stepper_controller.get_motor(3)
+        motor.move_until_limit = MagicMock(side_effect=[(500, 'min'), (1000, 'none')])
+        ctrl._home_z_to_max()
+        assert motor.move_until_limit.call_count == 2
+
+    def test_motor_stopped_skips(self, ctrl, pc_mod):
+        """When motor_stopped is True, _home_z_to_max returns immediately."""
+        ctrl.motor_stopped = True
+        ctrl._home_z_to_max()
+        # No exception, just returns early
+
+    def test_arduino_already_at_max(self, arduino_ctrl, pc_mod):
+        """Arduino: Z already at MAX limit (bit 1 set)."""
+        arduino_ctrl.stepper_controller._call_rpc.return_value = 2  # MAX bit set
+        arduino_ctrl._home_z_to_max()
+        arduino_ctrl.stepper_controller.move_until_limit.assert_not_called()
+
+    def test_arduino_finds_max_first_direction(self, arduino_ctrl, pc_mod):
+        """Arduino: Z finds MAX on first move."""
+        call_count = [0]
+        def mock_rpc(cmd, mid):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                return 0  # Not at MAX initially
+            return 2  # At MAX after move
+        arduino_ctrl.stepper_controller._call_rpc.side_effect = mock_rpc
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': True}
+        arduino_ctrl._home_z_to_max()
+
+    def test_arduino_hits_min_then_finds_max(self, arduino_ctrl, pc_mod):
+        """Arduino: first direction hits MIN, second finds MAX."""
+        call_count = [0]
+        def mock_rpc(cmd, mid):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                return 0  # Not at MAX initially, hit MIN first
+            return 2  # At MAX after reversal
+        arduino_ctrl.stepper_controller._call_rpc.side_effect = mock_rpc
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': True}
+        arduino_ctrl._home_z_to_max()
+
+    def test_arduino_no_limit_found(self, arduino_ctrl, pc_mod):
+        """Arduino: move_until_limit never hits a limit."""
+        arduino_ctrl.stepper_controller._call_rpc.return_value = 0  # Never at MAX
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': False}
+        arduino_ctrl._home_z_to_max()
+
+    def test_arduino_hit_limit_but_never_max(self, arduino_ctrl, pc_mod):
+        """Arduino: hits a limit in both directions but never at MAX."""
+        arduino_ctrl.stepper_controller._call_rpc.return_value = 0  # Never at MAX (bit 1 not set)
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': True}
+        arduino_ctrl._home_z_to_max()
+
+    def test_arduino_rpc_returns_none(self, arduino_ctrl, pc_mod):
+        """_check_max handles None from _call_rpc gracefully."""
+        arduino_ctrl.stepper_controller._call_rpc.return_value = None
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': False}
+        arduino_ctrl._home_z_to_max()
+
+    def test_arduino_rpc_returns_negative(self, arduino_ctrl, pc_mod):
+        """_check_max handles negative from _call_rpc."""
+        arduino_ctrl.stepper_controller._call_rpc.return_value = -1
+        arduino_ctrl.stepper_controller.move_until_limit.return_value = {'steps_taken': 500, 'hit_limit': False}
+        arduino_ctrl._home_z_to_max()
 
 
 # ===================================================================
@@ -1430,13 +1561,15 @@ class TestDualControllerHome:
         ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=0.0)
         motor3 = ctrl.stepper_controller.get_motor(3)
         motor3.current_position = 0
-        with patch.object(ctrl, '_home_axis_to_min'):
+        with patch.object(ctrl, '_home_axis_to_min'), \
+             patch.object(ctrl, '_home_z_to_max'):
             ctrl.home()
         assert ctrl.current_position.x == 0.0
 
     def test_arduino(self, arduino_ctrl, pc_mod):
         arduino_ctrl.current_position = pc_mod.WellCoordinates(x=50.0, y=30.0, z=0.0)
-        with patch.object(arduino_ctrl, '_home_axis_to_min'):
+        with patch.object(arduino_ctrl, '_home_axis_to_min'), \
+             patch.object(arduino_ctrl, '_home_z_to_max'):
             arduino_ctrl.home()
         assert arduino_ctrl.current_position.x == 0.0
 
