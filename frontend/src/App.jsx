@@ -92,6 +92,7 @@ function App() {
 
     // Motor stop interlock
     const [motorStopped, setMotorStopped] = useState(false)
+    const prevMotorStoppedRef = useRef(false)
 
     // Axis positions state
     const [axisPositions, setAxisPositions] = useState({x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {}})
@@ -784,6 +785,14 @@ function App() {
         return () => clearInterval(interval)
     }, [])
 
+    // Auto-home when motor stop is released
+    useEffect(() => {
+        if (prevMotorStoppedRef.current && !motorStopped) {
+            handleHome()
+        }
+        prevMotorStoppedRef.current = motorStopped
+    }, [motorStopped])
+
     // Theme effect
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme)
@@ -805,13 +814,16 @@ function App() {
     // ── Render ──
 
     return (
-        <div className={`min-h-screen flex flex-col bg-[image:var(--bg-primary)] text-[var(--text-primary)] font-sans ${motorStopped ? 'animate-motor-stop-border' : ''}`}>
+        <div className="min-h-screen flex flex-col bg-[image:var(--bg-primary)] text-[var(--text-primary)] font-sans">
             {motorStopped && (
-                <div className="animate-motor-stop-banner bg-[#dc2626] text-white text-center py-1.5 text-sm font-semibold tracking-wide flex items-center justify-center gap-2">
-                    <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
-                    MOTORS STOPPED
-                    <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
-                </div>
+                <>
+                    <div className="animate-motor-stop-overlay fixed inset-0 z-[9999] pointer-events-none border-[6px] border-solid border-[rgba(220,38,38,0.5)]" />
+                    <div className="animate-motor-stop-banner fixed top-0 left-0 right-0 z-[9999] bg-[#dc2626] text-white text-center py-1.5 text-sm font-semibold tracking-wide flex items-center justify-center gap-2">
+                        <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+                        MOTORS STOPPED
+                        <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+                    </div>
+                </>
             )}
             <NavBar
                 activeTab={activeTab}

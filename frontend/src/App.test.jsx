@@ -3601,3 +3601,71 @@ describe('saveConfig with non-numeric string config value', () => {
     consoleSpy.mockRestore()
   })
 })
+
+// ─── Auto-home when motor stop is released ──────────────────────────────────
+
+describe('auto-home on motor stop release', () => {
+  it('calls handleHome when motorStopped transitions from true to false', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    // First: render with motor_stopped true via status polling
+    let stopCallCount = 0
+    let currentMotorStopped = false
+    global.fetch = vi.fn((url, opts) => {
+      if (url === '/api/pipetting/stop' && opts?.method === 'POST') {
+        stopCallCount++
+        // First stop call: engage (true), second: release (false)
+        currentMotorStopped = stopCallCount === 1
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ message: currentMotorStopped ? 'Motor stop engaged' : 'Motor stop released', motor_stopped: currentMotorStopped }),
+        })
+      }
+      if (url === '/api/pipetting/status') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            initialized: true, current_well: 'WS1', message: 'System ready',
+            pipette_count: 3, layout_type: 'microchip', is_executing: false,
+            controller_type: 'raspberry_pi', current_operation: 'idle',
+            operation_well: null, motor_stopped: currentMotorStopped,
+          }),
+        })
+      }
+      // Default responses for other endpoints
+      const defaults = {
+        '/api/axis/positions': { status: 'success', positions: { x: 0, y: 0, z: 0, pipette_ml: 0, motor_steps: {} } },
+        '/api/pipetting/logs': { logs: [] },
+        '/api/config': { status: 'success', config: {} },
+        '/api/program/load': { steps: [], schedule: { cronExpression: '', enabled: false } },
+        '/api/program/status': { execution: { status: 'idle' } },
+        '/api/pipetting/home': { message: 'Homed successfully' },
+      }
+      const data = defaults[url] || {}
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(data) })
+    })
+
+    await act(async () => { render(<App />) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+
+    // Click stop to engage motor stop (motorStopped -> true)
+    await act(async () => { fireEvent.click(screen.getByTestId('right-stop')) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    expect(rightPanelProps.motorStopped).toBe(true)
+
+    // Clear fetch call history so we can check for the home call
+    global.fetch.mockClear()
+
+    // Click stop again to release motor stop (motorStopped -> false)
+    await act(async () => { fireEvent.click(screen.getByTestId('right-stop')) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    expect(rightPanelProps.motorStopped).toBe(false)
+
+    // Verify that /api/pipetting/home was called automatically
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/pipetting/home', expect.objectContaining({ method: 'POST' }))
+    })
+
+    consoleSpy.mockRestore()
+  })
+})

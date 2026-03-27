@@ -165,8 +165,7 @@ body {
         animation: motor-stop-pulse 1.5s ease-in-out infinite;
     }
 
-    .animate-motor-stop-border {
-        border: 6px solid rgba(220, 38, 38, 0.5);
+    .animate-motor-stop-overlay {
         animation: motor-stop-border 2s ease-in-out infinite;
     }
 

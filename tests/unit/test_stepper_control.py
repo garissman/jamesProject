@@ -1135,7 +1135,6 @@ class TestMoveUntilLimitStopRequested:
         m.simulated_position = 5000
         # Set stop_requested after the first batch completes (via sleep side effect)
         call_count = [0]
-        original_sleep = mock_sleep.side_effect
         def set_stop_on_batch(*args, **kwargs):
             call_count[0] += 1
             # After first batch of 50 steps + EMI settle sleep -> set stop
