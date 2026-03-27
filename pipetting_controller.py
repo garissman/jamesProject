@@ -1115,39 +1115,82 @@ class PipettingController:
         self.log(f"{axis_name} axis: WARNING - could not reach MIN limit")
         motor.reset_position()
 
+    def _home_z_to_max(self):
+        """Home Z axis to its MAX limit switch (fully up)."""
+        if self.motor_stopped:
+            self.log("Motor stop engaged — skipping Z homing")
+            return
+
+        z_up_dir = self._inv(Direction.CLOCKWISE, self.INVERT_Z)
+        z_down_dir = self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_Z)
+
+        if self.controller_type == 'arduino_uno_q':
+            def _check_max(mid):
+                result = self.stepper_controller._call_rpc("get_limit", mid)
+                return bool(result is not None and result >= 0 and (result & 2))
+
+            if _check_max(3):
+                self.log("Z axis already at MAX limit")
+                return
+
+            self.log("Homing Z axis to MAX limit...")
+            speed = self._speed(self.TRAVEL_SPEED)
+
+            for direction in [z_up_dir, z_down_dir]:
+                result = self.stepper_controller.move_until_limit(3, direction, speed)
+                self.log(f"Z axis: moved {direction.name} {result['steps_taken']} steps, hit_limit={result['hit_limit']}")
+                time.sleep(0.1)
+
+                if result['hit_limit']:
+                    if _check_max(3):
+                        self.log("Z axis: reached MAX limit")
+                        return
+                    else:
+                        self.log("Z axis: hit MIN limit, reversing...")
+                        continue
+
+                self.log(f"Z axis: WARNING - no limit found in {direction.name}")
+
+            self.log("Z axis: WARNING - could not reach MAX limit")
+            return
+
+        motor = self.stepper_controller.get_motor(3)
+
+        if motor.check_max_limit():
+            self.log("Z axis already at MAX limit")
+            return
+
+        self.log("Homing Z axis to MAX limit...")
+
+        for direction in [z_up_dir, z_down_dir]:
+            steps, hit = motor.move_until_limit(direction, self.TRAVEL_SPEED)
+            self.log(f"Z axis: moved {direction.name} {steps} steps, hit {hit}")
+
+            if hit == 'max':
+                self.log("Z axis: reached MAX limit")
+                return
+
+            if hit == 'min':
+                self.log("Z axis: hit MIN, reversing...")
+                continue
+
+            self.log(f"Z axis: WARNING - no limit found in {direction.name}")
+
+        self.log("Z axis: WARNING - could not reach MAX limit")
+
     def home(self):
-        """Return to home position by moving X and Y axes to their MIN limit switches"""
+        """Return to home position by homing Z to MAX switch, then X and Y to MIN switches"""
         if self.motor_stopped:
             self.log("Motor stop engaged — ignoring home")
             return
-        self.log("Homing all axes to MIN limit switches...")
+        self.log("Homing all axes...")
 
-        # Raise Z to safe height only if Z is currently down
         z_target_mm = 70.0
-        z_is_up = self.current_position.z >= z_target_mm
 
-        if z_is_up:
-            self.log(f"Z already up ({self.current_position.z:.1f}mm), skipping Z raise")
-        else:
-            self.log("Raising Z to safe height...")
-            if self.current_position.z < 0:
-                safe_z_steps = int(abs(self.current_position.z) * self.mapper.STEPS_PER_MM_Z)
-                self._move_z_safe(safe_z_steps, self._inv(Direction.CLOCKWISE, self.INVERT_Z), self.TRAVEL_SPEED)
-                self.current_position.z = 0.0
+        # Step 1: Home Z to MAX limit switch (fully up)
+        self._home_z_to_max()
 
-            if self.controller_type == 'arduino_uno_q':
-                z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
-                self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
-                self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
-            else:
-                z_motor = self.stepper_controller.get_motor(3)
-                z_steps = int(z_target_mm * self.mapper.STEPS_PER_MM_Z)
-                self.log(f"Moving Z-axis to {z_target_mm}mm CW ({z_steps} steps)...")
-                z_motor.reset_position()
-                self._move_z_safe(z_steps, Direction.CLOCKWISE, self.TRAVEL_SPEED)
-                self.log(f"Z-axis at {z_motor.current_position} steps")
-
-        # Home X and Y axes simultaneously to MIN limit switches
+        # Step 2: Home X and Y axes simultaneously to MIN limit switches
         t_x = threading.Thread(target=self._home_axis_to_min, args=(1, "X", Direction.CLOCKWISE))
         t_y = threading.Thread(target=self._home_axis_to_min, args=(2, "Y", Direction.COUNTERCLOCKWISE))
         t_x.start()
@@ -1155,7 +1198,7 @@ class PipettingController:
         t_x.join()
         t_y.join()
 
-        # Position is now at origin (X/Y at MIN limits, Z at 75mm)
+        # Position is now at origin (X/Y at MIN limits, Z at MAX)
         self.current_position = WellCoordinates(x=0.0, y=0.0, z=z_target_mm)
         self.save_position()
         self.log(f"Home complete - position: X=0, Y=0, Z={z_target_mm:.1f}mm")
