@@ -1189,6 +1189,10 @@ class PipettingController:
 
         # Step 1: Home Z to MAX limit switch (fully up)
         self._home_z_to_max()
+        # Sync motor step counter to Z_MAX so _move_z_safe allows downward travel
+        if self.controller_type != 'arduino_uno_q':
+            z_motor = self.stepper_controller.get_motor(3)
+            z_motor.current_position = self.Z_MAX_STEPS
 
         # Step 2: Home X, Y, and Pipette simultaneously to MIN limit switches
         pipette_min_dir = self._inv(Direction.COUNTERCLOCKWISE, self.INVERT_PIPETTE)
