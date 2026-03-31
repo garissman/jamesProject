@@ -446,7 +446,7 @@ class PipettingController:
         if clamped < steps:
             self.log(f"Z-axis: clamped {steps} -> {clamped} steps (limit: {self.Z_MAX_STEPS})")
         if clamped > 0:
-            self._move_motor(3, clamped, direction, speed)
+            self._move_motor(3, clamped, direction, speed, check_limits=False)
         return clamped
 
     def _move_y_safe(self, steps: int, direction: Direction, speed: float) -> int:
